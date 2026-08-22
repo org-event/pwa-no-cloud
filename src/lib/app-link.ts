@@ -93,6 +93,44 @@ export const parseDeepLink = (hash: string, search = ''): DeepLink => {
   return parseBody(hash);
 };
 
+export const parsePastedShare = (raw: string): DeepLink => {
+  const text = raw.trim();
+  if (!text) return { kind: 'section', section: 'lan' };
+  if (/^https?:\/\//i.test(text)) {
+    try {
+      const url = new URL(text);
+      const parsed = parseDeepLink(url.hash, url.search);
+      if (parsed.kind !== 'section') return parsed;
+    } catch {
+      /* not a URL */
+    }
+  }
+  const proto = stripProtocol(text);
+  if (
+    proto !== text.trim() ||
+    text.toLowerCase().startsWith(`${APP_PROTOCOL}:`)
+  ) {
+    const parsed = parseDeepLink(proto.startsWith('#') ? proto : `#${proto}`);
+    if (parsed.kind !== 'section') return parsed;
+  }
+  const asHash = text.startsWith('#')
+    ? text
+    : /^[jars]\//i.test(text)
+      ? `#${text}`
+      : '';
+  if (asHash) {
+    const parsed = parseDeepLink(asHash);
+    if (parsed.kind !== 'section') return parsed;
+  }
+  if (/^S1\./i.test(text)) {
+    return { kind: 'pack', section: 'servers', payload: text };
+  }
+  if (/^N1\./i.test(text)) {
+    return { kind: 'join', section: 'lan', payload: text };
+  }
+  return { kind: 'section', section: 'lan' };
+};
+
 export const encodeDeepHash = (kind: DeepKind, payload: string): string => {
   const token =
     kind === 'join'

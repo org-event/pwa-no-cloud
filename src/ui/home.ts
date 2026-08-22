@@ -31,6 +31,7 @@ export type HomeHandlers = {
   onJoin: () => void;
   onShareRoom: () => void;
   onCopyShareUrl: () => void;
+  onPasteLink: (text: string) => void;
   onCopyId: () => void;
   onAcceptPending: () => void;
   onSkipPending: () => void;
@@ -62,6 +63,7 @@ export const formatHomeWait = (state: {
   role: 'idle' | 'caller' | 'callee';
   fromLink: boolean;
   peerNick?: string;
+  shareUrl?: string;
 }): string => {
   const withWho = state.peerNick ? ` с ${state.peerNick}` : '';
   if (state.connected) {
@@ -72,11 +74,14 @@ export const formatHomeWait = (state: {
   if (state.waiting && state.fromLink) {
     return 'Открыли ссылку — сходимся с отправителем. Это окно не закрывайте.';
   }
+  if (state.waiting && state.shareUrl) {
+    return 'Ссылка уже в поле. «Копировать ссылку» → киньте в Telegram. Второй только открывает, ничего вам обратно слать не нужно. Окно не закрывайте.';
+  }
   if (state.waiting) {
     return 'Ждём, пока второй откроет ссылку. Это окно не закрывайте.';
   }
   if (state.queuedCount > 0) {
-    return 'Файл выбран. Нажмите «Получить ссылку» и отправьте её в Telegram или WhatsApp.';
+    return 'Файл выбран. Нажмите «Получить ссылку» — она появится в поле, её и отправляете.';
   }
   return 'Сначала файл в блоке «Файлы», потом «Получить ссылку».';
 };
@@ -191,6 +196,36 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
   copyBtn.addEventListener('click', () => handlers.onCopyShareUrl());
   shareActions.append(shareBtn, copyBtn);
 
+  const pasteField = document.createElement('label');
+  pasteField.className = 'field';
+  const pasteLabel = document.createElement('span');
+  pasteLabel.textContent =
+    'Пришло от другого — вставьте ссылку, если по клику не открылось';
+  const pasteInput = document.createElement('input');
+  pasteInput.type = 'text';
+  pasteInput.autocomplete = 'off';
+  pasteInput.placeholder = 'https://…/#r/… или текст приглашения';
+  pasteInput.setAttribute(
+    'aria-label',
+    'Вставить чужую ссылку или приглашение',
+  );
+  pasteField.append(pasteLabel, pasteInput);
+  const pasteBtn = document.createElement('button');
+  pasteBtn.type = 'button';
+  pasteBtn.className = 'button';
+  pasteBtn.textContent = 'Принять ссылку';
+  const submitPaste = () => handlers.onPasteLink(pasteInput.value);
+  pasteBtn.addEventListener('click', submitPaste);
+  pasteInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitPaste();
+    }
+  });
+  const pasteActions = document.createElement('div');
+  pasteActions.className = 'home-actions';
+  pasteActions.append(pasteBtn);
+
   const create = document.createElement('button');
   create.type = 'button';
   create.className = 'button';
@@ -216,6 +251,8 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
     wait,
     shareField,
     shareActions,
+    pasteField,
+    pasteActions,
     who,
     idBtn,
     recipients,
@@ -231,11 +268,23 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
       whoName.textContent = state.me.nick;
       whoId.textContent = `id ${state.me.id}`;
       lead.textContent = formatHomeLead(state);
-      wait.textContent = formatHomeWait(state);
+      wait.textContent = formatHomeWait({
+        ...state,
+        shareUrl: state.shareUrl,
+      });
       wait.dataset.waiting = String(state.waiting);
       wait.dataset.connected = String(state.connected);
       shareInput.value = state.shareUrl;
+      shareLabel.textContent = state.shareUrl
+        ? 'Эту ссылку отправьте второму — он только откроет'
+        : 'Ссылка появится здесь после «Получить ссылку»';
       copyBtn.disabled = !state.shareUrl;
+      copyBtn.className = state.shareUrl
+        ? 'button button-accent'
+        : 'button button-secondary';
+      shareBtn.className = state.shareUrl
+        ? 'button button-secondary'
+        : 'button button-accent';
       shareBtn.disabled = state.fromLink;
       shareBtn.textContent = formatShareButton({
         contacts: state.book.contacts.filter((item) =>

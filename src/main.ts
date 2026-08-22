@@ -33,6 +33,7 @@ import {
   encodeHttpsLink,
   encodeProtocolLink,
   parseDeepLink,
+  parsePastedShare,
   shareMessage,
   type DeepKind,
   type DeepLink,
@@ -671,6 +672,17 @@ const view = mountApp(root, {
       note(ok ? 'ссылка скопирована' : 'не удалось скопировать ссылку');
       view.sync(currentState());
     })();
+  },
+  onPasteLink: (text) => {
+    const link = parsePastedShare(text);
+    if (link.kind === 'section') {
+      inviteError =
+        'Не похоже на ссылку NoCloud. Вставьте https://…/#r/… или текст приглашения.';
+      view.sync(currentState());
+      return;
+    }
+    inviteError = '';
+    void applyDeepLink(link);
   },
   onCopyId: () => {
     void (async () => {

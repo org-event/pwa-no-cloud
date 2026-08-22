@@ -6,6 +6,7 @@ import {
   encodeHttpsLink,
   encodeProtocolLink,
   parseDeepLink,
+  parsePastedShare,
   shareMessage,
 } from './app-link.ts';
 
@@ -28,6 +29,16 @@ describe('app deep links', () => {
     if (parsed.kind !== 'pack') return;
     expect(parsed.payload).toBe(packed);
     expect(parsed.section).toBe('servers');
+  });
+
+  it('parses a full Pages URL pasted by hand', () => {
+    const pasted = parsePastedShare(
+      'https://org-event.github.io/pwa-no-cloud/#r/1t6c6w3z2m6g',
+    );
+    expect(pasted.kind).toBe('room');
+    if (pasted.kind === 'room') expect(pasted.payload).toBe('1t6c6w3z2m6g');
+    expect(parsePastedShare('r/office').kind).toBe('room');
+    expect(parsePastedShare('просто текст').kind).toBe('section');
   });
 
   it('parses room and section hashes', () => {
