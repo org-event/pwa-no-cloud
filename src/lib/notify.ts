@@ -21,12 +21,15 @@ export const notifyFileReceived = async (name: string): Promise<boolean> => {
       if (ready.showNotification) {
         await ready.showNotification(title, {
           body,
-          icon: '/icon.svg',
+          icon: `${import.meta.env.BASE_URL}icon.svg`,
         });
         return true;
       }
     }
-    new Notification(title, { body, icon: '/icon.svg' });
+    new Notification(title, {
+      body,
+      icon: `${import.meta.env.BASE_URL}icon.svg`,
+    });
     return true;
   } catch {
     return false;

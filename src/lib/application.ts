@@ -1,4 +1,4 @@
-import { SERVICE_WORKER_PATH } from '../workers/sw.ts';
+import { APP_BASE, SERVICE_WORKER_PATH } from '../workers/sw.ts';
 import { EventEmitter } from './events.ts';
 import { getClientId, type IdStorage } from './id.ts';
 
@@ -63,6 +63,7 @@ export class Application extends EventEmitter {
     if (!('serviceWorker' in navigator)) return;
     const registration = await navigator.serviceWorker.register(
       this.serviceWorker,
+      { scope: APP_BASE },
     );
     this.worker = registration.active;
     navigator.serviceWorker.addEventListener('message', (event) => {

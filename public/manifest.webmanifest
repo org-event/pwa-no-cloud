@@ -2,8 +2,9 @@
   "name": "NoCloud",
   "short_name": "NoCloud",
   "description": "обмен файлами без облака",
-  "start_url": "/",
-  "scope": "/",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0F172A",
@@ -11,7 +12,7 @@
   "lang": "ru",
   "categories": ["utilities", "productivity"],
   "share_target": {
-    "action": "/share",
+    "action": "./share",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
@@ -28,13 +29,13 @@
   },
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icon.svg",
+      "src": "icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"

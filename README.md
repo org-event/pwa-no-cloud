@@ -9,6 +9,12 @@ PWA для обмена файлами без облака. Файловый т�
 Свой TURN (coturn): [docs/turn.md](docs/turn.md). Чужой открытый TURN
 в пресеты не кладём.
 
+Поставить PWA с GitHub Pages (HTTPS):
+https://org-event.github.io/pwa-no-cloud/
+
+Signaling и TURN задаются в приложении на экране «Серверы».
+Со страницы Pages ставится только оболочка.
+
 ## Команды
 
 Инструментарий — [Vite+](https://viteplus.dev/) (`vp`).

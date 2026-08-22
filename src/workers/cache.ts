@@ -8,18 +8,36 @@ export const SHELL_ASSETS = [
   '/manifest.webmanifest',
 ];
 
-export const collectShellAssets = (fileNames: string[]): string[] => {
-  const assets = [...SHELL_ASSETS];
+export const joinBase = (base: string, path = ''): string => {
+  const root = base.endsWith('/') ? base : `${base}/`;
+  if (path === '' || path === '/') return root;
+  const name = path.startsWith('/') ? path.slice(1) : path;
+  return `${root}${name}`;
+};
+
+export const collectShellAssets = (
+  fileNames: string[],
+  base = '/',
+): string[] => {
+  const assets = SHELL_ASSETS.map((path) => joinBase(base, path));
   for (const fileName of fileNames) {
-    assets.push(`/${fileName}`);
+    assets.push(joinBase(base, fileName));
   }
   return assets;
 };
 
-export const createWorkerSource = (assets: string[]): string => {
+export const createWorkerSource = (assets: string[], base = '/'): string => {
   const list = JSON.stringify(assets);
+  const root = joinBase(base);
+  const sharePath = joinBase(base, 'share');
+  const indexPath = joinBase(base, 'index.html');
+  const iconPath = joinBase(base, 'icon.svg');
   return `'use strict';
 const CACHE = '${CACHE_NAME}';
+const BASE = '${root}';
+const SHARE = '${sharePath}';
+const INDEX = '${indexPath}';
+const ICON = '${iconPath}';
 const ASSETS = ${list};
 let pendingShare = null;
 
@@ -50,10 +68,10 @@ const handleShare = async (request) => {
       client.postMessage({ type: 'share-files', data: files });
     }
     if (windows.length === 0 && self.clients.openWindow) {
-      await self.clients.openWindow('/');
+      await self.clients.openWindow(BASE);
     }
   } catch (error) {}
-  return Response.redirect(new URL('/', self.location.origin), 303);
+  return Response.redirect(new URL(BASE, self.location.origin), 303);
 };
 
 self.addEventListener('install', (event) => {
@@ -72,7 +90,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
-  if (request.method === 'POST' && url.pathname === '/share') {
+  if (request.method === 'POST' && url.pathname === SHARE) {
     event.respondWith(handleShare(request));
     return;
   }
@@ -90,7 +108,7 @@ self.addEventListener('fetch', (event) => {
       return response;
     } catch {
       if (request.mode === 'navigate') {
-        const page = await cache.match('/index.html');
+        const page = await cache.match(INDEX);
         if (page) return page;
       }
       return new Response('Offline', {
@@ -108,7 +126,7 @@ self.addEventListener('message', (event) => {
     const body = event.data.body || '';
     void self.registration.showNotification(title, {
       body,
-      icon: '/icon.svg',
+      icon: ICON,
     });
     return;
   }
@@ -126,7 +144,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window' });
     if (windows[0]) return windows[0].focus();
-    return self.clients.openWindow('/');
+    return self.clients.openWindow(BASE);
   })());
 });
 `;
