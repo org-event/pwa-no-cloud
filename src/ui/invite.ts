@@ -121,6 +121,7 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
       ping.disabled = !state.connected;
       ice.hidden = !state.ice;
       ice.textContent = state.ice;
+      ice.dataset.path = state.ice.includes('путь = relay') ? 'relay' : '';
       pong.hidden = state.lastPongMs === null;
       if (state.lastPongMs !== null) {
         pong.textContent = `pong: ${state.lastPongMs} мс`;

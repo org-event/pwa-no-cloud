@@ -33,6 +33,8 @@ export type ResolvedServerConfig = {
   title: string;
   signaling: SignalingConfig;
   iceServers: IceServerConfig[];
+  hasTurn: boolean;
+  hasStun: boolean;
 };
 
 export type ConfigError = {

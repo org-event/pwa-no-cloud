@@ -12,7 +12,14 @@ export {
   LOCAL_STUN_PORT,
   DEFAULT_ROOM,
 } from './defaults.ts';
-export { createUserSettings, resolveServers } from './merge.ts';
+export {
+  createUserSettings,
+  iceServersHaveStun,
+  iceServersHaveTurn,
+  isStunUrl,
+  isTurnUrl,
+  resolveServers,
+} from './merge.ts';
 export { SERVER_PRESETS, getPreset } from './servers.ts';
 export {
   browserStorage,

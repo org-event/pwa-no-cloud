@@ -26,6 +26,26 @@ describe('resolveServers', () => {
     if (!result.ok) return;
     expect(result.value.signaling.url).toBe('wss://signal.example');
     expect(result.value.iceServers[0]?.urls).toBe('stun:stun.example:3478');
+    expect(result.value.hasStun).toBe(true);
+    expect(result.value.hasTurn).toBe(false);
+  });
+
+  it('marks a custom TURN after credentials are set', () => {
+    const settings = createUserSettings('custom', {
+      signaling: { kind: 'manual' },
+      iceServers: [
+        {
+          urls: 'turn:relay.example:3478',
+          username: 'user',
+          credential: 'secret',
+        },
+      ],
+    });
+    const result = resolveServers(settings);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.hasTurn).toBe(true);
+    expect(result.value.hasStun).toBe(false);
   });
 
   it('fills LAN urls from the current origin', () => {

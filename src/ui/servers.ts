@@ -129,9 +129,18 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
         <span>STUN, по одному URL в строке</span>
         <textarea name="stun" rows="3"></textarea>
       </label>
+      <p class="tagline">
+        Чужой открытый TURN не подставляем. Если устройства в разных
+        сетях и ICE падает — укажите свой релей (docs/turn.md).
+      </p>
       <label class="field">
         <span>TURN URL</span>
-        <input name="turnUrl" type="text" autocomplete="off" />
+        <input
+          name="turnUrl"
+          type="text"
+          autocomplete="off"
+          placeholder="turn:example.com:3478"
+        />
       </label>
       <label class="field">
         <span>TURN логин</span>
@@ -160,12 +169,16 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
   preview.className = 'resolved';
   preview.dataset.role = 'resolved';
 
+  const hint = document.createElement('p');
+  hint.className = 'tagline';
+  hint.dataset.role = 'turn-hint';
+
   const error = document.createElement('p');
   error.className = 'error';
   error.hidden = true;
   error.dataset.role = 'error';
 
-  root.append(list, form, error, preview);
+  root.append(list, hint, form, error, preview);
 
   return {
     sync(settings: UserSettings, result: ResolveResult) {
@@ -181,6 +194,15 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
         fillCustomForm(form, settings.custom);
       }
       preview.textContent = previewText(result);
+      if (result.ok && result.value.hasTurn) {
+        hint.textContent =
+          'TURN задан. Если увидите «сейчас путь = relay» — трафик идёт через ваш релей.';
+      } else if (result.ok) {
+        hint.textContent =
+          'TURN не задан. В одной Wi‑Fi часто хватает host/STUN; через интернет при жёстком NAT нужен свой TURN.';
+      } else {
+        hint.textContent = '';
+      }
       if (result.ok) {
         error.hidden = true;
         error.textContent = '';

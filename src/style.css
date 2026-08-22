@@ -76,6 +76,11 @@ h1 {
   color: #fde68a;
 }
 
+.status[data-path='relay'] {
+  color: #fde68a;
+  border-color: var(--color-accent);
+}
+
 .home,
 .home-actions {
   display: flex;

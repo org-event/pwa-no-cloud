@@ -75,7 +75,20 @@ describe('formatIceReport', () => {
       remote: ['host'],
       selected: { local: 'host', remote: 'host' },
     };
-    expect(formatIceReport(report)).toBe('ICE host → host · connected');
+    expect(formatIceReport(report)).toBe(
+      'сейчас путь = host → host · connected',
+    );
+  });
+
+  it('names a TURN relay path in plain language', () => {
+    const report: IceReport = {
+      connectionState: 'connected',
+      gatheringState: 'complete',
+      local: ['host', 'relay'],
+      remote: ['relay'],
+      selected: { local: 'relay', remote: 'relay' },
+    };
+    expect(formatIceReport(report)).toBe('сейчас путь = relay · connected');
   });
 
   it('falls back to gathered types', () => {

@@ -32,7 +32,7 @@ export const SERVER_PRESETS: ServerPreset[] = [
   },
   {
     id: 'google-stun',
-    title: 'STUN Google',
+    title: 'Интернет: STUN Google (без TURN)',
     signaling: { kind: 'manual' },
     iceServers: [{ urls: [GOOGLE_STUN, GOOGLE_STUN_BACKUP] }],
   },

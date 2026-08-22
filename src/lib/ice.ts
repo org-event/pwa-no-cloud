@@ -84,10 +84,18 @@ export const pairFromStats = (stats: Iterable<IceStat>): IcePair | null => {
   };
 };
 
+export const isRelayPair = (pair: IcePair | null): boolean => {
+  if (!pair) return false;
+  return pair.local === 'relay' || pair.remote === 'relay';
+};
+
 export const formatIceReport = (report: IceReport): string => {
   if (report.selected) {
+    if (isRelayPair(report.selected)) {
+      return `сейчас путь = relay · ${report.connectionState}`;
+    }
     return (
-      `ICE ${report.selected.local} → ${report.selected.remote}` +
+      `сейчас путь = ${report.selected.local} → ${report.selected.remote}` +
       ` · ${report.connectionState}`
     );
   }

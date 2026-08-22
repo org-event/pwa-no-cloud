@@ -7,7 +7,8 @@ PWA для обмена файлами и папками между устрой
 ## Как читать
 
 1. [plan.md](./plan.md) — полный план развития по шагам. Это основной документ.
-2. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI (подключаем на шаге оболочки).
+2. [turn.md](./turn.md) — свой coturn для режима через интернет. Чужой TURN не подключаем.
+3. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI.
 
 Код ещё не пишем. Следующий ход — выполнять шаги плана по порядку.
 

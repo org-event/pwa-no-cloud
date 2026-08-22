@@ -5,6 +5,8 @@ PWA для обмена файлами без облака. Файловый т�
 и, при жёстком NAT, как свой TURN.
 
 План работ: [docs/plan.md](docs/plan.md).
+Свой TURN (coturn): [docs/turn.md](docs/turn.md). Чужой открытый TURN
+в пресеты не кладём.
 
 ## Команды
 

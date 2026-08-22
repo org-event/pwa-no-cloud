@@ -12,10 +12,31 @@ export const isTurnUrl = (url: string): boolean => {
   return url.startsWith('turn:') || url.startsWith('turns:');
 };
 
-const iceHasTurn = (server: IceServerConfig): boolean => {
+export const isStunUrl = (url: string): boolean => {
+  return url.startsWith('stun:') || url.startsWith('stuns:');
+};
+
+const iceHasKind = (
+  server: IceServerConfig,
+  match: (url: string) => boolean,
+): boolean => {
   const urls = listIceUrls(server.urls);
   for (const url of urls) {
-    if (isTurnUrl(url)) return true;
+    if (match(url)) return true;
+  }
+  return false;
+};
+
+export const iceServersHaveTurn = (iceServers: IceServerConfig[]): boolean => {
+  for (const server of iceServers) {
+    if (iceHasKind(server, isTurnUrl)) return true;
+  }
+  return false;
+};
+
+export const iceServersHaveStun = (iceServers: IceServerConfig[]): boolean => {
+  for (const server of iceServers) {
+    if (iceHasKind(server, isStunUrl)) return true;
   }
   return false;
 };
@@ -28,7 +49,7 @@ export const validateIceServers = (
   iceServers: IceServerConfig[],
 ): ResolveResult | null => {
   for (const server of iceServers) {
-    if (!iceHasTurn(server)) continue;
+    if (!iceHasKind(server, isTurnUrl)) continue;
     if (hasSecret(server.username) && hasSecret(server.credential)) {
       continue;
     }
@@ -78,6 +99,8 @@ export const resolveServers = (
       title: preset.title,
       signaling,
       iceServers,
+      hasTurn: iceServersHaveTurn(iceServers),
+      hasStun: iceServersHaveStun(iceServers),
     },
   };
 };

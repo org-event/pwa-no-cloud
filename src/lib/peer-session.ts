@@ -1,4 +1,6 @@
+import { iceServersHaveStun, iceServersHaveTurn } from '../config/merge.ts';
 import { CHANNEL_BUFFER_HIGH, DATA_CHANNELS } from '../config/defaults.ts';
+import { explainIceFailure } from '../domain/ice-fail.ts';
 import type { IceServerConfig } from '../config/types.ts';
 import {
   applySessionEvent,
@@ -299,6 +301,17 @@ export class PeerSession extends EventEmitter {
     this.emit('error', message);
   }
 
+  failIce() {
+    this.fail(
+      explainIceFailure({
+        local: this.ice.local,
+        remote: this.ice.remote,
+        hasTurn: iceServersHaveTurn(this.config.iceServers),
+        hasStun: iceServersHaveStun(this.config.iceServers),
+      }),
+    );
+  }
+
   async onSignal(message: SignalMessage) {
     if (message.data.type === 'offer') {
       await this.handleOffer(message);
@@ -379,7 +392,7 @@ export class PeerSession extends EventEmitter {
       this.ice = { ...this.ice, connectionState: pc.connectionState };
       this.emit('ice', this.ice);
       void this.pullSelected();
-      if (pc.connectionState === 'failed') this.fail('ICE не собрался');
+      if (pc.connectionState === 'failed') this.failIce();
       if (pc.connectionState === 'closed') this.apply({ type: 'close' });
     };
   }
