@@ -19,7 +19,7 @@ describe('home copy', () => {
     ).toContain('установщик');
   });
 
-  it('tells the sender to wait after sharing a link', () => {
+  it('tells the sender the field is the invite and no reply is needed', () => {
     expect(
       formatHomeWait({
         connected: false,
@@ -27,8 +27,9 @@ describe('home copy', () => {
         queuedCount: 1,
         role: 'caller',
         fromLink: false,
+        shareUrl: 'https://example/#r/room',
       }),
-    ).toContain('откроет ссылку');
+    ).toContain('Копировать ссылку');
   });
 
   it('points to the files block before the get-link button', () => {
