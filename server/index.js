@@ -177,9 +177,7 @@ const attachSockets = (server) => {
         }
         rooms.join(roomId, clientId);
         rooms.attach(roomId, clientId, socket);
-        socket.send(
-          JSON.stringify({ op: 'peers', peers: rooms.peers(roomId, clientId) }),
-        );
+        rooms.broadcastPeers(roomId);
         return;
       }
       if (body.op === 'peers' && clientId) {
@@ -202,6 +200,7 @@ const attachSockets = (server) => {
       if (!clientId) return;
       rooms.detach(roomId, clientId, socket);
       rooms.leave(roomId, clientId);
+      rooms.broadcastPeers(roomId);
     });
   });
   return wss;

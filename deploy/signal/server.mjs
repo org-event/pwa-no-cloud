@@ -97,17 +97,34 @@ const getSignal = (req, res, url) => {
   sendJSON(res, 200, { messages });
 };
 
+const listPeers = (roomId, clientId) => {
+  const room = rooms.get(roomId || 'default');
+  const peers = [];
+  if (!room) return peers;
+  for (const id of room.keys()) {
+    if (id !== clientId) peers.push(id);
+  }
+  return peers;
+};
+
+const broadcastPeers = (roomId) => {
+  const room = rooms.get(roomId || 'default');
+  if (!room) return;
+  for (const [id, client] of room) {
+    const payload = JSON.stringify({
+      op: 'peers',
+      peers: listPeers(roomId, id),
+    });
+    for (const socket of client.sockets) {
+      if (socket.readyState === 1) socket.send(payload);
+    }
+  }
+};
+
 const getPeers = (req, res, url) => {
   const roomId = url.searchParams.get('roomId') || 'default';
   const clientId = url.searchParams.get('clientId') ?? '';
-  const room = rooms.get(roomId || 'default');
-  const peers = [];
-  if (room) {
-    for (const id of room.keys()) {
-      if (id !== clientId) peers.push(id);
-    }
-  }
-  sendJSON(res, 200, { peers });
+  sendJSON(res, 200, { peers: listPeers(roomId, clientId) });
 };
 
 const handleRequest = async (req, res) => {
@@ -185,14 +202,14 @@ wss.on('connection', (socket) => {
       }
       const client = getClient(roomId, clientId);
       client.sockets.add(socket);
-      const room = rooms.get(roomId || 'default');
-      const peers = [];
-      if (room) {
-        for (const id of room.keys()) {
-          if (id !== clientId) peers.push(id);
-        }
-      }
-      socket.send(JSON.stringify({ op: 'peers', peers }));
+      // Tell everyone — the first joiner must learn when the second arrives.
+      broadcastPeers(roomId);
+      return;
+    }
+    if (body.op === 'peers' && clientId) {
+      socket.send(
+        JSON.stringify({ op: 'peers', peers: listPeers(roomId, clientId) }),
+      );
       return;
     }
     if (body.op === 'signal' && clientId) {
@@ -221,6 +238,8 @@ wss.on('connection', (socket) => {
     const client = room?.get(clientId);
     client?.sockets.delete(socket);
     room?.delete(clientId);
+    if (room && room.size === 0) rooms.delete(roomId || 'default');
+    broadcastPeers(roomId);
   });
 });
 

@@ -67,5 +67,20 @@ export const createRooms = () => {
       }
       return ids;
     },
+    /** Push fresh peer lists to every socket in the room (join/leave). */
+    broadcastPeers(roomId) {
+      const room = rooms.get(roomId || 'default');
+      if (!room) return;
+      for (const [id, client] of room) {
+        const peers = [];
+        for (const other of room.keys()) {
+          if (other !== id) peers.push(other);
+        }
+        const payload = JSON.stringify({ op: 'peers', peers });
+        for (const socket of client.sockets) {
+          if (socket.readyState === 1) socket.send(payload);
+        }
+      }
+    },
   };
 };

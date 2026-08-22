@@ -21,7 +21,13 @@ describe('signaling rooms', () => {
 
   it('pushes to an attached socket instead of the inbox', () => {
     const rooms = createRooms();
-    const socket = { readyState: 1 };
+    const socket = {
+      readyState: 1,
+      sent: [] as string[],
+      send(data: string) {
+        this.sent.push(data);
+      },
+    };
     rooms.join('lab', 'bob');
     rooms.attach('lab', 'bob', socket);
     const delivered = rooms.enqueue('lab', 'alice', 'bob', {
@@ -30,6 +36,33 @@ describe('signaling rooms', () => {
     });
     expect(delivered.sockets).toEqual([socket]);
     expect(rooms.drain('lab', 'bob')).toEqual([]);
+  });
+
+  it('broadcasts peer lists so the first joiner learns about the second', () => {
+    const rooms = createRooms();
+    const alice = {
+      readyState: 1,
+      sent: [] as string[],
+      send(data: string) {
+        this.sent.push(data);
+      },
+    };
+    const bob = {
+      readyState: 1,
+      sent: [] as string[],
+      send(data: string) {
+        this.sent.push(data);
+      },
+    };
+    rooms.join('lab', 'alice');
+    rooms.attach('lab', 'alice', alice);
+    rooms.broadcastPeers('lab');
+    expect(JSON.parse(alice.sent.at(-1) ?? '{}').peers).toEqual([]);
+    rooms.join('lab', 'bob');
+    rooms.attach('lab', 'bob', bob);
+    rooms.broadcastPeers('lab');
+    expect(JSON.parse(alice.sent.at(-1) ?? '{}').peers).toEqual(['bob']);
+    expect(JSON.parse(bob.sent.at(-1) ?? '{}').peers).toEqual(['alice']);
   });
 });
 

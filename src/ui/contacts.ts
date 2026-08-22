@@ -114,7 +114,7 @@ export const mountContacts = (
   const meHint = document.createElement('p');
   meHint.className = 'tagline';
   meHint.textContent =
-    'Сгенерируйте карточку, скопируйте и отправьте. Второй вставит её у себя — как сойдётесь, появитесь в списках.';
+    'Сгенерируйте карточку и ждите. Второй только вставляет её у себя — сам «Сгенерировать» не жмёт, пока вы ждёте.';
   const file = document.createElement('input');
   file.type = 'file';
   file.accept = 'image/*';

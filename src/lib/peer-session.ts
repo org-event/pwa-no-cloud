@@ -74,6 +74,7 @@ export class PeerSession extends EventEmitter {
   constructor(config: PeerSessionConfig) {
     super();
     this.config = config;
+    if (config.profile?.id) this.clientId = config.profile.id;
   }
 
   setProfile(profile: ProfileCard | null) {
@@ -595,14 +596,25 @@ export class PeerSession extends EventEmitter {
     const profile = this.config.profile;
     const channel = this.links?.control;
     if (!profile || !channel || channel.readyState !== 'open') return;
+    // Id + nick first — avatar can be large and block the meet handshake.
     channel.send(
       JSON.stringify({
         type: 'profile',
         id: profile.id,
         nick: profile.nick,
-        avatar: profile.avatar,
+        avatar: '',
       }),
     );
+    if (profile.avatar) {
+      channel.send(
+        JSON.stringify({
+          type: 'profile',
+          id: profile.id,
+          nick: profile.nick,
+          avatar: profile.avatar,
+        }),
+      );
+    }
   }
 
   onControl(raw: string) {

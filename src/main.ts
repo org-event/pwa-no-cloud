@@ -408,6 +408,9 @@ const startPeer = (): PeerSession | null => {
     void refreshOutgoing();
   });
   next.on('channel-open', () => {
+    if (next.peerId && next.peerId !== me.id) {
+      livePeerId = next.peerId;
+    }
     note('канал открыт');
     flushQueue();
     view.sync(currentState());
