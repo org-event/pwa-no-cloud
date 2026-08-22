@@ -36,6 +36,40 @@ export const isSafeAvatar = (value: string): boolean => {
   );
 };
 
+export const CONTACT_CARD_PREFIX = 'C1.';
+
+export const encodeContactCard = (card: ProfileCard): string => {
+  return (
+    CONTACT_CARD_PREFIX + JSON.stringify({ v: 1, id: card.id, nick: card.nick })
+  );
+};
+
+export const meetRoomId = (ownerId: string): string => `c-${ownerId}`;
+
+export const parseContactCard = (text: string): ProfileCard | null => {
+  const raw = text.trim();
+  if (!raw) return null;
+  if (raw.startsWith(CONTACT_CARD_PREFIX)) {
+    try {
+      const parsed = JSON.parse(raw.slice(CONTACT_CARD_PREFIX.length)) as {
+        id?: unknown;
+        nick?: unknown;
+      };
+      return parseProfileCard({
+        id: parsed.id,
+        nick: typeof parsed.nick === 'string' ? parsed.nick : '',
+        avatar: '',
+      });
+    } catch {
+      return null;
+    }
+  }
+  if (isProfileId(raw)) {
+    return { id: raw, nick: defaultNick(raw), avatar: '' };
+  }
+  return null;
+};
+
 export const parseProfileCard = (raw: unknown): ProfileCard | null => {
   if (!raw || typeof raw !== 'object') return null;
   const record = raw as {

@@ -7,9 +7,9 @@ import {
 } from './sections.ts';
 
 describe('app sections', () => {
-  it('defaults empty hash to LAN transfer', () => {
+  it('defaults empty hash to contacts', () => {
     expect(parseSectionHash('')).toBe(DEFAULT_SECTION);
-    expect(parseSectionHash('#')).toBe('lan');
+    expect(parseSectionHash('#')).toBe('contacts');
   });
 
   it('maps aliases and known ids', () => {

@@ -27,7 +27,7 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_GIT_DESCRIBE': JSON.stringify(gitDescribe()),
   },
-  plugins: [shellWorker()],
+  plugins: [shellWorker(gitDescribe())],
   fmt: {
     ignorePatterns: ['dist/**', 'docs/**', 'design-system/**', 'deploy/**'],
     singleQuote: true,

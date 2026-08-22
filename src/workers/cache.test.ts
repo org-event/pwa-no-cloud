@@ -17,6 +17,8 @@ describe('shell worker source', () => {
     expect(source).toContain('/share');
     expect(source).toContain('share-files');
     expect(source).toContain('notificationclick');
+    expect(source).toContain('/version.json');
+    expect(source).toContain("cache: 'no-store'");
   });
 
   it('prefixes cache and share paths with a project base', () => {

@@ -62,7 +62,7 @@ const stripProtocol = (raw: string): string => {
 
 const parseBody = (body: string): DeepLink => {
   const trimmed = body.replace(/^#/, '').replace(/^\/+/, '').trim();
-  if (!trimmed) return { kind: 'section', section: 'lan' };
+  if (!trimmed) return { kind: 'section', section: 'contacts' };
   const deep = parseKindPayload(trimmed);
   if (deep) return deep;
   const id = trimmed.split('/')[0]?.toLowerCase() ?? '';
@@ -82,7 +82,7 @@ const parseBody = (body: string): DeepLink => {
       section: id === 'transfer' ? 'lan' : 'servers',
     };
   }
-  return { kind: 'section', section: 'lan' };
+  return { kind: 'section', section: 'contacts' };
 };
 
 export const parseDeepLink = (hash: string, search = ''): DeepLink => {
@@ -95,7 +95,7 @@ export const parseDeepLink = (hash: string, search = ''): DeepLink => {
 
 export const parsePastedShare = (raw: string): DeepLink => {
   const text = raw.trim();
-  if (!text) return { kind: 'section', section: 'lan' };
+  if (!text) return { kind: 'section', section: 'contacts' };
   if (/^https?:\/\//i.test(text)) {
     try {
       const url = new URL(text);
@@ -128,7 +128,7 @@ export const parsePastedShare = (raw: string): DeepLink => {
   if (/^N1\./i.test(text)) {
     return { kind: 'join', section: 'lan', payload: text };
   }
-  return { kind: 'section', section: 'lan' };
+  return { kind: 'section', section: 'contacts' };
 };
 
 export const encodeDeepHash = (kind: DeepKind, payload: string): string => {

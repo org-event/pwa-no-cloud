@@ -1,5 +1,11 @@
 import { APP_BASE, SERVICE_WORKER_PATH } from '../workers/sw.ts';
 import { APP_PROTOCOL, protocolHandlerUrl } from './app-link.ts';
+import {
+  decideUpdate,
+  parseRemoteVersion,
+  versionFileUrl,
+  type UpdateDecision,
+} from './app-update.ts';
 import { EventEmitter } from './events.ts';
 import { getClientId, type IdStorage } from './id.ts';
 
@@ -22,6 +28,7 @@ export class Application extends EventEmitter {
   prompt: InstallPrompt | null = null;
   serviceWorker = SERVICE_WORKER_PATH;
   storage: IdStorage;
+  reloading = false;
 
   constructor(config: ApplicationConfig = {}) {
     super();
@@ -87,9 +94,60 @@ export class Application extends EventEmitter {
       const payload = event.data as { type?: string; data?: unknown };
       if (payload.type) this.emit(payload.type, payload.data);
     });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (this.reloading) return;
+      this.reloading = true;
+      globalThis.location.reload();
+    });
     await navigator.serviceWorker.ready;
     this.worker = registration.active ?? navigator.serviceWorker.controller;
     this.post({ type: 'ping' });
+    void registration.update();
+  }
+
+  watchUpdates(localVersion: string) {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      void this.checkForUpdate(localVersion).then((decision) => {
+        if (decision === 'reload') void this.refreshShell();
+      });
+    };
+    document.addEventListener('visibilitychange', onVisible);
+  }
+
+  async checkForUpdate(localVersion: string): Promise<UpdateDecision> {
+    if ('serviceWorker' in navigator) {
+      const registration =
+        await navigator.serviceWorker.getRegistration(APP_BASE);
+      try {
+        await registration?.update();
+      } catch {
+        /* iOS sometimes throws if SW is mid-update */
+      }
+    }
+    try {
+      const url = `${versionFileUrl(APP_BASE)}?t=${Date.now()}`;
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) return 'unavailable';
+      const remote = parseRemoteVersion(await response.json());
+      return decideUpdate(localVersion, remote);
+    } catch {
+      return 'unavailable';
+    }
+  }
+
+  async refreshShell() {
+    if (this.reloading) return;
+    this.reloading = true;
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((item) => item.unregister()));
+    }
+    if ('caches' in globalThis) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+    globalThis.location.reload();
   }
 
   post(data: { type: string; data?: unknown }) {

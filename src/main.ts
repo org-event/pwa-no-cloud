@@ -1,5 +1,6 @@
 import {
   APP_NAME,
+  APP_VERSION,
   DEFAULT_ROOM,
   browserStorage,
   createUserSettings,
@@ -18,9 +19,9 @@ import {
 } from './domain/index.ts';
 import {
   EMPTY_BOOK,
-  defaultNick,
-  findContact,
-  parseProfileCard,
+  encodeContactCard,
+  meetRoomId,
+  parseContactCard,
   removeContact,
   sanitizeNick,
   upsertContact,
@@ -117,6 +118,10 @@ let contactsNotice = '';
 let selectedContactIds: string[] = [];
 let selectedGroupIds: string[] = [];
 let peerNick = '';
+let livePeerId: string | null = null;
+let cardText = '';
+let updateChecking = false;
+let updateNotice = '';
 const skippedPeers = new Set<string>();
 
 const LOG_CAP = 80_000;
@@ -233,6 +238,10 @@ const contactsState = (): ContactsState => ({
   book,
   pending,
   notice: contactsNotice,
+  cardText,
+  waiting: peerIsLive() && roomId === meetRoomId(me.id),
+  connected: peer?.state === 'connected',
+  livePeerId,
 });
 
 const currentState = () => ({
@@ -255,6 +264,8 @@ const currentState = () => ({
   selectedContactIds,
   selectedGroupIds,
   peerNick,
+  updateChecking,
+  updateNotice,
 });
 
 const setInboxError = (message: string) => {
@@ -300,16 +311,45 @@ const persistBook = () => {
 const applyPeerProfile = (card: ProfileCard) => {
   if (card.id === me.id) return;
   peerNick = card.nick;
-  const known = findContact(book, card.id);
-  if (known) {
-    book = upsertContact(book, card);
-    persistBook();
-    if (pending?.id === card.id) pending = null;
-    note(`контакт ${card.nick}`);
-  } else if (!skippedPeers.has(card.id)) {
-    pending = card;
-    note(`новый человек ${card.nick}`);
+  livePeerId = card.id;
+  if (skippedPeers.has(card.id)) {
+    view.sync(currentState());
+    return;
   }
+  book = upsertContact(book, card);
+  pending = null;
+  persistBook();
+  contactsNotice = `В книге: ${card.nick}`;
+  note(`контакт ${card.nick}`);
+  view.sync(currentState());
+};
+
+const knockOn = async (ownerId: string, asHost: boolean) => {
+  if (!usesRoomLink()) {
+    contactsNotice = socketBlocked()
+      ? MIXED_CONTENT_SIGNALING
+      : 'Нужен сокет из S1. Вставьте пакет в «Настройки сервера».';
+    view.sync(currentState());
+    return;
+  }
+  const target = meetRoomId(ownerId);
+  if (peerIsLive() && roomId === target) {
+    contactsNotice = asHost
+      ? 'Уже ждём, кто вставит карточку.'
+      : 'Уже стучимся.';
+    view.sync(currentState());
+    return;
+  }
+  openedFromLink = false;
+  roomId = target;
+  inviteRole = 'caller';
+  const next = startPeer();
+  if (!next) return;
+  contactsNotice = asHost
+    ? 'Карточка готова. Копируйте и не закрывайте окно.'
+    : 'Стучимся… как сойдётесь — будет в списке.';
+  view.sync(currentState());
+  await next.enterRoom(target);
   view.sync(currentState());
 };
 
@@ -341,6 +381,7 @@ const startPeer = (): PeerSession | null => {
   inviteError = '';
   lastLoggedState = '';
   peerNick = '';
+  livePeerId = null;
   const next = new PeerSession({
     iceServers: resolved.value.iceServers,
     signaling: createSignalingPort(peerSignaling()),
@@ -546,6 +587,35 @@ const view = mountApp(root, {
   onInstall: () => {
     void app.install();
   },
+  onCheckUpdate: () => {
+    void (async () => {
+      updateChecking = true;
+      updateNotice = 'Проверяем…';
+      view.sync(currentState());
+      const decision = await app.checkForUpdate(APP_VERSION);
+      updateChecking = false;
+      if (decision === 'reload') {
+        updateNotice = 'Есть новая сборка, перезагрузка…';
+        view.sync(currentState());
+        await app.refreshShell();
+        return;
+      }
+      const wipe = globalThis.confirm(
+        decision === 'current'
+          ? 'Сборка уже эта. Сбросить кэш PWA и перезагрузить? На iPhone так подхватывается релиз без удаления.'
+          : 'Не удалось проверить версию. Сбросить кэш и перезагрузить?',
+      );
+      if (wipe) {
+        updateNotice = 'Сбрасываем кэш…';
+        view.sync(currentState());
+        await app.refreshShell();
+        return;
+      }
+      updateNotice =
+        decision === 'current' ? 'Сборка актуальная' : 'Проверка не удалась';
+      view.sync(currentState());
+    })();
+  },
   onSaveHost: (draft) => {
     void (async () => {
       hostDraft = draft;
@@ -725,6 +795,7 @@ const view = mountApp(root, {
       return;
     }
     me = saveProfile(storage, { nick: nextNick, avatar: me.avatar });
+    if (cardText) cardText = encodeContactCard(me);
     peer?.setProfile(me);
     contactsNotice = 'Ник сохранён.';
     view.sync(currentState());
@@ -754,26 +825,37 @@ const view = mountApp(root, {
     contactsNotice = 'Лого сгенерировано из id.';
     view.sync(currentState());
   },
-  onAddContact: (id, nick) => {
-    const card = parseProfileCard({
-      id: id.trim(),
-      nick: sanitizeNick(nick) || defaultNick(id.trim()),
-      avatar: '',
-    });
+  onGenerateCard: () => {
+    cardText = encodeContactCard(me);
+    void knockOn(me.id, true);
+  },
+  onCopyCard: () => {
+    void (async () => {
+      if (!cardText) {
+        cardText = encodeContactCard(me);
+        void knockOn(me.id, true);
+      }
+      const ok = await copyText(cardText);
+      contactsNotice = ok
+        ? 'Карточка скопирована. Отправьте её.'
+        : 'Не удалось скопировать.';
+      note(ok ? 'карточка скопирована' : 'не удалось скопировать карточку');
+      view.sync(currentState());
+    })();
+  },
+  onAddContact: (text) => {
+    const card = parseContactCard(text);
     if (!card) {
-      contactsNotice = 'Неверный id. Нужны 8–24 латинских буквы или цифры.';
+      contactsNotice = 'Вставьте карточку C1. которую прислали.';
       view.sync(currentState());
       return;
     }
     if (card.id === me.id) {
-      contactsNotice = 'Это ваш id.';
+      contactsNotice = 'Это ваша карточка.';
       view.sync(currentState());
       return;
     }
-    book = upsertContact(book, card);
-    contactsNotice = `В книге: ${card.nick}`;
-    persistBook();
-    view.sync(currentState());
+    void knockOn(card.id, false);
   },
   onRemoveContact: (id) => {
     book = removeContact(book, id);
@@ -912,6 +994,7 @@ const view = mountApp(root, {
 });
 
 const redraw = () => view.sync(currentState());
+app.watchUpdates(APP_VERSION);
 app.on('network', redraw);
 app.on('install', redraw);
 app.on('installed', redraw);

@@ -7,9 +7,9 @@ import {
 } from './home.ts';
 
 describe('home copy', () => {
-  it('tells the sender to pick a file then get a link', () => {
+  it('points the sender to contacts instead of a file link', () => {
     expect(formatHomeLead({ manual: false, hasTurn: true })).toContain(
-      'Получить ссылку',
+      'Контакты',
     );
   });
 
@@ -32,7 +32,7 @@ describe('home copy', () => {
     ).toContain('Копировать ссылку');
   });
 
-  it('points to the files block before the get-link button', () => {
+  it('points to contacts before a share link', () => {
     expect(
       formatHomeWait({
         connected: false,
@@ -41,7 +41,7 @@ describe('home copy', () => {
         role: 'idle',
         fromLink: false,
       }),
-    ).toContain('Файлы');
+    ).toContain('Контакты');
   });
 
   it('points to the get-link button after a file is queued', () => {

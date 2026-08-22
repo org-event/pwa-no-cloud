@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   defaultNick,
+  encodeContactCard,
   expandRecipients,
+  meetRoomId,
+  parseContactCard,
   parseProfileCard,
   sanitizeNick,
   upsertContact,
@@ -36,6 +39,21 @@ describe('profile card', () => {
     expect(book.contacts).toHaveLength(1);
     expect(book.contacts[0]?.nick).toBe('Василий');
     expect(book.contacts[0]?.addedAt).toBe(1);
+  });
+
+  it('encodes a compact card another phone can paste', () => {
+    const packed = encodeContactCard({
+      id: 'abc123xyz9',
+      nick: 'Вася',
+      avatar: 'data:image/png;base64,xx',
+    });
+    expect(packed.startsWith('C1.')).toBe(true);
+    expect(packed).not.toContain('avatar');
+    const card = parseContactCard(packed);
+    expect(card).toEqual({ id: 'abc123xyz9', nick: 'Вася', avatar: '' });
+    expect(parseContactCard('abc123xyz9')?.id).toBe('abc123xyz9');
+    expect(parseContactCard('не то')).toBeNull();
+    expect(meetRoomId('abc123xyz9')).toBe('c-abc123xyz9');
   });
 
   it('expands a group into unique members', () => {

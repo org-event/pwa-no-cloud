@@ -51,7 +51,7 @@ export const formatHomeLead = (state: {
     return 'Сокета нет: ссылка короче не выйдет. «Получить ссылку» сделает приглашение.';
   }
   if (state.hasTurn) {
-    return 'Файл → «Получить ссылку» → отправьте её в мессенджер. Второй открывает и принимает.';
+    return 'Связь теперь в «Контакты»: карточка → копировать → второй вставляет. Файлы подключим после книги.';
   }
   return 'Сокет есть, но без TURN через сотовую часто не соединится. Добавьте TURN в «Настройки сервера».';
 };
@@ -83,7 +83,7 @@ export const formatHomeWait = (state: {
   if (state.queuedCount > 0) {
     return 'Файл выбран. Нажмите «Получить ссылку» — она появится в поле, её и отправляете.';
   }
-  return 'Сначала файл в блоке «Файлы», потом «Получить ссылку».';
+  return 'Сначала откройте «Контакты» и обменяйтесь карточками.';
 };
 
 export const formatShareButton = (state: {
@@ -240,6 +240,14 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
   manualActions.className = 'home-actions';
   manualActions.append(create, join);
 
+  const toContacts = document.createElement('a');
+  toContacts.href = '#contacts';
+  toContacts.className = 'button button-accent';
+  toContacts.textContent = 'Открыть контакты';
+  const toContactsRow = document.createElement('div');
+  toContactsRow.className = 'home-actions';
+  toContactsRow.append(toContacts);
+
   const error = document.createElement('p');
   error.className = 'error';
   error.hidden = true;
@@ -247,6 +255,7 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
 
   panel.append(
     lead,
+    toContactsRow,
     steps,
     wait,
     shareField,
@@ -338,12 +347,14 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
         row.append(input, label);
         recipientsList.append(row);
       }
-      steps.hidden = false;
-      shareField.hidden = false;
-      shareActions.hidden = false;
-      recipients.hidden =
-        state.book.contacts.length === 0 && state.book.groups.length === 0;
-      idBtn.hidden = false;
+      steps.hidden = true;
+      shareField.hidden = true;
+      shareActions.hidden = true;
+      pasteField.hidden = true;
+      pasteActions.hidden = true;
+      recipients.hidden = true;
+      idBtn.hidden = true;
+      who.hidden = true;
       manualActions.hidden = true;
       error.hidden = !state.error;
       error.textContent = state.error;

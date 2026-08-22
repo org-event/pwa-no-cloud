@@ -1,4 +1,4 @@
-export const CACHE_NAME = 'nocloud-shell-v3';
+export const CACHE_NAME = 'nocloud-shell-v4';
 
 export const SHELL_ASSETS = [
   '/',
@@ -32,12 +32,14 @@ export const createWorkerSource = (assets: string[], base = '/'): string => {
   const sharePath = joinBase(base, 'share');
   const indexPath = joinBase(base, 'index.html');
   const iconPath = joinBase(base, 'icon.svg');
+  const versionPath = joinBase(base, 'version.json');
   return `'use strict';
 const CACHE = '${CACHE_NAME}';
 const BASE = '${root}';
 const SHARE = '${sharePath}';
 const INDEX = '${indexPath}';
 const ICON = '${iconPath}';
+const VERSION = '${versionPath}';
 const ASSETS = ${list};
 let pendingShare = null;
 
@@ -96,8 +98,29 @@ self.addEventListener('fetch', (event) => {
   }
   if (request.method !== 'GET') return;
   if (!request.url.startsWith('http')) return;
+  if (url.pathname === VERSION) {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
+    if (request.mode === 'navigate') {
+      try {
+        const response = await fetch(request);
+        if (response.status === 200) {
+          await cache.put(request, response.clone());
+          await cache.put(INDEX, response.clone());
+        }
+        return response;
+      } catch {
+        const page = await cache.match(INDEX);
+        if (page) return page;
+        return new Response('Offline', {
+          status: 503,
+          statusText: 'Service Unavailable',
+        });
+      }
+    }
     const cached = await cache.match(request);
     if (cached) return cached;
     try {
@@ -107,10 +130,6 @@ self.addEventListener('fetch', (event) => {
       }
       return response;
     } catch {
-      if (request.mode === 'navigate') {
-        const page = await cache.match(INDEX);
-        if (page) return page;
-      }
       return new Response('Offline', {
         status: 503,
         statusText: 'Service Unavailable',

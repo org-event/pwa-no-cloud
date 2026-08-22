@@ -48,6 +48,8 @@ export type AppViewState = {
   selectedContactIds: string[];
   selectedGroupIds: string[];
   peerNick: string;
+  updateChecking: boolean;
+  updateNotice: string;
 };
 
 export type AppHandlers = HomeHandlers &
@@ -58,6 +60,7 @@ export type AppHandlers = HomeHandlers &
   InviteHandlers &
   TransferHandlers & {
     onInstall: () => void;
+    onCheckUpdate: () => void;
   };
 
 const icon = (paths: string): SVGSVGElement => {
@@ -169,7 +172,18 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
   version.title = APP_VERSION;
   version.textContent = APP_VERSION;
   version.setAttribute('aria-label', `Сборка ${APP_VERSION}`);
-  end.append(install, version);
+  const update = document.createElement('button');
+  update.type = 'button';
+  update.className = 'icon-button topbar-update';
+  update.setAttribute('aria-label', 'Проверить обновление');
+  update.title = 'Проверить обновление';
+  update.append(
+    icon(
+      '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 12a8 8 0 1 1-2.2-5.5M20 4v5h-5"/>',
+    ),
+  );
+  update.addEventListener('click', () => handlers.onCheckUpdate());
+  end.append(install, version, update);
 
   topbar.append(menu, status, end);
 
@@ -196,7 +210,8 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
   const inboxRoot = document.createElement('div');
   inboxRoot.className = 'inbox';
   const inbox = mountInbox(inboxRoot, handlers);
-  lanRoot.append(transferRoot, homeRoot, inviteRoot, inboxRoot);
+  transferRoot.hidden = true;
+  lanRoot.append(homeRoot, inviteRoot, inboxRoot, transferRoot);
 
   const serversRoot = document.createElement('section');
   serversRoot.className = 'page-section servers';
@@ -343,6 +358,15 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
         : '';
       status.title = line;
       install.hidden = !state.canInstall;
+      update.disabled = state.updateChecking;
+      update.title = state.updateNotice || 'Проверить обновление';
+      update.setAttribute(
+        'aria-label',
+        state.updateNotice || 'Проверить обновление',
+      );
+      version.title = state.updateNotice
+        ? `${APP_VERSION} · ${state.updateNotice}`
+        : APP_VERSION;
       home.sync({
         manual: state.invite.mode === 'manual',
         hasTurn: state.resolved.ok && state.resolved.value.hasTurn,
