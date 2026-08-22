@@ -219,11 +219,17 @@ write_turn_conf() {
     printf 'denied-peer-ip=172.16.0.0-172.31.255.255\n'
     printf 'denied-peer-ip=192.168.0.0-192.168.255.255\n'
     printf 'denied-peer-ip=::1\n'
-    local port=''
+    local port='' alt_set=0
     for port in $PORTS; do
-      if [ "$port" != "$main_port" ]; then
-        printf 'aux-server=0.0.0.0:%s\n' "$port"
+      if [ "$port" = "$main_port" ]; then
+        continue
       fi
+      if [ "$alt_set" -eq 0 ]; then
+        printf 'alt-listening-port=%s\n' "$port"
+        alt_set=1
+        continue
+      fi
+      printf 'aux-server=0.0.0.0:%s\n' "$port"
     done
   } >"$INSTALL_DIR/turnserver.conf"
 }
@@ -243,7 +249,7 @@ for port in prefer + rest:
     urls.append(f'turn:{host}:{port}?transport=tcp')
     urls.append(f'turn:{host}:{port}')
 print(json.dumps([
-    {'urls': f'stun:{host}:{stun_port}'},
+    {'urls': [f'stun:{host}:{p}' for p in prefer + rest] or [f'stun:{host}:{stun_port}']},
     {'urls': urls, 'username': user, 'credential': pw},
 ], indent=2))
 PY
@@ -269,17 +275,19 @@ print_ice_json_sh() {
 print_share_pack() {
   local sig="${SIGNAL_URL-}"
   if command -v python3 >/dev/null 2>&1; then
-    python3 - "$PUBLIC_IP" "$TURN_USER" "$TURN_PASS" "$PORTS" "$sig" <<'PY'
+    python3 - "$PUBLIC_IP" "$TURN_USER" "$TURN_PASS" "$PORTS" "$sig" "$MAIN_PORT" <<'PY'
 import json, sys
-ip, user, pw, ports, sig = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+ip, user, pw, ports, sig, main = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
 port_list = [item for item in ports.split() if item]
 prefer = [p for p in ('443', '80', '3478') if p in port_list]
 rest = [p for p in port_list if p not in prefer]
+ordered = prefer + rest
 urls = []
-for port in prefer + rest:
+for port in ordered:
     urls.append(f'turn:{ip}:{port}?transport=tcp')
     urls.append(f'turn:{ip}:{port}')
-stun = f'stun:{ip}:{port_list[0]}'
+stun_list = [f'stun:{ip}:{p}' for p in ordered]
+stun = stun_list[0] if len(stun_list) == 1 else stun_list
 signaling = {'kind': 'websocket', 'url': sig} if sig else {'kind': 'manual'}
 draft = {
     'v': 1,
@@ -605,10 +613,13 @@ if [ -n "$BUSY" ]; then
 fi
 
 MAIN_PORT=''
-for port in $PORTS; do
-  if [ "$port" = '3478' ]; then
-    MAIN_PORT='3478'
-  fi
+for p in 443 80 3478; do
+  for port in $PORTS; do
+    if [ "$port" = "$p" ]; then
+      MAIN_PORT="$p"
+      break 2
+    fi
+  done
 done
 if [ -z "$MAIN_PORT" ]; then
   MAIN_PORT=${PORTS%% *}
@@ -618,7 +629,9 @@ write_turn_conf "$MAIN_PORT" "$TURN_USER" "$TURN_PASS" "$PUBLIC_IP"
 
 as_root docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 as_root docker pull "$COTURN_IMAGE"
+# Image runs as turnserver; 80/443 need root on host network.
 as_root docker run -d --name "$CONTAINER" --restart unless-stopped --network host \
+  --user 0 --cap-add NET_BIND_SERVICE \
   -v "$INSTALL_DIR/turnserver.conf:/etc/coturn/turnserver.conf:ro" \
   "$COTURN_IMAGE"
 
@@ -653,7 +666,7 @@ say "IP:            $PUBLIC_IP"
 say "Логин TURN:    $TURN_USER"
 say "Пароль TURN:   $TURN_PASS"
 say "Порты:         $PORTS"
-say "listening:     $MAIN_PORT"
+say "listening:     $MAIN_PORT (остальные — alt/aux, контейнер от root)"
 say "Сокет:         ${SIGNAL_URL:-нет, приглашение вручную}"
 say "Контейнер:     $CONTAINER"
 say "Файл на VPS:   $INSTALL_DIR/credentials.txt"

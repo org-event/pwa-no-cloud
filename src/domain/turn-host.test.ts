@@ -37,7 +37,10 @@ describe('turn host console commands', () => {
       'secret12',
       [80, 443],
     );
-    expect(ice[0]?.urls).toBe('stun:203.0.113.10:80');
+    expect(ice[0]?.urls).toEqual([
+      'stun:203.0.113.10:443',
+      'stun:203.0.113.10:80',
+    ]);
     expect(ice[1]?.urls).toEqual([
       'turn:203.0.113.10:443?transport=tcp',
       'turn:203.0.113.10:80?transport=tcp',

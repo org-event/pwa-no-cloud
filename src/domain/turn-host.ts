@@ -24,6 +24,23 @@ export const COTURN_IMAGE = 'coturn/coturn:4.6.2';
 export const INSTALL_TURN_SCRIPT_URL =
   'https://raw.githubusercontent.com/org-event/pwa-no-cloud/main/deploy/install-turn.sh';
 
+const PREFERRED_TURN_PORTS = [443, 80, 3478];
+
+export const orderTurnPorts = (ports: number[]): number[] => {
+  const preferred = PREFERRED_TURN_PORTS.filter((port) => ports.includes(port));
+  const rest = ports.filter((port) => !PREFERRED_TURN_PORTS.includes(port));
+  return [...preferred, ...rest];
+};
+
+export const stunUrlsForHost = (
+  host: string,
+  ports: number[],
+): string | string[] => {
+  const urls = orderTurnPorts(ports).map((port) => `stun:${host}:${port}`);
+  if (urls.length <= 1) return urls[0] ?? `stun:${host}:3478`;
+  return urls;
+};
+
 const fail = (code: string, message: string): TurnHostError => ({
   ok: false,
   code,
@@ -100,14 +117,14 @@ export const iceServersFromTurnHost = (
   credential: string,
   ports: number[],
 ): IceServerConfig[] => {
+  const ordered = orderTurnPorts(ports);
   const urls: string[] = [];
-  const stunPort = ports.includes(3478) ? 3478 : (ports[0] ?? 3478);
-  for (const port of ports) {
+  for (const port of ordered) {
     urls.push(`turn:${host}:${port}`);
     urls.push(`turn:${host}:${port}?transport=tcp`);
   }
   return [
-    { urls: `stun:${host}:${stunPort}` },
+    { urls: stunUrlsForHost(host, ports) },
     { urls: sortIceUrls(urls), username, credential },
   ];
 };
