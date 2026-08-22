@@ -1,17 +1,39 @@
 :root {
+  color-scheme: dark;
   --color-primary: #2563eb;
+  --color-primary-hover: #3b82f6;
   --color-on-primary: #ffffff;
   --color-accent: #d97706;
+  --color-accent-hover: #f59e0b;
+  --color-on-accent: #000000;
   --color-background: #0f172a;
   --color-foreground: #f8fafc;
+  --color-card: #111827;
   --color-muted: #1e293b;
   --color-muted-foreground: #cbd5e1;
   --color-border: #334155;
   --color-ring: #2563eb;
+  --color-destructive: #fca5a5;
+  --color-on-destructive: #ffffff;
+  --color-warn: #ca8a04;
   --space-md: 1rem;
   --space-lg: 1.5rem;
   --space-xl: 2rem;
   --font-sans: Inter, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --color-background: #f8fafc;
+    --color-foreground: #0f172a;
+    --color-card: #ffffff;
+    --color-muted: #e2e8f0;
+    --color-muted-foreground: #334155;
+    --color-border: #cbd5e1;
+    --color-warn: #a16207;
+    --color-destructive: #b91c1c;
+  }
 }
 
 *,
@@ -72,12 +94,12 @@ h1 {
   font-size: 0.875rem;
 }
 
-.status[data-online='false'] {
-  color: #fde68a;
+.status[data-online='false'],
+.status[data-path='relay'] {
+  color: var(--color-warn);
 }
 
 .status[data-path='relay'] {
-  color: #fde68a;
   border-color: var(--color-accent);
 }
 
@@ -129,7 +151,7 @@ h1 {
   padding: var(--space-md);
   border: 1px solid var(--color-border);
   border-radius: 0.75rem;
-  background: #111827;
+  background: var(--color-card);
 }
 
 .panel legend {
@@ -191,10 +213,13 @@ h1 {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    opacity 150ms ease;
 }
 
 .button:hover {
-  background: #3b82f6;
+  background: var(--color-primary-hover);
 }
 
 .button-secondary {
@@ -204,16 +229,16 @@ h1 {
 }
 
 .button-secondary:hover {
-  background: #334155;
+  background: var(--color-border);
 }
 
 .button-accent {
   background: var(--color-accent);
-  color: #000000;
+  color: var(--color-on-accent);
 }
 
 .button-accent:hover {
-  background: #f59e0b;
+  background: var(--color-accent-hover);
 }
 
 .file-input {
@@ -242,7 +267,7 @@ h1 {
 
 .error {
   margin: 0;
-  color: #fecaca;
+  color: var(--color-destructive);
 }
 
 .resolved {

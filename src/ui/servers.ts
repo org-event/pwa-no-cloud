@@ -177,6 +177,7 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
   error.className = 'error';
   error.hidden = true;
   error.dataset.role = 'error';
+  error.setAttribute('role', 'alert');
 
   root.append(list, hint, form, error, preview);
 

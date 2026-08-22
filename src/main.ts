@@ -17,7 +17,9 @@ import {
   removeInboxFile,
   writeFixture,
 } from './lib/opfs.ts';
+import { notifyFileReceived, requestNotifyPermission } from './lib/notify.ts';
 import { requestPersist } from './lib/quota.ts';
+import { filesFromShare } from './lib/share.ts';
 import { PeerSession } from './lib/peer-session.ts';
 import { inviteToQr } from './lib/qr.ts';
 import { createSignalingPort } from './lib/signaling/factory.ts';
@@ -158,7 +160,9 @@ const startPeer = (): PeerSession | null => {
   next.on('file-offer', () => view.sync(currentState()));
   next.on('folder', () => view.sync(currentState()));
   next.on('folder-offer', () => view.sync(currentState()));
-  next.on('file-received', () => {
+  next.on('file-received', (value) => {
+    const transfer = value as { name?: string; path?: string };
+    void notifyFileReceived(transfer.path || transfer.name || 'файл');
     void (async () => {
       await refreshInbox();
       view.sync(currentState());
@@ -257,6 +261,7 @@ const view = mountApp(root, {
   },
   onAcceptFile: (transferId) => {
     transferError = '';
+    void requestNotifyPermission();
     peer?.acceptFile(transferId);
     view.sync(currentState());
   },
@@ -339,6 +344,19 @@ const redraw = () => view.sync(currentState());
 app.on('network', redraw);
 app.on('install', redraw);
 app.on('installed', redraw);
+app.on('share-files', (data) => {
+  const files = filesFromShare(data);
+  const file = files[0];
+  if (!file) return;
+  if (!peer || peer.state !== 'connected') {
+    transferError = 'Сначала соединитесь, затем поделитесь файлом снова';
+    view.sync(currentState());
+    return;
+  }
+  transferError = '';
+  peer.sendFile(file);
+  view.sync(currentState());
+});
 
 const opened = await openStore();
 if (opened.ok) {

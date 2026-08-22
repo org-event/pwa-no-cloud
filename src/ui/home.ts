@@ -16,6 +16,8 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
   const network = document.createElement('p');
   network.className = 'status';
   network.dataset.role = 'network';
+  network.setAttribute('role', 'status');
+  network.setAttribute('aria-live', 'polite');
 
   const room = document.createElement('label');
   room.className = 'field';
@@ -25,6 +27,7 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
   roomInput.type = 'text';
   roomInput.name = 'room';
   roomInput.autocomplete = 'off';
+  roomInput.setAttribute('aria-label', 'Имя комнаты');
   roomInput.addEventListener('input', () => handlers.onRoom(roomInput.value));
   room.append(roomLabel, roomInput);
 

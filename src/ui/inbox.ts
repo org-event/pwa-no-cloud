@@ -45,10 +45,13 @@ export const mountInbox = (root: HTMLElement, handlers: InboxHandlers) => {
 
   const list = document.createElement('div');
   list.className = 'inbox-list';
+  list.setAttribute('role', 'radiogroup');
+  list.setAttribute('aria-label', 'Полученные файлы');
 
   const error = document.createElement('p');
   error.className = 'error';
   error.hidden = true;
+  error.setAttribute('role', 'alert');
 
   const preview = document.createElement('pre');
   preview.className = 'resolved';

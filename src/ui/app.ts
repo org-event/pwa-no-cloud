@@ -50,6 +50,8 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
   const status = document.createElement('p');
   status.className = 'status';
   status.dataset.role = 'session';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
 
   const homeRoot = document.createElement('section');
   homeRoot.className = 'home';

@@ -127,6 +127,7 @@ export const mountTransfer = (
   const pick = document.createElement('input');
   pick.type = 'file';
   pick.className = 'file-input';
+  pick.setAttribute('aria-label', 'Выбрать файл для отправки');
   pick.addEventListener('change', () => {
     const file = pick.files?.[0];
     if (file) handlers.onPickFile(file);
@@ -139,6 +140,7 @@ export const mountTransfer = (
   pickFolder.multiple = true;
   pickFolder.setAttribute('webkitdirectory', '');
   pickFolder.setAttribute('directory', '');
+  pickFolder.setAttribute('aria-label', 'Выбрать папку для отправки');
   pickFolder.addEventListener('change', () => {
     const files = pickFolder.files;
     pickFolder.value = '';
@@ -199,10 +201,13 @@ export const mountTransfer = (
 
   const status = document.createElement('p');
   status.className = 'tagline';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
 
   const error = document.createElement('p');
   error.className = 'error';
   error.hidden = true;
+  error.setAttribute('role', 'alert');
 
   panel.append(pick, pickFolder, actions, status, error);
   root.append(panel);

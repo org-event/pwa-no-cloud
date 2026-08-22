@@ -4,6 +4,7 @@ PWA для обмена файлами без облака. Файловый т�
 (`RTCDataChannel`). Сервер нужен только для знакомства клиентов
 и, при жёстком NAT, как свой TURN.
 
+Как пользоваться: [docs/usage.md](docs/usage.md).
 План работ: [docs/plan.md](docs/plan.md).
 Свой TURN (coturn): [docs/turn.md](docs/turn.md). Чужой открытый TURN
 в пресеты не кладём.

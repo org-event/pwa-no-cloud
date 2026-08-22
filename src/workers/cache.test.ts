@@ -9,5 +9,8 @@ describe('shell worker source', () => {
     expect(source).toContain(CACHE_NAME);
     expect(source).toContain('/manifest.webmanifest');
     expect(source).toContain('/assets/index-abc.js');
+    expect(source).toContain('/share');
+    expect(source).toContain('share-files');
+    expect(source).toContain('notificationclick');
   });
 });

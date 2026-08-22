@@ -36,6 +36,7 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
   outgoing.readOnly = true;
   outgoing.rows = 6;
   outgoing.className = 'invite-out';
+  outgoing.setAttribute('aria-label', 'Исходящее приглашение');
 
   const copy = document.createElement('button');
   copy.type = 'button';
@@ -47,6 +48,7 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
   paste.rows = 6;
   paste.placeholder = 'Вставьте приглашение или ответ';
   paste.className = 'invite-in';
+  paste.setAttribute('aria-label', 'Входящее приглашение или ответ');
 
   const apply = document.createElement('button');
   apply.type = 'button';
@@ -71,6 +73,7 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
   const ice = document.createElement('p');
   ice.className = 'status';
   ice.dataset.role = 'ice';
+  ice.setAttribute('role', 'status');
 
   const pong = document.createElement('p');
   pong.className = 'status';
@@ -79,6 +82,7 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
   const error = document.createElement('p');
   error.className = 'error';
   error.hidden = true;
+  error.setAttribute('role', 'alert');
 
   panel.append(
     hint,
