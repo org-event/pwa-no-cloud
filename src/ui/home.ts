@@ -5,6 +5,8 @@ export type HomeState = {
 
 export type HomeHandlers = {
   onInstall: () => void;
+  onCreateInvite: () => void;
+  onJoin: () => void;
 };
 
 export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
@@ -19,15 +21,13 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
   create.type = 'button';
   create.className = 'button';
   create.textContent = 'Создать приглашение';
-  create.disabled = true;
-  create.title = 'Будет на шаге 4';
+  create.addEventListener('click', () => handlers.onCreateInvite());
 
   const join = document.createElement('button');
   join.type = 'button';
   join.className = 'button button-secondary';
   join.textContent = 'Присоединиться';
-  join.disabled = true;
-  join.title = 'Будет на шаге 4';
+  join.addEventListener('click', () => handlers.onJoin());
 
   const install = document.createElement('button');
   install.type = 'button';

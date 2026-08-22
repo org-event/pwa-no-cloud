@@ -83,10 +83,40 @@ h1 {
   gap: var(--space-md);
 }
 
+.invite,
+.inbox,
 .servers {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+}
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  margin: var(--space-md) 0;
+}
+
+.invite-qr {
+  width: 192px;
+  height: 192px;
+  margin-bottom: var(--space-md);
+  background: #ffffff;
+}
+
+.invite-out,
+.invite-in {
+  display: block;
+  width: 100%;
+  min-height: 7rem;
+  margin-bottom: var(--space-md);
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font: inherit;
+  resize: vertical;
 }
 
 .panel {
@@ -190,7 +220,9 @@ h1 {
 .choice input:focus-visible,
 .field input:focus-visible,
 .field select:focus-visible,
-.field textarea:focus-visible {
+.field textarea:focus-visible,
+.invite-out:focus-visible,
+.invite-in:focus-visible {
   outline: 2px solid var(--color-ring);
   outline-offset: 2px;
 }
