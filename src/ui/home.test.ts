@@ -7,10 +7,16 @@ import {
 } from './home.ts';
 
 describe('home copy', () => {
-  it('treats Wi-Fi and internet as one path when TURN exists', () => {
+  it('tells the sender to pick a file then get a link', () => {
     expect(formatHomeLead({ manual: false, hasTurn: true })).toContain(
-      'одно и то же',
+      'Получить ссылку',
     );
+  });
+
+  it('explains HTTPS blocking a plain ws socket', () => {
+    expect(
+      formatHomeLead({ manual: false, hasTurn: true, socketBlocked: true }),
+    ).toContain('установщик');
   });
 
   it('tells the sender to wait after sharing a link', () => {
@@ -25,13 +31,37 @@ describe('home copy', () => {
     ).toContain('откроет ссылку');
   });
 
+  it('points to the files block before the get-link button', () => {
+    expect(
+      formatHomeWait({
+        connected: false,
+        waiting: false,
+        queuedCount: 0,
+        role: 'idle',
+        fromLink: false,
+      }),
+    ).toContain('Файлы');
+  });
+
+  it('points to the get-link button after a file is queued', () => {
+    expect(
+      formatHomeWait({
+        connected: false,
+        waiting: false,
+        queuedCount: 1,
+        role: 'idle',
+        fromLink: false,
+      }),
+    ).toContain('Получить ссылку');
+  });
+
   it('names the share button after a chosen contact', () => {
     expect(
       formatShareButton({
         contacts: [{ nick: 'Вася' }],
         groups: [],
       }),
-    ).toBe('Ссылка для Вася');
+    ).toBe('Получить ссылку для Вася');
   });
 
   it('explains that a group is still one channel', () => {

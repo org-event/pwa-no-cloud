@@ -107,7 +107,7 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
       </label>
       <label class="field">
         <span>Адрес сокета</span>
-        <input name="signalingUrl" type="url" autocomplete="off" placeholder="ws://203.0.113.10:8443/ws" />
+        <input name="signalingUrl" type="url" autocomplete="off" placeholder="https://203.0.113.10:8443" />
       </label>
       <p class="tagline">
         Сокет — не файлы, а «комната»: два телефона стучатся сюда и находят друг друга.

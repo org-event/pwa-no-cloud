@@ -9,6 +9,14 @@ INSTALL_DIR='/opt/nocloud-turn'
 CONTAINER='nocloud-turn'
 SIGNAL_CONTAINER='nocloud-signal'
 REPO_RAW='https://raw.githubusercontent.com/org-event/pwa-no-cloud/main'
+SIGNAL_SRC_DIR=''
+if [ -n "${BASH_SOURCE[0]-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+  _sig_dir="$(dirname -- "${BASH_SOURCE[0]}")/signal"
+  if [ -d "$_sig_dir" ]; then
+    SIGNAL_SRC_DIR=$(CDPATH= cd -- "$_sig_dir" && pwd)
+  fi
+  unset _sig_dir
+fi
 RELAY_MIN=49160
 RELAY_MAX=49200
 TTY='/dev/tty'
@@ -298,44 +306,232 @@ ensure_qrencode() {
   fi
 }
 
+ensure_socat() {
+  if command -v socat >/dev/null 2>&1; then
+    return
+  fi
+  say 'Ставлю socat (нужен acme.sh в режиме standalone).'
+  if command -v apt-get >/dev/null 2>&1; then
+    as_root apt-get install -y socat cron >/dev/null 2>&1 || true
+  elif command -v dnf >/dev/null 2>&1; then
+    as_root dnf install -y socat cronie >/dev/null 2>&1 || true
+  fi
+}
+
+ACME_BIN='/root/.acme.sh/acme.sh'
+ACME_STATE_FILE="$INSTALL_DIR/acme.env"
+
+valid_email() {
+  printf '%s' "$1" | grep -Eq '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+}
+
+sslip_host() {
+  printf 'wss-%s.sslip.io' "$(printf '%s' "$1" | tr '.' '-')"
+}
+
+read_acme_state() {
+  local key="$1"
+  if [ ! -f "$ACME_STATE_FILE" ]; then
+    return 0
+  fi
+  awk -F= -v k="$key" '$1==k {print substr($0, length(k)+2); exit}' "$ACME_STATE_FILE"
+}
+
+save_acme_state() {
+  umask 077
+  mkdir -p "$INSTALL_DIR"
+  {
+    printf 'email=%s\n' "$1"
+    printf 'host=%s\n' "$2"
+    printf 'port=%s\n' "$3"
+  } >"$ACME_STATE_FILE"
+  chmod 600 "$ACME_STATE_FILE"
+}
+
+run_acme() {
+  as_root env HOME=/root "$ACME_BIN" --home /root/.acme.sh "$@"
+}
+
+ensure_cron() {
+  if command -v systemctl >/dev/null 2>&1; then
+    as_root systemctl enable --now cron >/dev/null 2>&1 || true
+    as_root systemctl enable --now crond >/dev/null 2>&1 || true
+  fi
+  as_root mkdir -p /etc/cron.d
+  as_root tee /etc/cron.d/nocloud-acme >/dev/null <<'EOF'
+# NoCloud: продление Let’s Encrypt для сокета. TURN на 80 коротко останавливается хуками acme.sh.
+MAILTO=""
+17 3 * * * root /root/.acme.sh/acme.sh --cron --home /root/.acme.sh >/dev/null 2>&1
+EOF
+  as_root chmod 644 /etc/cron.d/nocloud-acme
+  run_acme --install-cronjob >/dev/null 2>&1 || true
+}
+
+ensure_acme() {
+  local email="$1"
+  if [ -x "$ACME_BIN" ]; then
+    return
+  fi
+  say 'Ставлю acme.sh для сертификата Let’s Encrypt.'
+  if ! curl -fsSL 'https://get.acme.sh' | as_root env HOME=/root sh -s email="$email"; then
+    echo 'acme.sh не установился.' >&2
+    return 1
+  fi
+  if [ ! -x "$ACME_BIN" ]; then
+    echo 'acme.sh не появился в /root/.acme.sh.' >&2
+    return 1
+  fi
+}
+
+copy_signal_file() {
+  local name="$1"
+  local dest="$2"
+  if [ -n "$SIGNAL_SRC_DIR" ] && [ -f "$SIGNAL_SRC_DIR/$name" ]; then
+    cp "$SIGNAL_SRC_DIR/$name" "$dest"
+    return 0
+  fi
+  curl -fsSL "$REPO_RAW/deploy/signal/$name" -o "$dest"
+}
+
+write_acme_hooks() {
+  local dir="$INSTALL_DIR/signal"
+  mkdir -p "$dir"
+  umask 077
+  cat >"$dir/acme-pre.sh" <<EOF
+#!/bin/sh
+docker stop ${CONTAINER} >/dev/null 2>&1 || true
+EOF
+  cat >"$dir/acme-post.sh" <<EOF
+#!/bin/sh
+docker start ${CONTAINER} >/dev/null 2>&1 || true
+EOF
+  cat >"$dir/acme-reload.sh" <<EOF
+#!/bin/sh
+docker restart ${SIGNAL_CONTAINER} >/dev/null 2>&1 || true
+EOF
+  chmod 700 "$dir/acme-pre.sh" "$dir/acme-post.sh" "$dir/acme-reload.sh"
+}
+
+issue_signal_cert() {
+  local ident="$1"
+  local dir="$INSTALL_DIR/signal"
+  local pre="$dir/acme-pre.sh"
+  local post="$dir/acme-post.sh"
+  local extra=''
+  if printf '%s' "$ident" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
+    extra='--certificate-profile shortlived --days 3'
+  fi
+  # shellcheck disable=SC2086
+  if run_acme --issue --server letsencrypt --standalone -d "$ident" \
+    --pre-hook "$pre" --post-hook "$post" $extra; then
+    return 0
+  fi
+  if [ -n "$extra" ]; then
+    extra='--cert-profile shortlived --days 3'
+    # shellcheck disable=SC2086
+    if run_acme --issue --server letsencrypt --standalone -d "$ident" \
+      --pre-hook "$pre" --post-hook "$post" $extra; then
+      return 0
+    fi
+  fi
+  as_root docker start "$CONTAINER" >/dev/null 2>&1 || true
+  return 1
+}
+
 install_signal() {
   SIGNAL_URL=''
   say ''
-  say 'Сокет (signaling): обмен SDP без копирования N1. STUN уже в coturn, Google не нужен.'
-  say 'TURN занимает 80/443, сокет лучше на 8443.'
-  WANT_SIGNAL='n'
-  ask 'Поставить сокет? (y/N)' WANT_SIGNAL 'n'
+  say 'Сокет (signaling): обмен SDP без копирования N1.'
+  say 'PWA на GitHub Pages — HTTPS. Браузер не откроет ws://, нужен wss.'
+  say 'Имя по умолчанию — wss-<IP>.sslip.io: обычный сертификат ~90 дней, не 6.'
+  say 'Email спрашиваем один раз, дальше cron продлевает сам (TURN на 80 на минуту).'
+  WANT_SIGNAL='y'
+  ask 'Поставить сокет с HTTPS? (Y/n)' WANT_SIGNAL 'y'
   case "$WANT_SIGNAL" in
-    y|Y|yes|YES) ;;
-    *) return ;;
+    n|N|no|NO) return ;;
   esac
-  SIG_PORT='8443'
-  ask 'Порт сокета' SIG_PORT '8443'
+  SIG_PORT="$(read_acme_state port)"
+  if [ -z "$SIG_PORT" ]; then
+    SIG_PORT='8443'
+  fi
+  ask 'Порт сокета' SIG_PORT "$SIG_PORT"
   if ! valid_port "$SIG_PORT"; then
     echo 'Некорректный порт сокета.' >&2
     return
   fi
+  local default_host
+  default_host="$(read_acme_state host)"
+  if [ -z "$default_host" ]; then
+    default_host="$(sslip_host "$PUBLIC_IP")"
+  fi
+  SIG_HOST="$default_host"
+  ask 'Имя в сертификате (Enter = sslip.io / сохранённое)' SIG_HOST "$default_host"
+  if [ -z "$SIG_HOST" ]; then
+    SIG_HOST="$default_host"
+  fi
+  ACME_EMAIL="$(read_acme_state email)"
+  if [ -n "$ACME_EMAIL" ]; then
+    say "Email Let’s Encrypt уже сохранён на VPS: $ACME_EMAIL"
+    ask 'Другой email (Enter = оставить)' ACME_EMAIL "$ACME_EMAIL"
+  else
+    ask 'Email для Let’s Encrypt (один раз, не в git)' ACME_EMAIL
+  fi
+  if ! valid_email "$ACME_EMAIL"; then
+    echo 'Нужен настоящий email — без него сертификат не выпустить.' >&2
+    return
+  fi
   local dir="$INSTALL_DIR/signal"
-  mkdir -p "$dir"
-  if ! curl -fsSL "$REPO_RAW/deploy/signal/package.json" -o "$dir/package.json"; then
+  local certs="$dir/tls"
+  mkdir -p "$dir" "$certs"
+  chmod 700 "$certs"
+  if ! copy_signal_file package.json "$dir/package.json"; then
     say 'Не скачался deploy/signal — запушьте main и повторите, или пропустите сокет.'
     return
   fi
-  curl -fsSL "$REPO_RAW/deploy/signal/server.mjs" -o "$dir/server.mjs"
-  curl -fsSL "$REPO_RAW/deploy/signal/Dockerfile" -o "$dir/Dockerfile"
+  copy_signal_file server.mjs "$dir/server.mjs"
+  copy_signal_file Dockerfile "$dir/Dockerfile"
+  write_acme_hooks
+  ensure_socat
+  if ! ensure_acme "$ACME_EMAIL"; then
+    return
+  fi
+  run_acme --register-account -m "$ACME_EMAIL" --server letsencrypt >/dev/null 2>&1 || true
+  ensure_cron
+  if command -v ufw >/dev/null 2>&1; then
+    as_root ufw allow 80/tcp || true
+    as_root ufw allow "$SIG_PORT"/tcp || true
+  fi
+  say 'Выпускаю сертификат (TURN на 80 сейчас остановится на минуту)…'
+  if ! issue_signal_cert "$SIG_HOST"; then
+    say 'Сертификат не вышел. Сокет без TLS с Pages не работает — не пишу http:// в S1.'
+    say 'Проверьте: TCP 80 открыт с интернета, IP верный, лимиты Let’s Encrypt.'
+    return
+  fi
+  if ! run_acme --install-cert -d "$SIG_HOST" \
+    --key-file "$certs/privkey.pem" \
+    --fullchain-file "$certs/fullchain.pem" \
+    --reloadcmd "$dir/acme-reload.sh"; then
+    say 'Не удалось положить сертификат в каталог сокета.'
+    return
+  fi
   as_root docker rm -f "$SIGNAL_CONTAINER" >/dev/null 2>&1 || true
   as_root docker build -t nocloud-signal "$dir"
   as_root docker run -d --name "$SIGNAL_CONTAINER" --restart unless-stopped \
-    -p "${SIG_PORT}:${SIG_PORT}" -e "PORT=${SIG_PORT}" nocloud-signal
-  if command -v ufw >/dev/null 2>&1; then
-    as_root ufw allow "$SIG_PORT"/tcp || true
-  fi
-  SIGNAL_URL="http://${PUBLIC_IP}:${SIG_PORT}"
-  say "Сокет: $SIGNAL_URL  (в PWA WebSocket / HTTP poll)"
+    -p "${SIG_PORT}:${SIG_PORT}" \
+    -e "PORT=${SIG_PORT}" \
+    -e 'TLS_CERT=/certs/fullchain.pem' \
+    -e 'TLS_KEY=/certs/privkey.pem' \
+    -v "$certs:/certs:ro" \
+    nocloud-signal
+  SIGNAL_URL="https://${SIG_HOST}:${SIG_PORT}"
+  save_acme_state "$ACME_EMAIL" "$SIG_HOST" "$SIG_PORT"
+  say "Сокет: $SIGNAL_URL  (wss, браузер с Pages откроет)"
+  say "Продление: cron 03:17, email на VPS в $ACME_STATE_FILE"
 }
 
 say '=== NoCloud TURN ==='
-say 'Домен не обязателен. Пароль спросим здесь и не кладём в git.'
+say 'Домен не обязателен: TURN на IP, сокет — имя sslip.io и Let’s Encrypt ~90 дней.'
+say 'Пароль спросим здесь и не кладём в git.'
 say ''
 
 ensure_docker
@@ -472,4 +668,7 @@ else
   say 'qrencode нет — сохраните строку S1. и вставьте в PWA.'
 fi
 say '=================================='
+say 'Сокет в S1. должен быть https://wss-….sslip.io:8443 — тогда Pages откроет wss.'
+say 'Сертификат ~90 дней. Продлевает cron на VPS (email спрашиваем один раз). На продление коротко остановится TURN на 80.'
 say 'Проверка TURN: https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/'
+say "Проверка сокета: curl -sS ${SIGNAL_URL:-https://IP:8443}/"

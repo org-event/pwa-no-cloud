@@ -23,6 +23,7 @@ export type HomeState = {
   role: 'idle' | 'caller' | 'callee';
   fromLink: boolean;
   error: string;
+  socketBlocked: boolean;
 };
 
 export type HomeHandlers = {
@@ -40,12 +41,16 @@ export type HomeHandlers = {
 export const formatHomeLead = (state: {
   manual: boolean;
   hasTurn: boolean;
+  socketBlocked?: boolean;
 }): string => {
+  if (state.socketBlocked) {
+    return 'В S1 сокет http://, а сайт HTTPS — браузер режет ws://. Перезапустите установщик на VPS (сокет с HTTPS) и вставьте новый S1. Пока можно «Получить ссылку»: это приглашение через TURN.';
+  }
   if (state.manual) {
-    return 'Сокета нет: ссылка «открой и получи» не сработает. Нужны два текста — приглашение и ответ.';
+    return 'Сокета нет: ссылка короче не выйдет. «Получить ссылку» сделает приглашение.';
   }
   if (state.hasTurn) {
-    return 'Wi‑Fi и интернет здесь одно и то же. Файлы идут на второй телефон напрямую, при нужде через ваш TURN.';
+    return 'Файл → «Получить ссылку» → отправьте её в мессенджер. Второй открывает и принимает.';
   }
   return 'Сокет есть, но без TURN через сотовую часто не соединится. Добавьте TURN в «Настройки сервера».';
 };
@@ -70,7 +75,10 @@ export const formatHomeWait = (state: {
   if (state.waiting) {
     return 'Ждём, пока второй откроет ссылку. Это окно не закрывайте.';
   }
-  return 'Можно выбрать, кому, потом файлы, потом ссылку — ему в Telegram или WhatsApp.';
+  if (state.queuedCount > 0) {
+    return 'Файл выбран. Нажмите «Получить ссылку» и отправьте её в Telegram или WhatsApp.';
+  }
+  return 'Сначала файл в блоке «Файлы», потом «Получить ссылку».';
 };
 
 export const formatShareButton = (state: {
@@ -79,16 +87,16 @@ export const formatShareButton = (state: {
 }): string => {
   if (state.contacts.length === 1 && state.groups.length === 0) {
     const nick = state.contacts[0]?.nick;
-    return nick ? `Ссылка для ${nick}` : 'Ссылка для второго';
+    return nick ? `Получить ссылку для ${nick}` : 'Получить ссылку';
   }
   if (state.groups.length === 1 && state.contacts.length === 0) {
     const name = state.groups[0]?.name;
-    return name ? `Ссылка для группы «${name}»` : 'Ссылка для второго';
+    return name ? `Получить ссылку для группы «${name}»` : 'Получить ссылку';
   }
   if (state.contacts.length + state.groups.length > 1) {
-    return 'Ссылка для выбранных';
+    return 'Получить ссылку для выбранных';
   }
-  return 'Ссылка для второго';
+  return 'Получить ссылку';
 };
 
 export const formatRecipientHint = (people: number): string => {
@@ -147,12 +155,11 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
   const steps = document.createElement('ol');
   steps.className = 'home-steps';
   const step1 = document.createElement('li');
-  step1.textContent = 'Кому — из книги, если уже есть. Можно пропустить.';
+  step1.textContent = 'Выберите файл в блоке «Файлы».';
   const step2 = document.createElement('li');
-  step2.textContent = 'Файлы в блоке «Файлы».';
+  step2.textContent = 'Нажмите «Получить ссылку».';
   const step3 = document.createElement('li');
-  step3.textContent =
-    'Ссылка второму. Он открывает и принимает. Интернет отдельно искать не нужно.';
+  step3.textContent = 'Отправьте ссылку второму. Он открывает и принимает.';
   steps.append(step1, step2, step3);
 
   const wait = document.createElement('p');
@@ -162,7 +169,7 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
   const shareField = document.createElement('label');
   shareField.className = 'field';
   const shareLabel = document.createElement('span');
-  shareLabel.textContent = 'Ссылка, которую отправляете';
+  shareLabel.textContent = 'Ссылка — её копируете и отправляете';
   const shareInput = document.createElement('input');
   shareInput.type = 'text';
   shareInput.readOnly = true;
@@ -174,8 +181,8 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
   shareActions.className = 'home-actions';
   const shareBtn = document.createElement('button');
   shareBtn.type = 'button';
-  shareBtn.className = 'button';
-  shareBtn.textContent = 'Ссылка для второго';
+  shareBtn.className = 'button button-accent';
+  shareBtn.textContent = 'Получить ссылку';
   shareBtn.addEventListener('click', () => handlers.onShareRoom());
   const copyBtn = document.createElement('button');
   copyBtn.type = 'button';
@@ -204,14 +211,14 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
   error.setAttribute('role', 'alert');
 
   panel.append(
-    who,
-    idBtn,
     lead,
-    recipients,
     steps,
     wait,
     shareField,
     shareActions,
+    who,
+    idBtn,
+    recipients,
     manualActions,
     error,
   );
@@ -229,7 +236,7 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
       wait.dataset.connected = String(state.connected);
       shareInput.value = state.shareUrl;
       copyBtn.disabled = !state.shareUrl;
-      shareBtn.disabled = state.manual;
+      shareBtn.disabled = state.fromLink;
       shareBtn.textContent = formatShareButton({
         contacts: state.book.contacts.filter((item) =>
           state.selectedContactIds.includes(item.id),
@@ -282,12 +289,13 @@ export const mountHome = (root: HTMLElement, handlers: HomeHandlers) => {
         row.append(input, label);
         recipientsList.append(row);
       }
-      steps.hidden = state.manual;
-      shareField.hidden = state.manual;
-      shareActions.hidden = state.manual;
-      recipients.hidden = state.manual;
-      idBtn.hidden = state.manual;
-      manualActions.hidden = !state.manual;
+      steps.hidden = false;
+      shareField.hidden = false;
+      shareActions.hidden = false;
+      recipients.hidden =
+        state.book.contacts.length === 0 && state.book.groups.length === 0;
+      idBtn.hidden = false;
+      manualActions.hidden = true;
       error.hidden = !state.error;
       error.textContent = state.error;
     },

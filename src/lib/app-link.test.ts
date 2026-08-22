@@ -34,6 +34,7 @@ describe('app deep links', () => {
     const room = parseDeepLink('#r/office');
     expect(room.kind).toBe('room');
     if (room.kind === 'room') expect(room.payload).toBe('office');
+    expect(parseDeepLink('#/r/office').kind).toBe('room');
     expect(parseDeepLink('#help').section).toBe('help');
     expect(parseDeepLink('#j/').kind).toBe('section');
   });

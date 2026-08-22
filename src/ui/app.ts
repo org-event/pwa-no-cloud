@@ -1,3 +1,4 @@
+import { mixedContentBlocksSignaling } from '../lib/signaling/mixed-content.ts';
 import { APP_NAME, APP_TAGLINE, APP_VERSION } from '../config/index.ts';
 import type { ResolveResult, UserSettings } from '../config/types.ts';
 import type { Session, TurnHostDraft } from '../domain/index.ts';
@@ -195,7 +196,7 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
   const inboxRoot = document.createElement('div');
   inboxRoot.className = 'inbox';
   const inbox = mountInbox(inboxRoot, handlers);
-  lanRoot.append(homeRoot, transferRoot, inviteRoot, inboxRoot);
+  lanRoot.append(transferRoot, homeRoot, inviteRoot, inboxRoot);
 
   const serversRoot = document.createElement('section');
   serversRoot.className = 'page-section servers';
@@ -361,6 +362,10 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
         role: state.invite.role,
         fromLink: state.fromLink,
         error: state.invite.error,
+        socketBlocked:
+          state.resolved.ok &&
+          Boolean(state.resolved.value.signaling.url) &&
+          mixedContentBlocksSignaling(state.resolved.value.signaling.url ?? ''),
       });
       contacts.sync(state.contacts);
       invite.sync(state.invite);

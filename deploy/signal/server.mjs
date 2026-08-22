@@ -1,7 +1,11 @@
+import fs from 'node:fs';
 import http from 'node:http';
+import https from 'node:https';
 import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT) || 8443;
+const TLS_CERT = process.env.TLS_CERT ?? '';
+const TLS_KEY = process.env.TLS_KEY ?? '';
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -106,36 +110,60 @@ const getPeers = (req, res, url) => {
   sendJSON(res, 200, { peers });
 };
 
-const server = http.createServer(async (req, res) => {
+const handleRequest = async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
   if (req.method === 'OPTIONS') {
     res.writeHead(204, CORS);
     res.end();
     return;
   }
-  try {
-    if (url.pathname === '/join' && req.method === 'POST') {
-      await joinRoom(req, res);
-      return;
-    }
-    if (url.pathname === '/signal' && req.method === 'POST') {
-      await sendSignal(req, res);
-      return;
-    }
-    if (url.pathname === '/signal' && req.method === 'GET') {
-      getSignal(req, res, url);
-      return;
-    }
-    if (url.pathname === '/peers' && req.method === 'GET') {
-      getPeers(req, res, url);
-      return;
-    }
-    sendJSON(res, 404, { error: 'not found' });
-  } catch {
-    if (!res.headersSent) sendJSON(res, 500, { error: 'server' });
+  if (url.pathname === '/' && req.method === 'GET') {
+    sendJSON(res, 200, { ok: true, service: 'nocloud-signal' });
+    return;
   }
-});
+  if (url.pathname === '/join' && req.method === 'POST') {
+    await joinRoom(req, res);
+    return;
+  }
+  if (url.pathname === '/signal' && req.method === 'POST') {
+    await sendSignal(req, res);
+    return;
+  }
+  if (url.pathname === '/signal' && req.method === 'GET') {
+    getSignal(req, res, url);
+    return;
+  }
+  if (url.pathname === '/peers' && req.method === 'GET') {
+    getPeers(req, res, url);
+    return;
+  }
+  sendJSON(res, 404, { error: 'not found' });
+};
 
+const onRequest = (req, res) => {
+  void handleRequest(req, res).catch(() => {
+    if (!res.headersSent) sendJSON(res, 500, { error: 'server' });
+  });
+};
+
+const createServer = () => {
+  if (TLS_CERT || TLS_KEY) {
+    if (!TLS_CERT || !TLS_KEY) {
+      console.error('TLS_CERT and TLS_KEY must both be set');
+      process.exit(1);
+    }
+    return https.createServer(
+      {
+        cert: fs.readFileSync(TLS_CERT),
+        key: fs.readFileSync(TLS_KEY),
+      },
+      onRequest,
+    );
+  }
+  return http.createServer(onRequest);
+};
+
+const server = createServer();
 const wss = new WebSocketServer({ server, path: '/ws' });
 wss.on('connection', (socket) => {
   let roomId = '';
@@ -197,5 +225,6 @@ wss.on('connection', (socket) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`NoCloud signaling http 0.0.0.0:${PORT}`);
+  const kind = TLS_CERT ? 'https' : 'http';
+  console.log(`NoCloud signaling ${kind} 0.0.0.0:${PORT}`);
 });

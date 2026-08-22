@@ -33,6 +33,9 @@ describe('websocket signaling', () => {
       'ws://192.168.1.5:8000/ws',
     );
     expect(toWebSocketUrl('https://host/')).toBe('wss://host/ws');
+    expect(toWebSocketUrl('https://203.0.113.10:8443')).toBe(
+      'wss://203.0.113.10:8443/ws',
+    );
   });
 
   it('joins and notifies on a signal frame', async () => {

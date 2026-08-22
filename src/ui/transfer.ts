@@ -157,13 +157,13 @@ export const mountTransfer = (
   const send = document.createElement('button');
   send.type = 'button';
   send.className = 'button button-accent';
-  send.textContent = 'Отправить файл';
+  send.textContent = 'Выбрать файл';
   send.addEventListener('click', () => pick.click());
 
   const sendFolder = document.createElement('button');
   sendFolder.type = 'button';
   sendFolder.className = 'button';
-  sendFolder.textContent = 'Отправить папку';
+  sendFolder.textContent = 'Выбрать папку';
   sendFolder.addEventListener('click', () => {
     void pickDirectory(pickFolder, handlers);
   });
@@ -226,6 +226,10 @@ export const mountTransfer = (
         Boolean(state.current) || Boolean(state.incoming) || openFolder;
       send.disabled = blocked;
       sendFolder.disabled = blocked;
+      send.textContent = state.connected ? 'Отправить файл' : 'Выбрать файл';
+      sendFolder.textContent = state.connected
+        ? 'Отправить папку'
+        : 'Выбрать папку';
       accept.hidden = !needAccept;
       reject.hidden = !needAccept;
       accept.textContent = state.incomingFolder

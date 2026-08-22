@@ -17,7 +17,8 @@ curl -fsSL https://raw.githubusercontent.com/org-event/pwa-no-cloud/main/deploy/
 https://org-event.github.io/pwa-no-cloud/
 
 Signaling и TURN задаются в приложении на экране «Серверы».
-Со страницы Pages ставится только оболочка.
+Со страницы Pages ставится только оболочка. Сокет в S1 должен быть
+`https://wss-….sslip.io:8443` (wss) — иначе браузер с Pages не откроет соединение.
 
 ## Команды
 

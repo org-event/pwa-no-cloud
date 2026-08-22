@@ -61,7 +61,7 @@ const stripProtocol = (raw: string): string => {
 };
 
 const parseBody = (body: string): DeepLink => {
-  const trimmed = body.replace(/^#/, '').trim();
+  const trimmed = body.replace(/^#/, '').replace(/^\/+/, '').trim();
   if (!trimmed) return { kind: 'section', section: 'lan' };
   const deep = parseKindPayload(trimmed);
   if (deep) return deep;

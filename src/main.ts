@@ -10,7 +10,7 @@ import {
   resolveServers,
   saveUserSettings,
 } from './config/index.ts';
-import type { CustomServerDraft } from './config/types.ts';
+import type { CustomServerDraft, SignalingConfig } from './config/types.ts';
 import {
   EMPTY_TURN_HOST,
   createIdleSession,
@@ -46,7 +46,6 @@ import {
   readAppLog,
   readInboxFile,
   removeInboxFile,
-  writeFixture,
 } from './lib/opfs.ts';
 import { notifyFileReceived, requestNotifyPermission } from './lib/notify.ts';
 import { requestPersist } from './lib/quota.ts';
@@ -64,6 +63,11 @@ import { PeerSession } from './lib/peer-session.ts';
 import { inviteToQr } from './lib/qr.ts';
 import { canScanQr, decodeQrFromFile } from './lib/scan-qr.ts';
 import { createSignalingPort } from './lib/signaling/factory.ts';
+import {
+  humanizeSignalingError,
+  MIXED_CONTENT_SIGNALING,
+  mixedContentBlocksSignaling,
+} from './lib/signaling/mixed-content.ts';
 import { decodeInvite } from './lib/signaling/invite.ts';
 import { APP_BASE } from './workers/sw.ts';
 import { mountApp } from './ui/app.ts';
@@ -136,6 +140,49 @@ const isManualSignaling = (): boolean => {
   return !resolved.ok || resolved.value.signaling.kind === 'manual';
 };
 
+const socketBlocked = (): boolean => {
+  const resolved = resolveServers(settings, origin);
+  if (!resolved.ok) return false;
+  const url = resolved.value.signaling.url;
+  if (!url || resolved.value.signaling.kind === 'manual') return false;
+  return mixedContentBlocksSignaling(url);
+};
+
+const usesRoomLink = (): boolean => {
+  const resolved = resolveServers(settings, origin);
+  if (!resolved.ok) return false;
+  const sig = resolved.value.signaling;
+  if (sig.kind === 'manual' || !sig.url) return false;
+  return !mixedContentBlocksSignaling(sig.url);
+};
+
+const peerSignaling = (): SignalingConfig => {
+  const resolved = resolveServers(settings, origin);
+  if (!resolved.ok || socketBlocked()) return { kind: 'manual' };
+  return resolved.value.signaling;
+};
+
+const shareUrlNow = (): string => {
+  if (usesRoomLink() && roomId) {
+    return encodeHttpsLink(
+      globalThis.location.origin,
+      APP_BASE,
+      'room',
+      roomId,
+    );
+  }
+  if (outgoing) {
+    const kind: DeepKind = inviteRole === 'callee' ? 'answer' : 'join';
+    return encodeHttpsLink(
+      globalThis.location.origin,
+      APP_BASE,
+      kind,
+      outgoing,
+    );
+  }
+  return '';
+};
+
 const peerIsLive = (): boolean => {
   if (!peer) return false;
   return (
@@ -153,13 +200,13 @@ const inboxState = (): InboxState => ({
 
 const inviteState = (): InviteState => ({
   role: peer?.role && peer.role !== 'idle' ? peer.role : inviteRole,
-  mode: isManualSignaling() ? 'manual' : 'room',
+  mode: isManualSignaling() && !socketBlocked() ? 'manual' : 'room',
   open:
     inviteRole !== 'idle' ||
     Boolean(peer && peer.state !== 'idle' && peer.state !== 'closed'),
   outgoing,
   qrUrl,
-  error: inviteError || (peer?.error ?? ''),
+  error: humanizeSignalingError(inviteError || (peer?.error ?? '')),
   connected: peer?.state === 'connected',
   lastPongMs: peer?.lastPongMs ?? null,
   ice: peer ? formatIceReport(peer.ice) : '',
@@ -195,10 +242,7 @@ const currentState = () => ({
   canInstall: app.canInstall,
   clientId: app.clientId,
   roomId,
-  shareUrl:
-    roomId && !isManualSignaling()
-      ? encodeHttpsLink(globalThis.location.origin, APP_BASE, 'room', roomId)
-      : '',
+  shareUrl: shareUrlNow(),
   inbox: inboxState(),
   invite: inviteState(),
   transfer: transferState(),
@@ -298,7 +342,7 @@ const startPeer = (): PeerSession | null => {
   peerNick = '';
   const next = new PeerSession({
     iceServers: resolved.value.iceServers,
-    signaling: createSignalingPort(resolved.value.signaling),
+    signaling: createSignalingPort(peerSignaling()),
     shareServers: shareDraftForInvite(),
     profile: me,
   });
@@ -326,8 +370,8 @@ const startPeer = (): PeerSession | null => {
   next.on('pong', () => view.sync(currentState()));
   next.on('error', (value) => {
     if (typeof value === 'string') {
-      transferError = value;
-      note(`ошибка ${value}`);
+      transferError = humanizeSignalingError(value);
+      note(`ошибка ${transferError}`);
     }
     view.sync(currentState());
   });
@@ -460,11 +504,16 @@ const applyDeepLink = async (link: DeepLink) => {
   if (link.kind === 'room') {
     openedFromLink = true;
     roomId = link.payload;
-    if (!isManualSignaling()) {
-      inviteRole = 'caller';
-      const next = startPeer();
-      if (next) await next.enterRoom(roomId.trim() || DEFAULT_ROOM);
+    if (!usesRoomLink()) {
+      inviteError = socketBlocked()
+        ? MIXED_CONTENT_SIGNALING
+        : 'Короткая ссылка на комнату нужна с сокетом. Попросите «Получить ссылку» ещё раз.';
+      view.sync(currentState());
+      return;
     }
+    inviteRole = 'caller';
+    const next = startPeer();
+    if (next) await next.enterRoom(roomId.trim() || DEFAULT_ROOM);
     view.sync(currentState());
     return;
   }
@@ -590,35 +639,33 @@ const view = mountApp(root, {
   },
   onShareRoom: () => {
     void (async () => {
-      if (isManualSignaling()) {
-        inviteError =
-          'Ссылка на человека нужна с сокетом. Вставьте пакет S1. в «Настройки сервера».';
+      inviteError = '';
+      if (usesRoomLink()) {
+        if (!peerIsLive()) {
+          openedFromLink = false;
+          roomId = generateId();
+          inviteRole = 'caller';
+          const next = startPeer();
+          if (!next) return;
+          void next.enterRoom(roomId);
+        }
+        await shareDeepLink('room', roomId);
         view.sync(currentState());
         return;
       }
-      if (!peerIsLive()) {
-        openedFromLink = false;
-        roomId = generateId();
-        inviteRole = 'caller';
-        const next = startPeer();
-        if (!next) return;
-        void next.enterRoom(roomId);
-      }
-      await shareDeepLink('room', roomId);
+      openedFromLink = false;
+      inviteRole = 'caller';
+      const next = startPeer();
+      if (!next) return;
+      await next.createInvite();
+      await refreshOutgoing();
+      if (outgoing) await shareDeepLink('join', outgoing);
       view.sync(currentState());
     })();
   },
   onCopyShareUrl: () => {
     void (async () => {
-      const url =
-        roomId && !isManualSignaling()
-          ? encodeHttpsLink(
-              globalThis.location.origin,
-              APP_BASE,
-              'room',
-              roomId,
-            )
-          : '';
+      const url = shareUrlNow();
       if (!url) return;
       const ok = await copyText(url);
       note(ok ? 'ссылка скопирована' : 'не удалось скопировать ссылку');
@@ -808,22 +855,6 @@ const view = mountApp(root, {
   onResumeFile: () => {
     peer?.resumeFile();
     view.sync(currentState());
-  },
-  onWriteFixture: () => {
-    void (async () => {
-      if (!store) return;
-      const written = await writeFixture(store);
-      if (!written.ok) {
-        setInboxError(written.message);
-        view.sync(currentState());
-        return;
-      }
-      inboxError = '';
-      selected = written.value;
-      preview = '';
-      await refreshInbox();
-      view.sync(currentState());
-    })();
   },
   onRead: (entry) => {
     void (async () => {

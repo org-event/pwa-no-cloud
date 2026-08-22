@@ -28,8 +28,9 @@ export const mountHost = (root: HTMLElement, handlers: HostHandlers) => {
     <fieldset>
       <legend>Мой сервер</legend>
       <p class="tagline">
-        1) ssh на VPS. 2) curl установщика. На сервере скрипт спросит
-        пароль, порты (80/443) и сокет. В конце — QR пакета S1.
+        1) ssh на VPS. 2) curl установщика. Скрипт спросит пароль,
+        порты (80/443) и сокет с HTTPS. Имя sslip.io, Let’s Encrypt
+        ~90 дней, email один раз — дальше cron. В конце — QR S1.
       </p>
       <label class="field">
         <span>SSH-логин</span>

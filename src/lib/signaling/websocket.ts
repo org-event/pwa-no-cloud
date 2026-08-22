@@ -1,3 +1,4 @@
+import { MIXED_CONTENT_SIGNALING } from './mixed-content.ts';
 import { parseInvite } from './invite.ts';
 import type { SignalingPort, SignalMessage } from './port.ts';
 
@@ -79,7 +80,16 @@ export const createWebSocketPort = (
       clientId = input.clientId;
       if (!socket) {
         const open = options.open ?? ((href: string) => new WebSocket(href));
-        socket = open(target);
+        try {
+          socket = open(target);
+        } catch (error) {
+          const raw = error instanceof Error ? error.message : '';
+          throw new Error(
+            /insecure WebSocket|Mixed Content/i.test(raw)
+              ? MIXED_CONTENT_SIGNALING
+              : raw || 'WebSocket не открылся',
+          );
+        }
       }
       bind(socket);
       if (socket.readyState !== OPEN) {
