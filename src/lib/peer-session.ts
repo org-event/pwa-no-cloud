@@ -2,6 +2,7 @@ import { iceServersHaveStun, iceServersHaveTurn } from '../config/merge.ts';
 import { CHANNEL_BUFFER_HIGH, DATA_CHANNELS } from '../config/defaults.ts';
 import { explainIceFailure } from '../domain/ice-fail.ts';
 import type { IceServerConfig, CustomServerDraft } from '../config/types.ts';
+import { parseProfileCard, type ProfileCard } from '../domain/profile.ts';
 import {
   applySessionEvent,
   createIdleSession,
@@ -40,6 +41,7 @@ type PeerSessionConfig = {
   iceServers: IceServerConfig[];
   signaling: SignalingHandle;
   shareServers?: CustomServerDraft | null;
+  profile?: ProfileCard | null;
 };
 
 const errorMessage = (err: unknown, fallback: string): string => {
@@ -68,6 +70,11 @@ export class PeerSession extends EventEmitter {
   constructor(config: PeerSessionConfig) {
     super();
     this.config = config;
+  }
+
+  setProfile(profile: ProfileCard | null) {
+    this.config = { ...this.config, profile };
+    this.sendProfile();
   }
 
   outgoing() {
@@ -447,6 +454,7 @@ export class PeerSession extends EventEmitter {
       this.apply({ type: 'channel-open' });
       this.ensurePipe();
       void this.pullSelected();
+      this.sendProfile();
       this.emit('channel-open');
     };
     channel.onclose = () => {
@@ -496,10 +504,29 @@ export class PeerSession extends EventEmitter {
     this.pipe = null;
   }
 
+  sendProfile() {
+    const profile = this.config.profile;
+    const channel = this.links?.control;
+    if (!profile || !channel || channel.readyState !== 'open') return;
+    channel.send(
+      JSON.stringify({
+        type: 'profile',
+        id: profile.id,
+        nick: profile.nick,
+        avatar: profile.avatar,
+      }),
+    );
+  }
+
   onControl(raw: string) {
     if (this.pipe?.onControlRaw(raw)) return;
     try {
       const data = JSON.parse(raw) as { type?: string; t?: number };
+      if (data.type === 'profile') {
+        const card = parseProfileCard(data);
+        if (card) this.emit('profile', card);
+        return;
+      }
       if (data.type === 'ping' && this.links?.control) {
         this.links.control.send(JSON.stringify({ type: 'pong', t: data.t }));
         return;

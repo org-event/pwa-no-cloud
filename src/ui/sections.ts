@@ -2,7 +2,7 @@ import { parseDeepLink } from '../lib/app-link.ts';
 
 export const APP_SECTIONS = [
   { id: 'servers', title: 'Настройки сервера' },
-  { id: 'lan', title: 'Передача в локальной сети' },
+  { id: 'lan', title: 'Передача' },
   { id: 'contacts', title: 'Контакты' },
   { id: 'video', title: 'Видео конф' },
   { id: 'logs', title: 'Логи' },

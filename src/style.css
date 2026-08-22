@@ -324,6 +324,20 @@ h1 {
   gap: var(--space-md);
 }
 
+.home-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--color-muted-foreground);
+}
+
+.home-steps li + li {
+  margin-top: 0.35rem;
+}
+
+.home-wait[data-connected='true'] {
+  color: var(--color-foreground);
+}
+
 .invite,
 .inbox,
 .servers {
@@ -465,6 +479,52 @@ h1 {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-muted);
+}
+
+.contact-row {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.contact-row > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.contact-pick {
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.contact-pick legend {
+  padding: 0;
+  font-weight: 600;
+}
+
+form.panel > fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
 }
 
 .button:disabled {

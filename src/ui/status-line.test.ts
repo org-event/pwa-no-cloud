@@ -10,7 +10,7 @@ describe('status line', () => {
         ice: 'сейчас путь = host → host · connected',
         pongMs: 12,
       }),
-    ).toBe('онлайн · connected · host → host · 12 мс');
+    ).toBe('сеть · связь · локально · 12 мс');
   });
 
   it('skips missing ice and pong', () => {
@@ -21,6 +21,6 @@ describe('status line', () => {
         ice: '',
         pongMs: null,
       }),
-    ).toBe('офлайн · idle');
+    ).toBe('нет сети · нет пары');
   });
 });

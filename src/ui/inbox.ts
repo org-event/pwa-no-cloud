@@ -23,7 +23,7 @@ export const mountInbox = (root: HTMLElement, handlers: InboxHandlers) => {
   const panel = document.createElement('fieldset');
   panel.className = 'panel';
   const legend = document.createElement('legend');
-  legend.textContent = 'Входящие';
+  legend.textContent = 'Получено на этом телефоне';
   panel.append(legend);
 
   const actions = document.createElement('div');

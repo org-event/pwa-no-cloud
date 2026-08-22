@@ -122,7 +122,7 @@ export const mountTransfer = (
   const panel = document.createElement('fieldset');
   panel.className = 'panel';
   const legend = document.createElement('legend');
-  legend.textContent = 'Передача';
+  legend.textContent = 'Файлы';
   panel.append(legend);
 
   const pick = document.createElement('input');

@@ -13,5 +13,7 @@ describe('help topics', () => {
     expect(ids).toContain('logs');
     const links = HELP_TOPICS.find((topic) => topic.id === 'links');
     expect(links?.lead).toContain('web+nocloud');
+    const contacts = HELP_TOPICS.find((topic) => topic.id === 'contacts');
+    expect(contacts?.lead).toContain('постоянный id');
   });
 });

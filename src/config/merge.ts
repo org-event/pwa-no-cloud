@@ -89,7 +89,8 @@ export const resolveServers = (
     return {
       ok: false,
       code: 'signaling-url-required',
-      message: 'Для http-poll и websocket нужен URL signaling-сервера.',
+      message:
+        'Сокет выбран, а адрес пустой. Вставьте пакет S1. из консоли VPS или в Signaling поставьте «Вручную».',
     };
   }
   return {

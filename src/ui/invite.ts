@@ -104,7 +104,7 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
   return {
     sync(state: InviteState) {
       const manual = state.mode === 'manual';
-      panel.hidden = !state.open && state.role === 'idle' && !state.connected;
+      panel.hidden = !manual;
       if (!manual) {
         hint.textContent = state.connected
           ? 'Канал открыт'

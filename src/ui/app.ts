@@ -12,6 +12,11 @@ import {
   type InviteState,
 } from './invite.ts';
 import { mountLogs, type LogsState } from './logs.ts';
+import {
+  mountContacts,
+  type ContactsHandlers,
+  type ContactsState,
+} from './contacts.ts';
 import { mountPlaceholder } from './placeholder.ts';
 import { mountServers, type ServersHandlers } from './servers.ts';
 import { APP_SECTIONS, parseSectionHash, type AppSection } from './sections.ts';
@@ -28,16 +33,24 @@ export type AppViewState = {
   resolved: ResolveResult;
   online: boolean;
   canInstall: boolean;
+  clientId: string;
   roomId: string;
+  shareUrl: string;
   inbox: InboxState;
   invite: InviteState;
   transfer: TransferViewState;
   host: TurnHostDraft;
   hostNotice: string;
   logs: LogsState;
+  fromLink: boolean;
+  contacts: ContactsState;
+  selectedContactIds: string[];
+  selectedGroupIds: string[];
+  peerNick: string;
 };
 
 export type AppHandlers = HomeHandlers &
+  ContactsHandlers &
   HostHandlers &
   ServersHandlers &
   InboxHandlers &
@@ -173,7 +186,7 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
   const inboxRoot = document.createElement('div');
   inboxRoot.className = 'inbox';
   const inbox = mountInbox(inboxRoot, handlers);
-  lanRoot.append(homeRoot, inviteRoot, transferRoot, inboxRoot);
+  lanRoot.append(homeRoot, transferRoot, inviteRoot, inboxRoot);
 
   const serversRoot = document.createElement('section');
   serversRoot.className = 'page-section servers';
@@ -190,11 +203,7 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
   const contactsRoot = document.createElement('section');
   contactsRoot.className = 'page-section';
   contactsRoot.dataset.section = 'contacts';
-  mountPlaceholder(
-    contactsRoot,
-    'Контакты',
-    'Список людей появится здесь. Пока соединяйтесь приглашением в разделе «Передача в локальной сети».',
-  );
+  const contacts = mountContacts(contactsRoot, handlers);
 
   const videoRoot = document.createElement('section');
   videoRoot.className = 'page-section';
@@ -326,8 +335,25 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
       install.hidden = !state.canInstall;
       home.sync({
         manual: state.invite.mode === 'manual',
+        hasTurn: state.resolved.ok && state.resolved.value.hasTurn,
+        me: state.contacts.me,
+        book: state.contacts.book,
+        pending: state.contacts.pending,
+        selectedContactIds: state.selectedContactIds,
+        selectedGroupIds: state.selectedGroupIds,
+        peerNick: state.peerNick,
         roomId: state.roomId,
+        shareUrl: state.shareUrl,
+        waiting:
+          state.session.state === 'signaling' ||
+          state.session.state === 'connecting',
+        connected: state.session.state === 'connected',
+        queuedCount: state.transfer.queuedNames.length,
+        role: state.invite.role,
+        fromLink: state.fromLink,
+        error: state.invite.error,
       });
+      contacts.sync(state.contacts);
       invite.sync(state.invite);
       transfer.sync(state.transfer);
       inbox.sync(state.inbox);

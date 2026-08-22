@@ -16,6 +16,17 @@ import {
   createIdleSession,
   type TurnHostDraft,
 } from './domain/index.ts';
+import {
+  EMPTY_BOOK,
+  defaultNick,
+  findContact,
+  parseProfileCard,
+  removeContact,
+  sanitizeNick,
+  upsertContact,
+  type AddressBook,
+  type ProfileCard,
+} from './domain/profile.ts';
 import { Application } from './lib/application.ts';
 import {
   cleanLocation,
@@ -41,6 +52,14 @@ import { notifyFileReceived, requestNotifyPermission } from './lib/notify.ts';
 import { requestPersist } from './lib/quota.ts';
 import { filesFromShare } from './lib/share.ts';
 import { loadTurnHost, saveTurnHost } from './lib/turn-host-store.ts';
+import { generateId } from './lib/id.ts';
+import { fileToAvatarDataUrl } from './lib/avatar.ts';
+import {
+  createGroup,
+  loadAddressBook,
+  saveAddressBook,
+} from './lib/contacts-store.ts';
+import { loadProfile, saveProfile } from './lib/profile-store.ts';
 import { PeerSession } from './lib/peer-session.ts';
 import { inviteToQr } from './lib/qr.ts';
 import { canScanQr, decodeQrFromFile } from './lib/scan-qr.ts';
@@ -51,6 +70,7 @@ import { mountApp } from './ui/app.ts';
 import type { InboxState } from './ui/inbox.ts';
 import type { InviteState } from './ui/invite.ts';
 import type { LogsState } from './ui/logs.ts';
+import type { ContactsState } from './ui/contacts.ts';
 import type { PickedFile } from './lib/folder-walk.ts';
 import type { TransferViewState } from './ui/transfer.ts';
 import './style.css';
@@ -75,15 +95,24 @@ let inviteRole: InviteState['role'] = 'idle';
 let outgoing = '';
 let qrUrl: string | null = null;
 let inviteError = '';
-let roomId = DEFAULT_ROOM;
+let roomId = '';
 let transferError = '';
 let hostDraft: TurnHostDraft = { ...EMPTY_TURN_HOST };
 let hostNotice = '';
 let shareWithPeer = true;
 let queuedFiles: File[] = [];
+let openedFromLink = false;
 let logText = '';
 let logError = '';
 let lastLoggedState = '';
+let me = loadProfile(storage);
+let book: AddressBook = { ...EMPTY_BOOK };
+let pending: ProfileCard | null = null;
+let contactsNotice = '';
+let selectedContactIds: string[] = [];
+let selectedGroupIds: string[] = [];
+let peerNick = '';
+const skippedPeers = new Set<string>();
 
 const LOG_CAP = 80_000;
 
@@ -105,6 +134,13 @@ const logsState = (): LogsState => ({
 const isManualSignaling = (): boolean => {
   const resolved = resolveServers(settings, origin);
   return !resolved.ok || resolved.value.signaling.kind === 'manual';
+};
+
+const peerIsLive = (): boolean => {
+  if (!peer) return false;
+  return (
+    peer.state !== 'idle' && peer.state !== 'closed' && peer.state !== 'failed'
+  );
 };
 
 const inboxState = (): InboxState => ({
@@ -144,19 +180,36 @@ const transferState = (): TransferViewState => ({
   error: transferError,
 });
 
+const contactsState = (): ContactsState => ({
+  me,
+  book,
+  pending,
+  notice: contactsNotice,
+});
+
 const currentState = () => ({
   session: peer?.session ?? createIdleSession(),
   settings,
   resolved: resolveServers(settings, origin),
   online: app.online,
   canInstall: app.canInstall,
+  clientId: app.clientId,
   roomId,
+  shareUrl:
+    roomId && !isManualSignaling()
+      ? encodeHttpsLink(globalThis.location.origin, APP_BASE, 'room', roomId)
+      : '',
   inbox: inboxState(),
   invite: inviteState(),
   transfer: transferState(),
   host: hostDraft,
   hostNotice,
   logs: logsState(),
+  fromLink: openedFromLink,
+  contacts: contactsState(),
+  selectedContactIds,
+  selectedGroupIds,
+  peerNick,
 });
 
 const setInboxError = (message: string) => {
@@ -188,6 +241,33 @@ const refreshOutgoing = async () => {
   view.sync(currentState());
 };
 
+const persistBook = () => {
+  if (!store) return;
+  void (async () => {
+    const saved = await saveAddressBook(store, book);
+    if (!saved.ok) {
+      contactsNotice = saved.message;
+      view.sync(currentState());
+    }
+  })();
+};
+
+const applyPeerProfile = (card: ProfileCard) => {
+  if (card.id === me.id) return;
+  peerNick = card.nick;
+  const known = findContact(book, card.id);
+  if (known) {
+    book = upsertContact(book, card);
+    persistBook();
+    if (pending?.id === card.id) pending = null;
+    note(`контакт ${card.nick}`);
+  } else if (!skippedPeers.has(card.id)) {
+    pending = card;
+    note(`новый человек ${card.nick}`);
+  }
+  view.sync(currentState());
+};
+
 const applyShareDraft = (draft: CustomServerDraft, notice: string) => {
   settings = createUserSettings('custom', draft);
   saveUserSettings(settings, storage);
@@ -215,10 +295,12 @@ const startPeer = (): PeerSession | null => {
   qrUrl = null;
   inviteError = '';
   lastLoggedState = '';
+  peerNick = '';
   const next = new PeerSession({
     iceServers: resolved.value.iceServers,
     signaling: createSignalingPort(resolved.value.signaling),
     shareServers: shareDraftForInvite(),
+    profile: me,
   });
   next.on('state', () => {
     const label = next.session.state;
@@ -235,6 +317,10 @@ const startPeer = (): PeerSession | null => {
     note('канал открыт');
     flushQueue();
     view.sync(currentState());
+  });
+  next.on('profile', (value) => {
+    const card = value as ProfileCard;
+    applyPeerProfile(card);
   });
   next.on('ice', () => view.sync(currentState()));
   next.on('pong', () => view.sync(currentState()));
@@ -372,6 +458,7 @@ const applyDeepLink = async (link: DeepLink) => {
     return;
   }
   if (link.kind === 'room') {
+    openedFromLink = true;
     roomId = link.payload;
     if (!isManualSignaling()) {
       inviteRole = 'caller';
@@ -408,9 +495,6 @@ const view = mountApp(root, {
   },
   onInstall: () => {
     void app.install();
-  },
-  onRoom: (value) => {
-    roomId = value;
   },
   onSaveHost: (draft) => {
     void (async () => {
@@ -487,12 +571,6 @@ const view = mountApp(root, {
       inviteRole = 'caller';
       const next = startPeer();
       if (!next) return;
-      if (!isManualSignaling()) {
-        await next.enterRoom(roomId.trim() || DEFAULT_ROOM);
-        inviteRole = next.role;
-        view.sync(currentState());
-        return;
-      }
       await next.createInvite();
       await refreshOutgoing();
     })();
@@ -511,7 +589,164 @@ const view = mountApp(root, {
     void shareDeepLink(kind, outgoing);
   },
   onShareRoom: () => {
-    void shareDeepLink('room', roomId.trim() || DEFAULT_ROOM);
+    void (async () => {
+      if (isManualSignaling()) {
+        inviteError =
+          'Ссылка на человека нужна с сокетом. Вставьте пакет S1. в «Настройки сервера».';
+        view.sync(currentState());
+        return;
+      }
+      if (!peerIsLive()) {
+        openedFromLink = false;
+        roomId = generateId();
+        inviteRole = 'caller';
+        const next = startPeer();
+        if (!next) return;
+        void next.enterRoom(roomId);
+      }
+      await shareDeepLink('room', roomId);
+      view.sync(currentState());
+    })();
+  },
+  onCopyShareUrl: () => {
+    void (async () => {
+      const url =
+        roomId && !isManualSignaling()
+          ? encodeHttpsLink(
+              globalThis.location.origin,
+              APP_BASE,
+              'room',
+              roomId,
+            )
+          : '';
+      if (!url) return;
+      const ok = await copyText(url);
+      note(ok ? 'ссылка скопирована' : 'не удалось скопировать ссылку');
+      view.sync(currentState());
+    })();
+  },
+  onCopyId: () => {
+    void (async () => {
+      const ok = await copyText(me.id);
+      note(ok ? 'id скопирован' : 'не удалось скопировать id');
+      view.sync(currentState());
+    })();
+  },
+  onAcceptPending: () => {
+    if (!pending) return;
+    book = upsertContact(book, pending);
+    contactsNotice = `В книге: ${pending.nick}`;
+    skippedPeers.delete(pending.id);
+    pending = null;
+    persistBook();
+    view.sync(currentState());
+  },
+  onSkipPending: () => {
+    if (pending) skippedPeers.add(pending.id);
+    pending = null;
+    view.sync(currentState());
+  },
+  onToggleContact: (id) => {
+    selectedContactIds = selectedContactIds.includes(id)
+      ? selectedContactIds.filter((item) => item !== id)
+      : [...selectedContactIds, id];
+    view.sync(currentState());
+  },
+  onToggleGroup: (id) => {
+    selectedGroupIds = selectedGroupIds.includes(id)
+      ? selectedGroupIds.filter((item) => item !== id)
+      : [...selectedGroupIds, id];
+    view.sync(currentState());
+  },
+  onSaveProfile: (nick) => {
+    const nextNick = sanitizeNick(nick);
+    if (!nextNick) {
+      contactsNotice = 'Ник: буквы, цифры, пробел, . _ - до 32 знаков.';
+      view.sync(currentState());
+      return;
+    }
+    me = saveProfile(storage, { nick: nextNick, avatar: me.avatar });
+    peer?.setProfile(me);
+    contactsNotice = 'Ник сохранён.';
+    view.sync(currentState());
+  },
+  onPickAvatar: (file) => {
+    void (async () => {
+      try {
+        const avatar = await fileToAvatarDataUrl(file);
+        if (!avatar) {
+          contactsNotice = 'Не удалось прочитать фото.';
+          view.sync(currentState());
+          return;
+        }
+        me = saveProfile(storage, { nick: me.nick, avatar });
+        peer?.setProfile(me);
+        contactsNotice = 'Фото сохранено. Второй получит карточку по каналу.';
+        view.sync(currentState());
+      } catch {
+        contactsNotice = 'Не удалось прочитать фото.';
+        view.sync(currentState());
+      }
+    })();
+  },
+  onClearAvatar: () => {
+    me = saveProfile(storage, { nick: me.nick, avatar: '' });
+    peer?.setProfile(me);
+    contactsNotice = 'Лого сгенерировано из id.';
+    view.sync(currentState());
+  },
+  onAddContact: (id, nick) => {
+    const card = parseProfileCard({
+      id: id.trim(),
+      nick: sanitizeNick(nick) || defaultNick(id.trim()),
+      avatar: '',
+    });
+    if (!card) {
+      contactsNotice = 'Неверный id. Нужны 8–24 латинских буквы или цифры.';
+      view.sync(currentState());
+      return;
+    }
+    if (card.id === me.id) {
+      contactsNotice = 'Это ваш id.';
+      view.sync(currentState());
+      return;
+    }
+    book = upsertContact(book, card);
+    contactsNotice = `В книге: ${card.nick}`;
+    persistBook();
+    view.sync(currentState());
+  },
+  onRemoveContact: (id) => {
+    book = removeContact(book, id);
+    selectedContactIds = selectedContactIds.filter((item) => item !== id);
+    contactsNotice = 'Удалено.';
+    persistBook();
+    view.sync(currentState());
+  },
+  onSaveGroup: (name, memberIds) => {
+    const label = sanitizeNick(name);
+    if (!label || memberIds.length === 0) {
+      contactsNotice = 'Нужны название и хотя бы один человек.';
+      view.sync(currentState());
+      return;
+    }
+    book = {
+      ...book,
+      groups: [...book.groups, createGroup(label, memberIds)],
+    };
+    contactsNotice = `Группа «${label}». Канал всё равно 1:1.`;
+    persistBook();
+    view.sync(currentState());
+  },
+  onRemoveGroup: (id) => {
+    book = {
+      ...book,
+      groups: book.groups.filter((group) => group.id !== id),
+    };
+    selectedGroupIds = selectedGroupIds.filter((item) => item !== id);
+    contactsNotice = 'Группа удалена.';
+    persistBook();
+    view.sync(currentState());
   },
   onCopy: () => {
     void (async () => {
@@ -655,6 +890,7 @@ if (opened.ok) {
   else logError = existing.message;
   await refreshInbox();
   hostDraft = await loadTurnHost(store);
+  book = await loadAddressBook(store);
 } else {
   inboxError = opened.message;
   logError = opened.message;

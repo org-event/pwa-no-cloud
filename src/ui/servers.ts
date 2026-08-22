@@ -106,9 +106,13 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
         <select name="kind"></select>
       </label>
       <label class="field">
-        <span>Signaling URL</span>
-        <input name="signalingUrl" type="url" autocomplete="off" />
+        <span>Адрес сокета</span>
+        <input name="signalingUrl" type="url" autocomplete="off" placeholder="ws://203.0.113.10:8443/ws" />
       </label>
+      <p class="tagline">
+        Сокет — не файлы, а «комната»: два телефона стучатся сюда и находят друг друга.
+        Берётся из пакета S1. после curl на VPS. Без адреса ссылка «открой и получи» не сойдётся.
+      </p>
       <label class="field">
         <span>STUN, по одному URL в строке</span>
         <textarea name="stun" rows="3"></textarea>
