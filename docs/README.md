@@ -1,0 +1,30 @@
+# Документация NoCloud
+
+PWA для обмена файлами и папками между устройствами без облака.
+Трафик файлов идёт напрямую по WebRTC (`RTCDataChannel`).
+Сервер нужен только для знакомства клиентов (signaling) и, при жёстком NAT, как TURN-релей.
+
+## Как читать
+
+1. [plan.md](./plan.md) — полный план развития по шагам. Это основной документ.
+2. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI (подключаем на шаге оболочки).
+
+Код ещё не пишем. Следующий ход — выполнять шаги плана по порядку.
+
+## Источники подхода
+
+Локальный каталог: `/Users/org-event/git-step/HowMeta`.
+
+| тема | куда смотреть |
+|---|---|
+| слои, контракты, конфиг | `HowMeta/Metarhia/Docs`, `Example`, `metaconfiguration` |
+| стиль JS | `HowMeta/Metarhia/metaskills/skills/js-conventions` |
+| WebRTC + signaling + STUN | `HowMeta/HowProgrammingWorks/WebRTC` |
+| PWA, SW, offline, Application | `HowMeta/HowProgrammingWorks/PWA`, `ServiceWorker`, `Application` |
+| OPFS | `HowMeta/HowProgrammingWorks/OPFS` |
+| слои абстракции | `HowMeta/HowProgrammingWorks/AbstractionLayers` |
+| адаптеры и стратегии | `HowMeta/HowProgrammingWorks/Adapter`, `Strategy` |
+| очереди, стримы | `HowMeta/HowProgrammingWorks/AsyncQueue`, `WebStreams` |
+| конфигурация как JS-объекты | `HowMeta/HowProgrammingWorks/Configuration` |
+
+Копируем **подход и структуру**, не файлы слепо.
