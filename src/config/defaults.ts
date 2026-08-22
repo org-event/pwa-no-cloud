@@ -21,6 +21,10 @@ export const DATA_CHANNELS = {
 
 export const CHUNK_SIZE_BYTES = 64 * 1024;
 
+export const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024;
+
+export const CHANNEL_BUFFER_HIGH = 256 * 1024;
+
 export const DEFAULT_SIGNALING: SignalingConfig = {
   kind: 'manual',
 };

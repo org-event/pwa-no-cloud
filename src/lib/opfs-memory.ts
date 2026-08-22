@@ -95,7 +95,7 @@ export class MemoryDirectory {
     return file;
   }
 
-  async removeEntry(name: string) {
+  async removeEntry(name: string, _options?: { recursive?: boolean }) {
     if (!this.children.delete(name)) throw new Error('NotFoundError');
   }
 

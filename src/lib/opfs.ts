@@ -138,6 +138,41 @@ export const appendLog = async (
   }
 };
 
+export const openInboxWritable = async (
+  store: OpfsStore,
+  transferId: string,
+  name: string,
+): Promise<OpfsResult<FileSystemWritableFileStream>> => {
+  if (!isSafeName(transferId)) {
+    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+  }
+  if (!isSafeName(name)) return fail('unsafe-name', 'Недопустимое имя файла');
+  try {
+    const folder = await store.inbox.getDirectoryHandle(transferId, {
+      create: true,
+    });
+    const handle = await folder.getFileHandle(name, { create: true });
+    return { ok: true, value: await handle.createWritable() };
+  } catch (error) {
+    return asError(error, 'write-failed');
+  }
+};
+
+export const removeInboxTransfer = async (
+  store: OpfsStore,
+  transferId: string,
+): Promise<OpfsResult<true>> => {
+  if (!isSafeName(transferId)) {
+    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+  }
+  try {
+    await store.inbox.removeEntry(transferId, { recursive: true });
+    return { ok: true, value: true };
+  } catch (error) {
+    return asError(error, 'remove-failed');
+  }
+};
+
 export const writeInboxFile = async (
   store: OpfsStore,
   transferId: string,

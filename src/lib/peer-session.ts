@@ -1,4 +1,4 @@
-import { DATA_CHANNELS } from '../config/defaults.ts';
+import { CHANNEL_BUFFER_HIGH, DATA_CHANNELS } from '../config/defaults.ts';
 import type { IceServerConfig } from '../config/types.ts';
 import {
   applySessionEvent,
@@ -8,7 +8,9 @@ import {
   type SessionState,
 } from '../domain/session.ts';
 import { EventEmitter } from './events.ts';
+import { FilePipe, type DataSink } from './file-pipe.ts';
 import { generateId } from './id.ts';
+import type { OpfsStore } from './opfs.ts';
 import {
   addUniquePath,
   classifyCandidate,
@@ -51,6 +53,8 @@ export class PeerSession extends EventEmitter {
   config: PeerSessionConfig;
   waitGen = 0;
   waitTimer: ReturnType<typeof setTimeout> | null = null;
+  pipe: FilePipe | null = null;
+  store: OpfsStore | null = null;
 
   get state(): SessionState {
     return this.session.state;
@@ -109,6 +113,7 @@ export class PeerSession extends EventEmitter {
     this.links = createLocalChannels(pc);
     this.bindPeer(pc);
     this.bindControl(this.links.control);
+    this.bindBytes(this.links.bytes);
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     await waitIceComplete(pc);
@@ -162,6 +167,40 @@ export class PeerSession extends EventEmitter {
     return accepted;
   }
 
+  setStore(store: OpfsStore | null) {
+    this.store = store;
+    this.pipe?.setStore(store);
+  }
+
+  sendFile(file: File) {
+    this.ensurePipe();
+    this.pipe?.sendFile(file);
+  }
+
+  acceptFile(transferId: string) {
+    this.pipe?.accept(transferId);
+  }
+
+  rejectFile(transferId: string, reason?: string) {
+    this.pipe?.reject(transferId, reason);
+  }
+
+  cancelFile() {
+    this.pipe?.cancel();
+  }
+
+  currentTransfer() {
+    return this.pipe?.current() ?? null;
+  }
+
+  activeFile() {
+    return this.pipe?.active ?? null;
+  }
+
+  incomingFile() {
+    return this.pipe?.incoming ?? null;
+  }
+
   ping() {
     const channel = this.links?.control;
     if (!channel || channel.readyState !== 'open') return;
@@ -173,6 +212,7 @@ export class PeerSession extends EventEmitter {
     this.waitGen += 1;
     if (this.waitTimer) clearTimeout(this.waitTimer);
     this.waitTimer = null;
+    this.dropPipe();
     this.config.signaling.close();
     const links = this.links;
     this.links = null;
@@ -191,6 +231,7 @@ export class PeerSession extends EventEmitter {
     this.waitGen += 1;
     if (this.waitTimer) clearTimeout(this.waitTimer);
     this.waitTimer = null;
+    this.dropPipe();
     this.error = '';
     this.lastPongMs = null;
     this.ice = emptyIceReport();
@@ -268,6 +309,9 @@ export class PeerSession extends EventEmitter {
         attachRemoteChannels(this.links as PeerLinks, event.channel);
         if (event.channel.label === DATA_CHANNELS.control) {
           this.bindControl(event.channel);
+        }
+        if (event.channel.label === DATA_CHANNELS.bytes) {
+          this.bindBytes(event.channel);
         }
       };
       await pc.setRemoteDescription({ type: 'offer', sdp: payload.sdp });
@@ -361,6 +405,7 @@ export class PeerSession extends EventEmitter {
     if (!channel) return;
     channel.onopen = () => {
       this.apply({ type: 'channel-open' });
+      this.ensurePipe();
       void this.pullSelected();
       this.emit('channel-open');
     };
@@ -372,7 +417,45 @@ export class PeerSession extends EventEmitter {
     };
   }
 
+  bindBytes(channel: RTCDataChannel | null) {
+    if (!channel) return;
+    channel.binaryType = 'arraybuffer';
+    channel.bufferedAmountLowThreshold = CHANNEL_BUFFER_HIGH;
+    channel.onopen = () => {
+      this.ensurePipe();
+    };
+    channel.onmessage = (event) => {
+      const data = event.data;
+      if (data instanceof ArrayBuffer) void this.pipe?.onBytes(data);
+    };
+  }
+
+  ensurePipe() {
+    if (this.pipe) return;
+    const links = this.links;
+    if (!links?.control || !links.bytes) return;
+    if (links.control.readyState !== 'open') return;
+    if (links.bytes.readyState !== 'open') return;
+    const pipe = new FilePipe({
+      control: links.control,
+      bytes: links.bytes as unknown as DataSink,
+      store: this.store,
+    });
+    pipe.on('transfer', (value) => this.emit('transfer', value));
+    pipe.on('offer', (value) => this.emit('file-offer', value));
+    pipe.on('received', (value) => this.emit('file-received', value));
+    pipe.on('error', (value) => this.emit('error', value));
+    this.pipe = pipe;
+  }
+
+  dropPipe() {
+    if (!this.pipe) return;
+    this.pipe.generation += 1;
+    this.pipe = null;
+  }
+
   onControl(raw: string) {
+    if (this.pipe?.onControlRaw(raw)) return;
     try {
       const data = JSON.parse(raw) as { type?: string; t?: number };
       if (data.type === 'ping' && this.links?.control) {

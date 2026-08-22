@@ -23,6 +23,7 @@ import { createSignalingPort } from './lib/signaling/factory.ts';
 import { mountApp } from './ui/app.ts';
 import type { InboxState } from './ui/inbox.ts';
 import type { InviteState } from './ui/invite.ts';
+import type { TransferViewState } from './ui/transfer.ts';
 import './style.css';
 
 const root = document.querySelector<HTMLElement>('#app');
@@ -46,6 +47,7 @@ let outgoing = '';
 let qrUrl: string | null = null;
 let inviteError = '';
 let roomId = DEFAULT_ROOM;
+let transferError = '';
 
 const isManualSignaling = (): boolean => {
   const resolved = resolveServers(settings, origin);
@@ -74,6 +76,13 @@ const inviteState = (): InviteState => ({
   ice: peer ? formatIceReport(peer.ice) : '',
 });
 
+const transferState = (): TransferViewState => ({
+  connected: peer?.state === 'connected',
+  current: peer?.activeFile() ?? null,
+  incoming: peer?.incomingFile() ?? null,
+  error: transferError,
+});
+
 const currentState = () => ({
   session: peer?.session ?? createIdleSession(),
   settings,
@@ -83,6 +92,7 @@ const currentState = () => ({
   roomId,
   inbox: inboxState(),
   invite: inviteState(),
+  transfer: transferState(),
 });
 
 const setInboxError = (message: string) => {
@@ -136,7 +146,19 @@ const startPeer = (): PeerSession | null => {
   next.on('channel-open', () => view.sync(currentState()));
   next.on('ice', () => view.sync(currentState()));
   next.on('pong', () => view.sync(currentState()));
-  next.on('error', () => view.sync(currentState()));
+  next.on('error', (value) => {
+    if (typeof value === 'string') transferError = value;
+    view.sync(currentState());
+  });
+  next.on('transfer', () => view.sync(currentState()));
+  next.on('file-offer', () => view.sync(currentState()));
+  next.on('file-received', () => {
+    void (async () => {
+      await refreshInbox();
+      view.sync(currentState());
+    })();
+  });
+  next.setStore(store);
   peer = next;
   return next;
 };
@@ -212,6 +234,24 @@ const view = mountApp(root, {
   },
   onPing: () => {
     peer?.ping();
+  },
+  onPickFile: (file) => {
+    transferError = '';
+    peer?.sendFile(file);
+    view.sync(currentState());
+  },
+  onAcceptFile: (transferId) => {
+    transferError = '';
+    peer?.acceptFile(transferId);
+    view.sync(currentState());
+  },
+  onRejectFile: (transferId) => {
+    peer?.rejectFile(transferId);
+    view.sync(currentState());
+  },
+  onCancelFile: () => {
+    peer?.cancelFile();
+    view.sync(currentState());
   },
   onWriteFixture: () => {
     void (async () => {

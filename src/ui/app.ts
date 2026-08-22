@@ -10,6 +10,11 @@ import {
   type InviteState,
 } from './invite.ts';
 import { mountServers, type ServersHandlers } from './servers.ts';
+import {
+  mountTransfer,
+  type TransferHandlers,
+  type TransferViewState,
+} from './transfer.ts';
 
 export type AppViewState = {
   session: Session;
@@ -20,12 +25,14 @@ export type AppViewState = {
   roomId: string;
   inbox: InboxState;
   invite: InviteState;
+  transfer: TransferViewState;
 };
 
 export type AppHandlers = HomeHandlers &
   ServersHandlers &
   InboxHandlers &
-  InviteHandlers;
+  InviteHandlers &
+  TransferHandlers;
 
 export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
   root.replaceChildren();
@@ -52,6 +59,10 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
   inviteRoot.className = 'invite';
   const invite = mountInvite(inviteRoot, handlers);
 
+  const transferRoot = document.createElement('section');
+  transferRoot.className = 'invite';
+  const transfer = mountTransfer(transferRoot, handlers);
+
   const inboxRoot = document.createElement('section');
   inboxRoot.className = 'inbox';
   const inbox = mountInbox(inboxRoot, handlers);
@@ -66,6 +77,7 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
     status,
     homeRoot,
     inviteRoot,
+    transferRoot,
     inboxRoot,
     serversRoot,
   );
@@ -84,6 +96,7 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
         roomId: state.roomId,
       });
       invite.sync(state.invite);
+      transfer.sync(state.transfer);
       inbox.sync(state.inbox);
       servers.sync(state.settings, state.resolved);
     },
