@@ -1,4 +1,5 @@
 import type { IceServerConfig } from '../config/types.ts';
+import { sortIceUrls } from '../config/ice-urls.ts';
 
 export type TurnHostDraft = {
   host: string;
@@ -105,5 +106,8 @@ export const iceServersFromTurnHost = (
     urls.push(`turn:${host}:${port}`);
     urls.push(`turn:${host}:${port}?transport=tcp`);
   }
-  return [{ urls: `stun:${host}:${stunPort}` }, { urls, username, credential }];
+  return [
+    { urls: `stun:${host}:${stunPort}` },
+    { urls: sortIceUrls(urls), username, credential },
+  ];
 };

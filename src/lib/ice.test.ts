@@ -3,6 +3,7 @@ import {
   classifyCandidate,
   formatIceReport,
   pairFromStats,
+  parseIceCandidateInit,
   pathsFromSdp,
   type IceReport,
   type IceStat,
@@ -21,6 +22,20 @@ describe('classifyCandidate', () => {
     expect(classifyCandidate(srflx)).toBe('srflx');
     expect(classifyCandidate(relay)).toBe('relay');
     expect(classifyCandidate('candidate:9 1 udp 1 10.0.0.1 9')).toBe('unknown');
+  });
+
+  it('keeps sdpMid so addIceCandidate can apply a trickled line', () => {
+    const parsed = parseIceCandidateInit({
+      candidate: host,
+      sdpMid: '0',
+      sdpMLineIndex: 0,
+    });
+    expect(parsed).toEqual({
+      candidate: host,
+      sdpMid: '0',
+      sdpMLineIndex: 0,
+    });
+    expect(parseIceCandidateInit({ candidate: '' })).toBeNull();
   });
 });
 

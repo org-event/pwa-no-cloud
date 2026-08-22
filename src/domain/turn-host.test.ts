@@ -38,6 +38,11 @@ describe('turn host console commands', () => {
       [80, 443],
     );
     expect(ice[0]?.urls).toBe('stun:203.0.113.10:80');
-    expect(ice[1]?.urls).toContain('turn:203.0.113.10:443?transport=tcp');
+    expect(ice[1]?.urls).toEqual([
+      'turn:203.0.113.10:443?transport=tcp',
+      'turn:203.0.113.10:80?transport=tcp',
+      'turn:203.0.113.10:443',
+      'turn:203.0.113.10:80',
+    ]);
   });
 });

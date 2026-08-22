@@ -29,6 +29,7 @@ describe('explainIceFailure', () => {
       remote: ['srflx'],
       hasTurn: true,
       hasStun: true,
+      gathering: 'complete',
     });
     expect(message).toContain('relay-кандидат не появился');
   });

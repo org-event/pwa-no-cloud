@@ -13,14 +13,30 @@ export type IceReport = {
   selected: IcePair | null;
 };
 
-export type IceStat = {
-  type: string;
-  id?: string;
-  state?: string;
-  nominated?: boolean;
-  localCandidateId?: string;
-  remoteCandidateId?: string;
-  candidateType?: string;
+export type IceCandidateInit = {
+  candidate: string;
+  sdpMid?: string | null;
+  sdpMLineIndex?: number | null;
+};
+
+export const parseIceCandidateInit = (
+  raw: unknown,
+): IceCandidateInit | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const record = raw as {
+    candidate?: unknown;
+    sdpMid?: unknown;
+    sdpMLineIndex?: unknown;
+  };
+  if (typeof record.candidate !== 'string' || !record.candidate) return null;
+  const init: IceCandidateInit = { candidate: record.candidate };
+  if (typeof record.sdpMid === 'string' || record.sdpMid === null) {
+    init.sdpMid = record.sdpMid;
+  }
+  if (typeof record.sdpMLineIndex === 'number') {
+    init.sdpMLineIndex = record.sdpMLineIndex;
+  }
+  return init;
 };
 
 const KNOWN: IcePath[] = ['host', 'srflx', 'prflx', 'relay'];
@@ -61,6 +77,16 @@ export const pathsFromSdp = (sdp: string): IcePath[] => {
     paths = addUniquePath(paths, classifyCandidate(line));
   }
   return paths;
+};
+
+export type IceStat = {
+  type: string;
+  id?: string;
+  state?: string;
+  nominated?: boolean;
+  localCandidateId?: string;
+  remoteCandidateId?: string;
+  candidateType?: string;
 };
 
 export const pairFromStats = (stats: Iterable<IceStat>): IcePair | null => {

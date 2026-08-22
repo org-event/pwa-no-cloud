@@ -1,4 +1,4 @@
-import { listIceUrls } from './ice-urls.ts';
+import { listIceUrls, sortIceUrls } from './ice-urls.ts';
 import { isTurnUrl } from './merge.ts';
 import type { IceServerConfig } from './types.ts';
 
@@ -45,8 +45,9 @@ export const draftIceServers = (draft: IceDraft): IceServerConfig[] => {
     iceServers.push({ urls: url });
   }
   if (draft.turn.length === 0) return iceServers;
+  const turnUrls = sortIceUrls(draft.turn);
   iceServers.push({
-    urls: draft.turn.length === 1 ? draft.turn[0] : [...draft.turn],
+    urls: turnUrls.length === 1 ? (turnUrls[0] as string) : turnUrls,
     username: draft.username,
     credential: draft.credential,
   });

@@ -20,7 +20,9 @@ import {
   classifyCandidate,
   emptyIceReport,
   pairFromStats,
+  parseIceCandidateInit,
   pathsFromSdp,
+  type IceCandidateInit,
   type IceReport,
 } from './ice.ts';
 import type { SignalingHandle } from './signaling/factory.ts';
@@ -31,7 +33,7 @@ import {
   createLocalChannels,
   createPeerConnection,
   localSdp,
-  waitIceComplete,
+  waitIceGathering,
   type PeerLinks,
 } from './webrtc.ts';
 
@@ -62,6 +64,8 @@ export class PeerSession extends EventEmitter {
   waitTimer: ReturnType<typeof setTimeout> | null = null;
   pipe: FilePipe | null = null;
   store: OpfsStore | null = null;
+  peerId = '';
+  pendingCandidates: IceCandidateInit[] = [];
 
   get state(): SessionState {
     return this.session.state;
@@ -107,6 +111,7 @@ export class PeerSession extends EventEmitter {
       await signaling.connect({ roomId, clientId: this.clientId });
       signaling.subscribe((message) => this.onSignal(message));
       const peerId = await this.waitPeer();
+      this.peerId = peerId;
       if (this.clientId < peerId) {
         this.role = 'caller';
         await this.offerTo(peerId);
@@ -122,8 +127,13 @@ export class PeerSession extends EventEmitter {
     }
   }
 
+  canTrickle() {
+    return !isManualPort(this.config.signaling);
+  }
+
   async offerTo(to: string) {
     const signaling = this.config.signaling;
+    this.peerId = to;
     const pc = createPeerConnection(this.config.iceServers);
     this.links = createLocalChannels(pc);
     this.bindPeer(pc);
@@ -131,7 +141,11 @@ export class PeerSession extends EventEmitter {
     this.bindBytes(this.links.bytes);
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    await waitIceComplete(pc);
+    if (!this.canTrickle()) {
+      await waitIceGathering(pc, {
+        wantRelay: iceServersHaveTurn(this.config.iceServers),
+      });
+    }
     this.noteLocalSdp(localSdp(pc));
     await signaling.send({
       from: this.clientId,
@@ -255,6 +269,8 @@ export class PeerSession extends EventEmitter {
     this.role = 'idle';
     this.lastPongMs = null;
     this.ice = emptyIceReport();
+    this.peerId = '';
+    this.pendingCandidates = [];
     if (links) {
       links.control?.close();
       links.bytes?.close();
@@ -271,6 +287,8 @@ export class PeerSession extends EventEmitter {
     this.error = '';
     this.lastPongMs = null;
     this.ice = emptyIceReport();
+    this.peerId = '';
+    this.pendingCandidates = [];
     this.config.signaling.close();
     const links = this.links;
     this.links = null;
@@ -328,6 +346,7 @@ export class PeerSession extends EventEmitter {
         remote: this.ice.remote,
         hasTurn: iceServersHaveTurn(this.config.iceServers),
         hasStun: iceServersHaveStun(this.config.iceServers),
+        gathering: this.ice.gatheringState,
       }),
     );
   }
@@ -339,6 +358,10 @@ export class PeerSession extends EventEmitter {
     }
     if (message.data.type === 'answer') {
       await this.handleAnswer(message);
+      return;
+    }
+    if (message.data.type === 'candidate') {
+      await this.handleCandidate(message);
     }
   }
 
@@ -349,6 +372,7 @@ export class PeerSession extends EventEmitter {
       return;
     }
     try {
+      this.peerId = message.from;
       const pc = createPeerConnection(this.config.iceServers);
       this.links = { pc, control: null, bytes: null };
       this.bindPeer(pc);
@@ -363,9 +387,14 @@ export class PeerSession extends EventEmitter {
       };
       await pc.setRemoteDescription({ type: 'offer', sdp: payload.sdp });
       this.noteRemoteSdp(payload.sdp);
+      await this.flushCandidates();
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      await waitIceComplete(pc);
+      if (!this.canTrickle()) {
+        await waitIceGathering(pc, {
+          wantRelay: iceServersHaveTurn(this.config.iceServers),
+        });
+      }
       this.noteLocalSdp(localSdp(pc));
       this.apply({ type: 'remote-ready' });
       await this.config.signaling.send({
@@ -387,18 +416,66 @@ export class PeerSession extends EventEmitter {
       return;
     }
     try {
+      if (message.from) this.peerId = message.from;
       await pc.setRemoteDescription({ type: 'answer', sdp: payload.sdp });
       this.noteRemoteSdp(payload.sdp);
+      await this.flushCandidates();
       this.apply({ type: 'remote-ready' });
     } catch (err) {
       this.fail(errorMessage(err, 'Не удалось принять ответ'));
     }
   }
 
+  async handleCandidate(message: SignalMessage) {
+    if (message.from) this.peerId = message.from;
+    const init = parseIceCandidateInit(message.data.payload);
+    if (!init) return;
+    const pc = this.links?.pc;
+    if (!pc?.remoteDescription) {
+      this.pendingCandidates.push(init);
+      return;
+    }
+    await this.addCandidate(pc, init);
+  }
+
+  async flushCandidates() {
+    const pc = this.links?.pc;
+    if (!pc?.remoteDescription) return;
+    const queued = this.pendingCandidates;
+    this.pendingCandidates = [];
+    for (const init of queued) await this.addCandidate(pc, init);
+  }
+
+  async addCandidate(pc: RTCPeerConnection, init: IceCandidateInit) {
+    try {
+      await pc.addIceCandidate(init);
+      this.ice = {
+        ...this.ice,
+        remote: addUniquePath(
+          this.ice.remote,
+          classifyCandidate(init.candidate),
+        ),
+      };
+      this.emit('ice', this.ice);
+    } catch {
+      return;
+    }
+  }
+
+  sendLocalCandidate(init: IceCandidateInit) {
+    if (!this.canTrickle() || !this.peerId || this.peerId === '*') return;
+    void this.config.signaling.send({
+      from: this.clientId,
+      to: this.peerId,
+      data: { type: 'candidate', payload: init },
+    });
+  }
+
   bindPeer(pc: RTCPeerConnection) {
     pc.onicecandidate = (event) => {
       if (this.links?.pc !== pc) return;
-      const line = event.candidate?.candidate;
+      const candidate = event.candidate;
+      const line = candidate?.candidate;
       if (!line) return;
       this.ice = {
         ...this.ice,
@@ -406,6 +483,11 @@ export class PeerSession extends EventEmitter {
         gatheringState: pc.iceGatheringState,
       };
       this.emit('ice', this.ice);
+      this.sendLocalCandidate({
+        candidate: line,
+        sdpMid: candidate.sdpMid,
+        sdpMLineIndex: candidate.sdpMLineIndex,
+      });
     };
     pc.onconnectionstatechange = () => {
       if (this.links?.pc !== pc) return;
@@ -427,7 +509,12 @@ export class PeerSession extends EventEmitter {
     for (const path of pathsFromSdp(sdp)) {
       local = addUniquePath(local, path);
     }
-    this.ice = { ...this.ice, local, gatheringState: 'complete' };
+    this.ice = {
+      ...this.ice,
+      local,
+      gatheringState:
+        this.links?.pc.iceGatheringState ?? this.ice.gatheringState,
+    };
     this.emit('ice', this.ice);
   }
 

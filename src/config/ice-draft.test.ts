@@ -20,8 +20,8 @@ describe('ice draft', () => {
       { urls: 'stun:stun.l.google.com:19302' },
       {
         urls: [
-          'turn:standard.relay.metered.ca:80',
           'turns:standard.relay.metered.ca:443?transport=tcp',
+          'turn:standard.relay.metered.ca:80',
         ],
         username: 'user',
         credential: 'secret',

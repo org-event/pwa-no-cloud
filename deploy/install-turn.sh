@@ -197,8 +197,9 @@ write_turn_conf() {
     printf 'no-multicast-peers\n'
     printf 'no-loopback-peers\n'
     printf 'stale-nonce=600\n'
-    printf 'total-quota=12\n'
-    printf 'user-quota=4\n'
+    printf 'total-quota=256\n'
+    printf 'user-quota=64\n'
+    printf 'listening-ip=0.0.0.0\n'
     printf 'simple-log\n'
     printf 'log-file=stdout\n'
     printf 'external-ip=%s\n' "$public_ip"
@@ -223,6 +224,27 @@ print_ice_json() {
   local host="$1"
   local user="$2"
   local pass="$3"
+  python3 - "$host" "$user" "$pass" "$PORTS" "$MAIN_PORT" <<'PY' 2>/dev/null || print_ice_json_sh "$host" "$user" "$pass"
+import json, sys
+host, user, pw, ports, stun_port = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+port_list = [item for item in ports.split() if item]
+prefer = [p for p in ('443', '80', '3478') if p in port_list]
+rest = [p for p in port_list if p not in prefer]
+urls = []
+for port in prefer + rest:
+    urls.append(f'turn:{host}:{port}?transport=tcp')
+    urls.append(f'turn:{host}:{port}')
+print(json.dumps([
+    {'urls': f'stun:{host}:{stun_port}'},
+    {'urls': urls, 'username': user, 'credential': pw},
+], indent=2))
+PY
+}
+
+print_ice_json_sh() {
+  local host="$1"
+  local user="$2"
+  local pass="$3"
   local port='' first=1
   printf '[\n  {"urls": "stun:%s:%s"},\n  {\n    "urls": [\n' "$host" "$MAIN_PORT"
   for port in $PORTS; do
@@ -231,7 +253,7 @@ print_ice_json() {
     else
       printf ',\n'
     fi
-    printf '      "turn:%s:%s",\n      "turn:%s:%s?transport=tcp"' "$host" "$port" "$host" "$port"
+    printf '      "turn:%s:%s?transport=tcp",\n      "turn:%s:%s"' "$host" "$port" "$host" "$port"
   done
   printf '\n    ],\n    "username": "%s",\n    "credential": "%s"\n  }\n]\n' "$user" "$pass"
 }
@@ -243,10 +265,12 @@ print_share_pack() {
 import json, sys
 ip, user, pw, ports, sig = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 port_list = [item for item in ports.split() if item]
+prefer = [p for p in ('443', '80', '3478') if p in port_list]
+rest = [p for p in port_list if p not in prefer]
 urls = []
-for port in port_list:
-    urls.append(f'turn:{ip}:{port}')
+for port in prefer + rest:
     urls.append(f'turn:{ip}:{port}?transport=tcp')
+    urls.append(f'turn:{ip}:{port}')
 stun = f'stun:{ip}:{port_list[0]}'
 signaling = {'kind': 'websocket', 'url': sig} if sig else {'kind': 'manual'}
 draft = {

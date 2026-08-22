@@ -3,6 +3,7 @@ export type IceFailContext = {
   remote: string[];
   hasTurn: boolean;
   hasStun: boolean;
+  gathering?: string;
 };
 
 const hasPath = (paths: string[], name: string): boolean => {
@@ -22,9 +23,15 @@ export const explainIceFailure = (ctx: IceFailContext): string => {
     );
   }
   if (ctx.hasTurn && !sawRelay) {
+    if (ctx.gathering && ctx.gathering !== 'complete') {
+      return (
+        'ICE оборвался, пока TURN ещё собирал relay. ' +
+        'Попробуйте ещё раз — кандидаты теперь досылаются по сокету, не только в SDP.'
+      );
+    }
     return (
       'ICE не собрался. TURN задан, но relay-кандидат не появился — ' +
-      'сервер недоступен или данные неверны.'
+      'сервер недоступен, порты закрыты или логин/пароль неверны.'
     );
   }
   if (!ctx.hasStun && !ctx.hasTurn) {
