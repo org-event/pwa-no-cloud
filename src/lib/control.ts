@@ -9,8 +9,10 @@ export type FileControl =
       folderId?: string;
       path?: string;
     }
-  | { type: 'file-accept'; transferId: string }
+  | { type: 'file-accept'; transferId: string; startIndex?: number }
   | { type: 'file-reject'; transferId: string; reason: string }
+  | { type: 'file-pause'; transferId: string }
+  | { type: 'file-resume'; transferId: string }
   | { type: 'file-chunk-meta'; transferId: string; index: number; size: number }
   | { type: 'file-ack'; transferId: string; index: number }
   | { type: 'file-done'; transferId: string }
@@ -59,10 +61,16 @@ export const parseFileControl = (raw: unknown): FileControl | null => {
     const path = asString(raw.path) ?? undefined;
     return { type, transferId, name, size, mime, chunkSize, folderId, path };
   }
+  if (type === 'file-accept') {
+    const startIndex = asNumber(raw.startIndex) ?? 0;
+    if (startIndex < 0) return null;
+    return { type, transferId, startIndex };
+  }
   if (
-    type === 'file-accept' ||
     type === 'file-done' ||
-    type === 'file-cancel'
+    type === 'file-cancel' ||
+    type === 'file-pause' ||
+    type === 'file-resume'
   ) {
     return { type, transferId };
   }

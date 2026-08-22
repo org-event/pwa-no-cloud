@@ -21,6 +21,18 @@ export type InboxEntry = {
   name: string;
 };
 
+export type TransferCursor = {
+  id: string;
+  inboxId: string;
+  name: string;
+  path: string;
+  folderId: string;
+  size: number;
+  mime: string;
+  chunkSize: number;
+  index: number;
+};
+
 export const FIXTURE_TRANSFER_ID = 'fixture';
 export const FIXTURE_FILE_NAME = 'hello.txt';
 export const FIXTURE_TEXT = 'NoCloud inbox fixture\n';
@@ -197,14 +209,117 @@ export const openInboxWritable = async (
   store: OpfsStore,
   transferId: string,
   name: string,
+  keep = false,
 ): Promise<OpfsResult<FileSystemWritableFileStream>> => {
   const handle = await openInboxHandle(store, transferId, name, true);
   if (!handle.ok) return handle;
   try {
-    return { ok: true, value: await handle.value.createWritable() };
+    return {
+      ok: true,
+      value: await handle.value.createWritable({ keepExistingData: keep }),
+    };
   } catch (error) {
     return asError(error, 'write-failed');
   }
+};
+
+const cursorFileName = (id: string): string => `${id}.json`;
+
+const parseCursor = (raw: string): TransferCursor | null => {
+  try {
+    const data = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof data.id !== 'string') return null;
+    if (typeof data.inboxId !== 'string') return null;
+    if (typeof data.name !== 'string') return null;
+    if (typeof data.path !== 'string') return null;
+    if (typeof data.folderId !== 'string') return null;
+    if (typeof data.size !== 'number') return null;
+    if (typeof data.mime !== 'string') return null;
+    if (typeof data.chunkSize !== 'number') return null;
+    if (typeof data.index !== 'number') return null;
+    return {
+      id: data.id,
+      inboxId: data.inboxId,
+      name: data.name,
+      path: data.path,
+      folderId: data.folderId,
+      size: data.size,
+      mime: data.mime,
+      chunkSize: data.chunkSize,
+      index: data.index,
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const sameCursorFile = (
+  left: Pick<TransferCursor, 'name' | 'path' | 'size' | 'chunkSize'>,
+  right: Pick<TransferCursor, 'name' | 'path' | 'size' | 'chunkSize'>,
+): boolean => {
+  return (
+    left.name === right.name &&
+    left.path === right.path &&
+    left.size === right.size &&
+    left.chunkSize === right.chunkSize
+  );
+};
+
+export const writeTransferCursor = async (
+  store: OpfsStore,
+  cursor: TransferCursor,
+): Promise<OpfsResult<true>> => {
+  if (!isSafeName(cursor.id)) {
+    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+  }
+  return writeFile(
+    store.transfers,
+    cursorFileName(cursor.id),
+    JSON.stringify(cursor),
+  );
+};
+
+export const removeTransferCursor = async (
+  store: OpfsStore,
+  id: string,
+): Promise<OpfsResult<true>> => {
+  if (!isSafeName(id)) {
+    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+  }
+  try {
+    await store.transfers.removeEntry(cursorFileName(id));
+    return { ok: true, value: true };
+  } catch {
+    return { ok: true, value: true };
+  }
+};
+
+export const listTransferCursors = async (
+  store: OpfsStore,
+): Promise<OpfsResult<TransferCursor[]>> => {
+  const listed = await listEntries(store.transfers);
+  if (!listed.ok) return listed;
+  const items: TransferCursor[] = [];
+  for (const entry of listed.value) {
+    if (entry.kind !== 'file' || !entry.name.endsWith('.json')) continue;
+    const text = await readText(store.transfers, entry.name);
+    if (!text.ok) continue;
+    const cursor = parseCursor(text.value);
+    if (cursor) items.push(cursor);
+  }
+  return { ok: true, value: items };
+};
+
+export const findTransferCursor = async (
+  store: OpfsStore,
+  match: Pick<TransferCursor, 'name' | 'path' | 'size' | 'chunkSize'>,
+): Promise<OpfsResult<TransferCursor | null>> => {
+  const listed = await listTransferCursors(store);
+  if (!listed.ok) return listed;
+  for (const cursor of listed.value) {
+    if (sameCursorFile(cursor, match)) return { ok: true, value: cursor };
+  }
+  return { ok: true, value: null };
 };
 
 export const removeInboxTransfer = async (

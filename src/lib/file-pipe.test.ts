@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FilePipe, type ControlSink, type DataSink } from './file-pipe.ts';
 import { createMemoryRoot } from './opfs-memory.ts';
-import { listInbox, openStore, readInboxFile } from './opfs.ts';
+import { listInbox, openStore, readInboxFile, type OpfsStore } from './opfs.ts';
 
 const openSink = (
   onSend: (data: string | ArrayBuffer) => void,
@@ -12,8 +12,10 @@ const openSink = (
   addEventListener() {},
 });
 
-const pair = async () => {
-  const opened = await openStore(createMemoryRoot());
+const pair = async (existing?: OpfsStore) => {
+  const opened = existing
+    ? { ok: true as const, value: existing }
+    : await openStore(createMemoryRoot());
   if (!opened.ok) throw new Error(opened.message);
   let alice: FilePipe | null = null;
   let bob: FilePipe | null = null;
@@ -136,5 +138,106 @@ describe('file pipe', () => {
     );
     expect(a.ok && a.value).toBe('aa');
     expect(b.ok && b.value).toBe('bbbb');
+  });
+
+  it('resumes a file from the saved cursor after a drop', async () => {
+    const first = await pair();
+    const interrupted = new Promise<void>((resolve) => {
+      first.alice.on('transfer', (value) => {
+        const transfer = value as { state?: string; index?: number };
+        if (transfer.state === 'sending' && transfer.index === 1) {
+          first.alice.interrupt();
+          first.bob.interrupt();
+          resolve();
+        }
+      });
+    });
+    first.bob.on('offer', (value) => {
+      const transfer = value as { id: string };
+      first.bob.accept(transfer.id);
+    });
+    first.alice.sendFile(
+      new File(['abcdefghij'], 'note.txt', { type: 'text/plain' }),
+    );
+    await interrupted;
+    const second = await pair(first.store);
+    const done = new Promise<void>((resolve) => {
+      second.alice.on('transfer', (value) => {
+        const transfer = value as { state?: string };
+        if (transfer.state === 'done') resolve();
+      });
+    });
+    second.alice.sendFile(
+      new File(['abcdefghij'], 'note.txt', { type: 'text/plain' }),
+    );
+    await done;
+    const listed = await listInbox(second.store);
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) return;
+    const text = await readInboxFile(
+      second.store,
+      listed.value[0]?.transferId ?? '',
+      'note.txt',
+    );
+    expect(text.ok && text.value).toBe('abcdefghij');
+  });
+
+  it('waits while paused and continues after resume', async () => {
+    const { alice } = await pair();
+    alice.paused = true;
+    let released = false;
+    const waiting = alice.waitIfPaused().then(() => {
+      released = true;
+    });
+    expect(released).toBe(false);
+    alice.resume();
+    await waiting;
+    expect(released).toBe(true);
+    expect(alice.paused).toBe(false);
+  });
+
+  it('rejects when the estimated free space is too small', async () => {
+    const opened = await openStore(createMemoryRoot());
+    if (!opened.ok) throw new Error(opened.message);
+    let alice: FilePipe | null = null;
+    let bob: FilePipe | null = null;
+    const aliceControl = openSink((data) => {
+      if (typeof data === 'string') bob?.onControlRaw(data);
+    });
+    const aliceBytes = openSink((data) => {
+      if (typeof data !== 'string') void bob?.onBytes(data);
+    });
+    const bobControl = openSink((data) => {
+      if (typeof data === 'string') alice?.onControlRaw(data);
+    });
+    const bobBytes = openSink((data) => {
+      if (typeof data !== 'string') void alice?.onBytes(data);
+    });
+    alice = new FilePipe({
+      control: aliceControl,
+      bytes: aliceBytes,
+      chunkSize: 4,
+      maxSize: 1024,
+    });
+    bob = new FilePipe({
+      control: bobControl,
+      bytes: bobBytes,
+      store: opened.value,
+      chunkSize: 4,
+      maxSize: 1024,
+      estimate: async () => ({ free: 1 }),
+    });
+    const failed = new Promise<string>((resolve) => {
+      alice?.on('transfer', (value) => {
+        const transfer = value as { state?: string; error?: string };
+        if (transfer.state === 'failed') resolve(transfer.error ?? '');
+      });
+    });
+    bob.on('offer', (value) => {
+      const transfer = value as { id: string };
+      bob?.accept(transfer.id);
+    });
+    alice.sendFile(new File(['abcdefghij'], 'note.txt'));
+    expect(await failed).toBe('нет места');
   });
 });

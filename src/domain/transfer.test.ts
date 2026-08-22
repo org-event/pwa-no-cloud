@@ -46,6 +46,17 @@ describe('transfer machine', () => {
     expect(transfer.error).toBe('нет места');
   });
 
+  it('pauses and resumes sending', () => {
+    let transfer = applyTransferEvent(sender(), { type: 'offer' });
+    transfer = applyTransferEvent(transfer, { type: 'accept' });
+    transfer = applyTransferEvent(transfer, { type: 'ack', index: 0 });
+    transfer = applyTransferEvent(transfer, { type: 'pause' });
+    expect(transfer.state).toBe('paused');
+    expect(transfer.index).toBe(1);
+    transfer = applyTransferEvent(transfer, { type: 'resume' });
+    expect(transfer.state).toBe('sending');
+  });
+
   it('receives chunks then writes', () => {
     let transfer = createReceiveTransfer({
       id: 't2',

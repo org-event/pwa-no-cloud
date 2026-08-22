@@ -13,6 +13,8 @@ import {
   removeInboxFile,
   writeFixture,
   writeInboxFile,
+  writeTransferCursor,
+  findTransferCursor,
 } from './opfs.ts';
 
 const store = async () => {
@@ -89,6 +91,31 @@ describe('opfs inbox', () => {
     expect(text.ok).toBe(true);
     if (!text.ok) return;
     expect(text.value).toBe('nested');
+  });
+
+  it('stores a resume cursor under transfers/', async () => {
+    const fs = await store();
+    const written = await writeTransferCursor(fs, {
+      id: 't1',
+      inboxId: 't1',
+      name: 'note.txt',
+      path: 'note.txt',
+      folderId: '',
+      size: 10,
+      mime: 'text/plain',
+      chunkSize: 4,
+      index: 2,
+    });
+    expect(written.ok).toBe(true);
+    const found = await findTransferCursor(fs, {
+      name: 'note.txt',
+      path: 'note.txt',
+      size: 10,
+      chunkSize: 4,
+    });
+    expect(found.ok).toBe(true);
+    if (!found.ok) return;
+    expect(found.value?.index).toBe(2);
   });
 
   it('returns an error when the file is missing', async () => {

@@ -32,6 +32,8 @@ export type TransferEvent =
   | { type: 'ack'; index: number }
   | { type: 'chunk'; index: number }
   | { type: 'write' }
+  | { type: 'pause' }
+  | { type: 'resume' }
   | { type: 'done' }
   | { type: 'fail'; message: string }
   | { type: 'cancel' };
@@ -90,11 +92,18 @@ const canApply = (transfer: Transfer, type: TransferEvent['type']): boolean => {
   }
   if (type === 'offer') return state === 'queued';
   if (type === 'accept' || type === 'reject') return state === 'offering';
-  if (type === 'ack') return state === 'sending';
+  if (type === 'ack') return state === 'sending' || state === 'paused';
   if (type === 'chunk') return state === 'receiving';
   if (type === 'write') return state === 'receiving';
+  if (type === 'pause') return state === 'sending' || state === 'receiving';
+  if (type === 'resume') return state === 'paused';
   if (type === 'done') {
-    return state === 'sending' || state === 'writing' || state === 'receiving';
+    return (
+      state === 'sending' ||
+      state === 'writing' ||
+      state === 'receiving' ||
+      state === 'paused'
+    );
   }
   return false;
 };
@@ -115,7 +124,12 @@ export const applyTransferEvent = (
   if (event.type === 'ack') {
     const index = event.index + 1;
     const done = index >= transferChunks(transfer);
-    return { ...transfer, index, state: done ? 'done' : 'sending' };
+    const state = done
+      ? 'done'
+      : transfer.state === 'paused'
+        ? 'paused'
+        : 'sending';
+    return { ...transfer, index, state };
   }
   if (event.type === 'chunk') {
     const index = event.index + 1;
@@ -127,6 +141,11 @@ export const applyTransferEvent = (
     };
   }
   if (event.type === 'write') return { ...transfer, state: 'writing' };
+  if (event.type === 'pause') return { ...transfer, state: 'paused' };
+  if (event.type === 'resume') {
+    const state = transfer.direction === 'send' ? 'sending' : 'receiving';
+    return { ...transfer, state, error: '' };
+  }
   if (event.type === 'done') return { ...transfer, state: 'done' };
   if (event.type === 'cancel') return { ...transfer, state: 'canceled' };
   return { ...transfer, state: 'failed', error: event.message };

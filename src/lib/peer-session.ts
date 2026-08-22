@@ -197,6 +197,14 @@ export class PeerSession extends EventEmitter {
     this.pipe?.cancel();
   }
 
+  pauseFile() {
+    this.pipe?.pause();
+  }
+
+  resumeFile() {
+    this.pipe?.resume();
+  }
+
   currentTransfer() {
     return this.pipe?.current() ?? null;
   }
@@ -479,7 +487,7 @@ export class PeerSession extends EventEmitter {
 
   dropPipe() {
     if (!this.pipe) return;
-    this.pipe.generation += 1;
+    this.pipe.interrupt();
     this.pipe = null;
   }
 

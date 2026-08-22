@@ -17,6 +17,7 @@ import {
   removeInboxFile,
   writeFixture,
 } from './lib/opfs.ts';
+import { requestPersist } from './lib/quota.ts';
 import { PeerSession } from './lib/peer-session.ts';
 import { inviteToQr } from './lib/qr.ts';
 import { createSignalingPort } from './lib/signaling/factory.ts';
@@ -267,6 +268,14 @@ const view = mountApp(root, {
     peer?.cancelFile();
     view.sync(currentState());
   },
+  onPauseFile: () => {
+    peer?.pauseFile();
+    view.sync(currentState());
+  },
+  onResumeFile: () => {
+    peer?.resumeFile();
+    view.sync(currentState());
+  },
   onWriteFixture: () => {
     void (async () => {
       if (!store) return;
@@ -334,6 +343,7 @@ app.on('installed', redraw);
 const opened = await openStore();
 if (opened.ok) {
   store = opened.value;
+  void requestPersist();
   await refreshInbox();
 } else {
   inboxError = opened.message;

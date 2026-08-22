@@ -28,11 +28,16 @@ import { folderNameFromPaths, normalizeRelativePath } from './folder-path.ts';
 import type { PickedFile } from './folder-walk.ts';
 import { generateId } from './id.ts';
 import {
+  findTransferCursor,
   isSafeName,
   openInboxWritable,
   removeInboxTransfer,
+  removeTransferCursor,
+  writeTransferCursor,
   type OpfsStore,
+  type TransferCursor,
 } from './opfs.ts';
+import { estimateQuota, requestPersist } from './quota.ts';
 
 export type DataSink = {
   send(data: string | ArrayBuffer): void;
@@ -57,6 +62,8 @@ type FilePipeConfig = {
   chunkSize?: number;
   maxSize?: number;
   maxFiles?: number;
+  estimate?: () => Promise<{ free: number } | null>;
+  persist?: () => Promise<boolean>;
 };
 
 const concat = (left: Uint8Array, right: Uint8Array): Uint8Array => {
@@ -89,6 +96,10 @@ export class FilePipe extends EventEmitter {
   expectBytes: { transferId: string; index: number; size: number } | null =
     null;
   ackWaiters = new Map<string, (index: number) => void>();
+  resumeWaiters: Array<() => void> = [];
+  resumeCursor: TransferCursor | null = null;
+  resumeInboxId: string | null = null;
+  paused = false;
   generation = 0;
 
   constructor(config: FilePipeConfig) {
@@ -138,6 +149,51 @@ export class FilePipe extends EventEmitter {
     this.incoming = null;
   }
 
+  pause() {
+    const transfer = this.active ?? this.incoming;
+    if (!transfer) return;
+    this.paused = true;
+    this.sendControl({ type: 'file-pause', transferId: transfer.id });
+    if (this.active && this.active.state !== 'paused') {
+      const next = applyTransferEvent(this.active, { type: 'pause' });
+      if (next.state === 'paused') {
+        this.active = next;
+        this.emit('transfer', next);
+      }
+    }
+  }
+
+  resume() {
+    const transfer = this.active ?? this.incoming;
+    this.paused = false;
+    if (transfer) {
+      this.sendControl({ type: 'file-resume', transferId: transfer.id });
+    }
+    if (this.active?.state === 'paused') {
+      this.active = applyTransferEvent(this.active, { type: 'resume' });
+      this.emit('transfer', this.active);
+    }
+    for (const waiter of this.resumeWaiters) waiter();
+    this.resumeWaiters = [];
+  }
+
+  interrupt() {
+    this.generation += 1;
+    for (const waiter of this.ackWaiters.values()) waiter(-1);
+    this.ackWaiters.clear();
+    for (const waiter of this.resumeWaiters) waiter();
+    this.resumeWaiters = [];
+    this.expectBytes = null;
+    this.paused = false;
+    const writer = this.writer;
+    this.writer = null;
+    if (writer) void writer.close();
+    const active = this.active;
+    if (active && active.direction === 'receive') {
+      void this.saveCursor(active);
+    }
+  }
+
   cancel() {
     const folder = this.currentFolder();
     const transfer = this.current();
@@ -183,6 +239,7 @@ export class FilePipe extends EventEmitter {
     this.active = next;
     this.emit('transfer', next);
     if (next.state === 'writing') await this.completeReceive(next);
+    else await this.saveCursor(next);
     this.sendControl({
       type: 'file-ack',
       transferId: active.id,
@@ -221,11 +278,19 @@ export class FilePipe extends EventEmitter {
       return;
     }
     if (message.type === 'file-offer') {
-      this.handleOffer(message);
+      await this.handleOffer(message);
       return;
     }
     if (message.type === 'file-accept') {
-      await this.handleAccept(message.transferId);
+      await this.handleAccept(message.transferId, message.startIndex ?? 0);
+      return;
+    }
+    if (message.type === 'file-pause') {
+      if (this.active?.id === message.transferId) this.pauseRemote();
+      return;
+    }
+    if (message.type === 'file-resume') {
+      if (this.active?.id === message.transferId) this.resumeRemote();
       return;
     }
     if (message.type === 'file-reject') {
@@ -267,7 +332,7 @@ export class FilePipe extends EventEmitter {
     }
   }
 
-  handleOffer(message: Extract<FileControl, { type: 'file-offer' }>) {
+  async handleOffer(message: Extract<FileControl, { type: 'file-offer' }>) {
     const folderId = message.folderId ?? '';
     const auto = Boolean(folderId) && this.acceptedFolderId === folderId;
     if (this.active || this.incoming || this.incomingFolder) {
@@ -313,6 +378,19 @@ export class FilePipe extends EventEmitter {
     this.incoming = transfer;
     this.emit('offer', transfer);
     this.emit('transfer', transfer);
+    if (this.store) {
+      const found = await findTransferCursor(this.store, {
+        name,
+        path,
+        size: message.size,
+        chunkSize: message.chunkSize,
+      });
+      if (found.ok && found.value) {
+        this.resumeCursor = found.value;
+        await this.acceptOffer(transfer.id);
+        return;
+      }
+    }
     if (auto) void this.acceptOffer(transfer.id);
   }
 
@@ -402,20 +480,45 @@ export class FilePipe extends EventEmitter {
       this.reject(transferId, 'нет OPFS');
       return;
     }
-    const inboxId = incoming.folderId || incoming.id;
+    const resume = this.resumeCursor;
+    this.resumeCursor = null;
+    const startIndex = resume?.index ?? 0;
+    const inboxId = resume?.inboxId || incoming.folderId || incoming.id;
+    const remaining =
+      incoming.size - chunkOffset(startIndex, incoming.chunkSize);
+    const estimate = this.config.estimate
+      ? await this.config.estimate()
+      : await estimateQuota();
+    if (estimate && remaining > estimate.free) {
+      this.reject(transferId, 'нет места');
+      return;
+    }
+    const persist = this.config.persist ?? requestPersist;
+    void persist();
     const writable = await openInboxWritable(
       this.store,
       inboxId,
       incoming.path,
+      startIndex > 0,
     );
     if (!writable.ok) {
       this.reject(transferId, writable.message);
       return;
     }
     this.writer = writable.value;
-    this.active = applyTransferEvent(incoming, { type: 'accept' });
+    this.resumeInboxId = resume?.inboxId ?? null;
+    const accepted = applyTransferEvent(incoming, { type: 'accept' });
+    this.active = {
+      ...accepted,
+      index: startIndex,
+      folderId: incoming.folderId,
+    };
+    if (resume && resume.id !== incoming.id) {
+      void removeTransferCursor(this.store, resume.id);
+    }
     this.incoming = null;
-    this.sendControl({ type: 'file-accept', transferId });
+    await this.saveCursor(this.active);
+    this.sendControl({ type: 'file-accept', transferId, startIndex });
     this.emit('transfer', this.active);
   }
 
@@ -531,13 +634,14 @@ export class FilePipe extends EventEmitter {
     this.emit('folder', folder);
   }
 
-  async handleAccept(transferId: string) {
+  async handleAccept(transferId: string, startIndex = 0) {
     const active = this.active;
     const source = this.source;
     if (!active || active.id !== transferId || !source) return;
-    this.active = applyTransferEvent(active, { type: 'accept' });
+    const accepted = applyTransferEvent(active, { type: 'accept' });
+    this.active = { ...accepted, index: startIndex };
     this.emit('transfer', this.active);
-    await this.pushBytes(this.active, source);
+    await this.pushBytes(this.active, source, startIndex);
   }
 
   async handleFolderAccept(folderId: string) {
@@ -564,14 +668,18 @@ export class FilePipe extends EventEmitter {
     });
   }
 
-  async pushBytes(transfer: Transfer, source: Blob) {
+  async pushBytes(transfer: Transfer, source: Blob, startIndex = 0) {
     const gen = this.generation;
-    const reader = source.stream().getReader();
+    const offset = chunkOffset(startIndex, transfer.chunkSize);
+    const blob = offset > 0 ? source.slice(offset) : source;
+    const reader = blob.stream().getReader();
     let leftover = new Uint8Array();
-    let index = 0;
+    let index = startIndex;
     const total = transferChunks(transfer);
     try {
       while (index < total && gen === this.generation) {
+        await this.waitIfPaused();
+        if (gen !== this.generation) return;
         const need = chunkLength(index, transfer.size, transfer.chunkSize);
         leftover = new Uint8Array(await this.fill(reader, leftover, need));
         if (leftover.byteLength < need) {
@@ -628,8 +736,53 @@ export class FilePipe extends EventEmitter {
     this.active = applyTransferEvent(this.active, { type: 'done' });
     this.emit('transfer', this.active);
     this.emit('received', this.active);
+    if (this.store) void removeTransferCursor(this.store, transfer.id);
+    this.resumeInboxId = null;
     this.active = null;
     this.advanceReceiveFolder();
+  }
+
+  pauseRemote() {
+    this.paused = true;
+    if (this.active && this.active.state !== 'paused') {
+      const next = applyTransferEvent(this.active, { type: 'pause' });
+      if (next.state === 'paused') {
+        this.active = next;
+        this.emit('transfer', next);
+      }
+    }
+  }
+
+  resumeRemote() {
+    this.paused = false;
+    if (this.active?.state === 'paused') {
+      this.active = applyTransferEvent(this.active, { type: 'resume' });
+      this.emit('transfer', this.active);
+    }
+    for (const waiter of this.resumeWaiters) waiter();
+    this.resumeWaiters = [];
+  }
+
+  waitIfPaused(): Promise<void> {
+    if (!this.paused) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.resumeWaiters.push(resolve);
+    });
+  }
+
+  async saveCursor(transfer: Transfer) {
+    if (!this.store || transfer.direction !== 'receive') return;
+    await writeTransferCursor(this.store, {
+      id: transfer.id,
+      inboxId: this.inboxKey(transfer),
+      name: transfer.name,
+      path: transfer.path,
+      folderId: transfer.folderId,
+      size: transfer.size,
+      mime: transfer.mime,
+      chunkSize: transfer.chunkSize,
+      index: transfer.index,
+    });
   }
 
   async advanceSendFolder() {
@@ -707,7 +860,7 @@ export class FilePipe extends EventEmitter {
   }
 
   inboxKey(transfer: Transfer) {
-    return transfer.folderId || transfer.id;
+    return this.resumeInboxId || transfer.folderId || transfer.id;
   }
 
   finish(
@@ -723,11 +876,19 @@ export class FilePipe extends EventEmitter {
     this.ackWaiters.clear();
     this.expectBytes = null;
     this.source = null;
+    this.paused = false;
+    for (const waiter of this.resumeWaiters) waiter();
+    this.resumeWaiters = [];
     const writer = this.writer;
     this.writer = null;
     if (writer) void writer.close();
     if (this.store && transfer.direction === 'receive') {
-      void removeInboxTransfer(this.store, this.inboxKey(transfer));
+      if (event.type === 'cancel' || event.type === 'reject') {
+        void removeInboxTransfer(this.store, this.inboxKey(transfer));
+        void removeTransferCursor(this.store, transfer.id);
+      } else {
+        void this.saveCursor(transfer);
+      }
     }
     let next = transfer;
     if (event.type === 'reject') {
@@ -745,6 +906,9 @@ export class FilePipe extends EventEmitter {
     }
     if (this.active?.id === transfer.id) this.active = null;
     if (this.incoming?.id === transfer.id) this.incoming = null;
+    if (event.type === 'cancel' || event.type === 'reject') {
+      this.resumeInboxId = null;
+    }
     this.emit('transfer', next);
     const folder = this.currentFolder();
     if (folder && transfer.folderId === folder.id) {

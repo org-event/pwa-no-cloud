@@ -22,6 +22,8 @@ export type TransferHandlers = {
   onAcceptFile: (transferId: string) => void;
   onRejectFile: (transferId: string) => void;
   onCancelFile: () => void;
+  onPauseFile: () => void;
+  onResumeFile: () => void;
 };
 
 const formatSize = (size: number): string => {
@@ -51,6 +53,9 @@ const fileStatus = (transfer: Transfer): string => {
   if (transfer.state === 'sending') return `отправка ${label} ${chunk}`;
   if (transfer.state === 'receiving') return `приём ${label} ${chunk}`;
   if (transfer.state === 'writing') return `запись ${label}`;
+  if (transfer.state === 'paused') {
+    return `пауза ${label} ${chunk} · можно докачать`;
+  }
   if (transfer.state === 'done') return `готово: ${label}`;
   if (transfer.state === 'canceled') return `отменено: ${label}`;
   if (transfer.state === 'failed') {
@@ -176,9 +181,21 @@ export const mountTransfer = (
   cancel.textContent = 'Отменить';
   cancel.addEventListener('click', () => handlers.onCancelFile());
 
+  const pause = document.createElement('button');
+  pause.type = 'button';
+  pause.className = 'button button-secondary';
+  pause.textContent = 'Пауза';
+  pause.addEventListener('click', () => handlers.onPauseFile());
+
+  const resume = document.createElement('button');
+  resume.type = 'button';
+  resume.className = 'button';
+  resume.textContent = 'Продолжить';
+  resume.addEventListener('click', () => handlers.onResumeFile());
+
   const actions = document.createElement('div');
   actions.className = 'home-actions';
-  actions.append(send, sendFolder, accept, reject, cancel);
+  actions.append(send, sendFolder, accept, reject, pause, resume, cancel);
 
   const status = document.createElement('p');
   status.className = 'tagline';
@@ -231,7 +248,10 @@ export const mountTransfer = (
         state.current?.state === 'receiving' ||
         state.folder?.state === 'sending' ||
         state.folder?.state === 'receiving';
-      cancel.hidden = !busy;
+      const paused = state.current?.state === 'paused';
+      pause.hidden = !busy;
+      resume.hidden = !paused;
+      cancel.hidden = !busy && !paused;
       const shownFolder = state.incomingFolder ?? state.folder;
       const shownFile = incomingFile ?? state.current;
       let text = '';
