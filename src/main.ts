@@ -4,7 +4,9 @@ import {
   resolveServers,
   saveUserSettings,
 } from './config/index.ts';
+import { createIdleSession } from './domain/index.ts';
 import { Application } from './lib/application.ts';
+import { formatIceReport } from './lib/ice.ts';
 import type { InboxEntry, OpfsStore } from './lib/opfs.ts';
 import {
   appendLog,
@@ -58,10 +60,11 @@ const inviteState = (): InviteState => ({
   error: inviteError || (peer?.error ?? ''),
   connected: peer?.state === 'connected',
   lastPongMs: peer?.lastPongMs ?? null,
+  ice: peer ? formatIceReport(peer.ice) : '',
 });
 
 const currentState = () => ({
-  session: { state: peer?.state ?? 'idle' },
+  session: peer?.session ?? createIdleSession(),
   settings,
   resolved: resolveServers(settings, origin),
   online: app.online,
@@ -119,6 +122,7 @@ const startPeer = (): PeerSession | null => {
     void refreshOutgoing();
   });
   next.on('channel-open', () => view.sync(currentState()));
+  next.on('ice', () => view.sync(currentState()));
   next.on('pong', () => view.sync(currentState()));
   next.on('error', () => view.sync(currentState()));
   peer = next;

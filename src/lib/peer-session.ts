@@ -1,8 +1,22 @@
 import { DATA_CHANNELS } from '../config/defaults.ts';
 import type { IceServerConfig } from '../config/types.ts';
-import type { SessionState } from '../domain/session.ts';
+import {
+  applySessionEvent,
+  createIdleSession,
+  type Session,
+  type SessionEvent,
+  type SessionState,
+} from '../domain/session.ts';
 import { EventEmitter } from './events.ts';
 import { generateId } from './id.ts';
+import {
+  addUniquePath,
+  classifyCandidate,
+  emptyIceReport,
+  pairFromStats,
+  pathsFromSdp,
+  type IceReport,
+} from './ice.ts';
 import type { ManualPort } from './signaling/manual.ts';
 import type { SignalMessage } from './signaling/port.ts';
 import {
@@ -27,13 +41,18 @@ const errorMessage = (err: unknown, fallback: string): string => {
 };
 
 export class PeerSession extends EventEmitter {
-  state: SessionState = 'idle';
+  session: Session = createIdleSession();
   role: PeerRole = 'idle';
   clientId = generateId();
   lastPongMs: number | null = null;
   error = '';
+  ice: IceReport = emptyIceReport();
   links: PeerLinks | null = null;
   config: PeerSessionConfig;
+
+  get state(): SessionState {
+    return this.session.state;
+  }
 
   constructor(config: PeerSessionConfig) {
     super();
@@ -47,7 +66,7 @@ export class PeerSession extends EventEmitter {
   async createInvite() {
     this.reset();
     this.role = 'caller';
-    this.setState('signaling');
+    this.apply({ type: 'start' });
     const signaling = this.config.signaling;
     await signaling.connect({ roomId: 'manual', clientId: this.clientId });
     signaling.subscribe((message) => this.onSignal(message));
@@ -59,6 +78,7 @@ export class PeerSession extends EventEmitter {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       await waitIceComplete(pc);
+      this.noteLocalSdp(localSdp(pc));
       await signaling.send({
         from: this.clientId,
         to: '*',
@@ -73,7 +93,7 @@ export class PeerSession extends EventEmitter {
   async acceptInvite(text: string) {
     this.reset();
     this.role = 'callee';
-    this.setState('signaling');
+    this.apply({ type: 'start' });
     const signaling = this.config.signaling;
     await signaling.connect({ roomId: 'manual', clientId: this.clientId });
     signaling.subscribe((message) => this.onSignal(message));
@@ -103,38 +123,43 @@ export class PeerSession extends EventEmitter {
 
   close() {
     this.config.signaling.close();
-    if (this.links) {
-      this.links.control?.close();
-      this.links.bytes?.close();
-      this.links.pc.close();
-    }
+    const links = this.links;
     this.links = null;
     this.role = 'idle';
     this.lastPongMs = null;
-    this.setState('closed');
+    this.ice = emptyIceReport();
+    if (links) {
+      links.control?.close();
+      links.bytes?.close();
+      links.pc.close();
+    }
+    this.apply({ type: 'close' });
   }
 
   reset() {
     this.error = '';
     this.lastPongMs = null;
+    this.ice = emptyIceReport();
     this.config.signaling.close();
-    if (this.links) {
-      this.links.control?.close();
-      this.links.bytes?.close();
-      this.links.pc.close();
-      this.links = null;
+    const links = this.links;
+    this.links = null;
+    if (links) {
+      links.control?.close();
+      links.bytes?.close();
+      links.pc.close();
     }
-    this.setState('idle');
+    this.apply({ type: 'reset' });
   }
 
-  setState(state: SessionState) {
-    this.state = state;
-    this.emit('state', state);
+  apply(event: SessionEvent) {
+    this.session = applySessionEvent(this.session, event);
+    if (event.type === 'fail') this.error = this.session.error;
+    this.emit('state', this.session.state);
   }
 
   fail(message: string) {
     this.error = message;
-    this.setState('failed');
+    this.apply({ type: 'fail', message });
     this.emit('error', message);
   }
 
@@ -165,10 +190,12 @@ export class PeerSession extends EventEmitter {
         }
       };
       await pc.setRemoteDescription({ type: 'offer', sdp: payload.sdp });
+      this.noteRemoteSdp(payload.sdp);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       await waitIceComplete(pc);
-      this.setState('connecting');
+      this.noteLocalSdp(localSdp(pc));
+      this.apply({ type: 'remote-ready' });
       await this.config.signaling.send({
         from: this.clientId,
         to: message.from,
@@ -189,27 +216,75 @@ export class PeerSession extends EventEmitter {
     }
     try {
       await pc.setRemoteDescription({ type: 'answer', sdp: payload.sdp });
-      this.setState('connecting');
+      this.noteRemoteSdp(payload.sdp);
+      this.apply({ type: 'remote-ready' });
     } catch (err) {
       this.fail(errorMessage(err, 'Не удалось принять ответ'));
     }
   }
 
   bindPeer(pc: RTCPeerConnection) {
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed') this.fail('ICE не собрался');
-      if (pc.connectionState === 'closed') this.setState('closed');
+    pc.onicecandidate = (event) => {
+      if (this.links?.pc !== pc) return;
+      const line = event.candidate?.candidate;
+      if (!line) return;
+      this.ice = {
+        ...this.ice,
+        local: addUniquePath(this.ice.local, classifyCandidate(line)),
+        gatheringState: pc.iceGatheringState,
+      };
+      this.emit('ice', this.ice);
     };
+    pc.onconnectionstatechange = () => {
+      if (this.links?.pc !== pc) return;
+      this.ice = { ...this.ice, connectionState: pc.connectionState };
+      this.emit('ice', this.ice);
+      void this.pullSelected();
+      if (pc.connectionState === 'failed') this.fail('ICE не собрался');
+      if (pc.connectionState === 'closed') this.apply({ type: 'close' });
+    };
+  }
+
+  noteRemoteSdp(sdp: string) {
+    this.ice = { ...this.ice, remote: pathsFromSdp(sdp) };
+    this.emit('ice', this.ice);
+  }
+
+  noteLocalSdp(sdp: string) {
+    let local = this.ice.local;
+    for (const path of pathsFromSdp(sdp)) {
+      local = addUniquePath(local, path);
+    }
+    this.ice = { ...this.ice, local, gatheringState: 'complete' };
+    this.emit('ice', this.ice);
+  }
+
+  async pullSelected() {
+    const pc = this.links?.pc;
+    if (!pc) return;
+    try {
+      const stats = await pc.getStats();
+      this.ice = {
+        ...this.ice,
+        connectionState: pc.connectionState,
+        gatheringState: pc.iceGatheringState,
+        selected: pairFromStats(stats.values()),
+      };
+      this.emit('ice', this.ice);
+    } catch {
+      this.emit('ice', this.ice);
+    }
   }
 
   bindControl(channel: RTCDataChannel | null) {
     if (!channel) return;
     channel.onopen = () => {
-      this.setState('connected');
+      this.apply({ type: 'channel-open' });
+      void this.pullSelected();
       this.emit('channel-open');
     };
     channel.onclose = () => {
-      if (this.state === 'connected') this.setState('closed');
+      if (this.session.state === 'connected') this.apply({ type: 'close' });
     };
     channel.onmessage = (event) => {
       this.onControl(String(event.data));

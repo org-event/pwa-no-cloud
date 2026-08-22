@@ -5,6 +5,7 @@ export type InviteState = {
   error: string;
   connected: boolean;
   lastPongMs: number | null;
+  ice: string;
 };
 
 export type InviteHandlers = {
@@ -65,6 +66,10 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
   inActions.className = 'home-actions';
   inActions.append(apply, ping);
 
+  const ice = document.createElement('p');
+  ice.className = 'status';
+  ice.dataset.role = 'ice';
+
   const pong = document.createElement('p');
   pong.className = 'status';
   pong.dataset.role = 'pong';
@@ -73,7 +78,17 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
   error.className = 'error';
   error.hidden = true;
 
-  panel.append(hint, qr, outgoing, outActions, paste, inActions, pong, error);
+  panel.append(
+    hint,
+    qr,
+    outgoing,
+    outActions,
+    paste,
+    inActions,
+    ice,
+    pong,
+    error,
+  );
   root.append(panel);
 
   return {
@@ -93,6 +108,8 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
       if (state.qrUrl) qr.src = state.qrUrl;
       apply.disabled = state.connected;
       ping.disabled = !state.connected;
+      ice.hidden = !state.ice;
+      ice.textContent = state.ice;
       pong.hidden = state.lastPongMs === null;
       if (state.lastPongMs !== null) {
         pong.textContent = `pong: ${state.lastPongMs} мс`;

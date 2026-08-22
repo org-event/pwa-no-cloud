@@ -72,7 +72,10 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
 
   return {
     sync(state: AppViewState) {
-      status.textContent = `сессия: ${state.session.state}`;
+      const ice = state.invite.ice;
+      status.textContent = ice
+        ? `сессия: ${state.session.state} · ${ice}`
+        : `сессия: ${state.session.state}`;
       home.sync({ online: state.online, canInstall: state.canInstall });
       invite.sync(state.invite);
       inbox.sync(state.inbox);
