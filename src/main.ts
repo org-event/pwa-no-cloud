@@ -23,6 +23,7 @@ import { createSignalingPort } from './lib/signaling/factory.ts';
 import { mountApp } from './ui/app.ts';
 import type { InboxState } from './ui/inbox.ts';
 import type { InviteState } from './ui/invite.ts';
+import type { PickedFile } from './lib/folder-walk.ts';
 import type { TransferViewState } from './ui/transfer.ts';
 import './style.css';
 
@@ -80,6 +81,8 @@ const transferState = (): TransferViewState => ({
   connected: peer?.state === 'connected',
   current: peer?.activeFile() ?? null,
   incoming: peer?.incomingFile() ?? null,
+  folder: peer?.activeFolder() ?? null,
+  incomingFolder: peer?.incomingFolder() ?? null,
   error: transferError,
 });
 
@@ -152,6 +155,8 @@ const startPeer = (): PeerSession | null => {
   });
   next.on('transfer', () => view.sync(currentState()));
   next.on('file-offer', () => view.sync(currentState()));
+  next.on('folder', () => view.sync(currentState()));
+  next.on('folder-offer', () => view.sync(currentState()));
   next.on('file-received', () => {
     void (async () => {
       await refreshInbox();
@@ -238,6 +243,15 @@ const view = mountApp(root, {
   onPickFile: (file) => {
     transferError = '';
     peer?.sendFile(file);
+    view.sync(currentState());
+  },
+  onPickFolder: (entries: PickedFile[]) => {
+    transferError = '';
+    peer?.sendFolder(entries);
+    view.sync(currentState());
+  },
+  onPickError: (message) => {
+    transferError = message;
     view.sync(currentState());
   },
   onAcceptFile: (transferId) => {

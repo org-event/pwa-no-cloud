@@ -12,6 +12,7 @@ import {
   readText,
   removeInboxFile,
   writeFixture,
+  writeInboxFile,
 } from './opfs.ts';
 
 const store = async () => {
@@ -67,6 +68,27 @@ describe('opfs inbox', () => {
     expect(text.ok).toBe(true);
     if (!text.ok) return;
     expect(text.value).toBe('hello\n');
+  });
+
+  it('writes and lists a nested inbox path', async () => {
+    const fs = await store();
+    const written = await writeInboxFile(
+      fs,
+      'pack',
+      'docs/sub/note.txt',
+      'nested',
+    );
+    expect(written.ok).toBe(true);
+    const listed = await listInbox(fs);
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) return;
+    expect(listed.value).toEqual([
+      { transferId: 'pack', name: 'docs/sub/note.txt' },
+    ]);
+    const text = await readInboxFile(fs, 'pack', 'docs/sub/note.txt');
+    expect(text.ok).toBe(true);
+    if (!text.ok) return;
+    expect(text.value).toBe('nested');
   });
 
   it('returns an error when the file is missing', async () => {

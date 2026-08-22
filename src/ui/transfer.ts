@@ -1,14 +1,24 @@
+import { folderProgress, type FolderTransfer } from '../domain/folder.ts';
 import { transferProgress, type Transfer } from '../domain/transfer.ts';
+import {
+  collectFromDirectory,
+  collectFromFileList,
+  type PickedFile,
+} from '../lib/folder-walk.ts';
 
 export type TransferViewState = {
   connected: boolean;
   current: Transfer | null;
   incoming: Transfer | null;
+  folder: FolderTransfer | null;
+  incomingFolder: FolderTransfer | null;
   error: string;
 };
 
 export type TransferHandlers = {
   onPickFile: (file: File) => void;
+  onPickFolder: (entries: PickedFile[]) => void;
+  onPickError: (message: string) => void;
   onAcceptFile: (transferId: string) => void;
   onRejectFile: (transferId: string) => void;
   onCancelFile: () => void;
@@ -20,25 +30,83 @@ const formatSize = (size: number): string => {
   return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
 };
 
-const statusText = (transfer: Transfer): string => {
+const isOpenFolder = (folder: FolderTransfer | null): boolean => {
+  if (!folder) return false;
+  return (
+    folder.state !== 'done' &&
+    folder.state !== 'failed' &&
+    folder.state !== 'canceled'
+  );
+};
+
+const fileStatus = (transfer: Transfer): string => {
   const progress = transferProgress(transfer);
   const chunk = `${progress.done}/${progress.total}`;
+  const label = transfer.path || transfer.name;
   if (transfer.state === 'offering') {
     return transfer.direction === 'send'
-      ? `ждём согласие · ${transfer.name}`
-      : `принять ${transfer.name} (${formatSize(transfer.size)})`;
+      ? `ждём согласие · ${label}`
+      : `принять ${label} (${formatSize(transfer.size)})`;
   }
-  if (transfer.state === 'sending') return `отправка ${transfer.name} ${chunk}`;
-  if (transfer.state === 'receiving') {
-    return `приём ${transfer.name} ${chunk}`;
-  }
-  if (transfer.state === 'writing') return `запись ${transfer.name}`;
-  if (transfer.state === 'done') return `готово: ${transfer.name}`;
-  if (transfer.state === 'canceled') return `отменено: ${transfer.name}`;
+  if (transfer.state === 'sending') return `отправка ${label} ${chunk}`;
+  if (transfer.state === 'receiving') return `приём ${label} ${chunk}`;
+  if (transfer.state === 'writing') return `запись ${label}`;
+  if (transfer.state === 'done') return `готово: ${label}`;
+  if (transfer.state === 'canceled') return `отменено: ${label}`;
   if (transfer.state === 'failed') {
-    return `ошибка ${transfer.name}: ${transfer.error}`;
+    return `ошибка ${label}: ${transfer.error}`;
   }
-  return transfer.name;
+  return label;
+};
+
+const folderStatus = (
+  folder: FolderTransfer,
+  current: Transfer | null,
+): string => {
+  const progress = folderProgress(folder);
+  const count = `${progress.done}/${progress.total}`;
+  const currentPath = current?.path ?? folder.name;
+  if (folder.state === 'offering') {
+    return folder.direction === 'send'
+      ? `ждём согласие · папка ${folder.name} (${progress.total} файлов)`
+      : `принять папку ${folder.name} (${progress.total} файлов, ${formatSize(folder.totalSize)})`;
+  }
+  if (folder.state === 'sending') {
+    return `отправка ${count} · ${currentPath}`;
+  }
+  if (folder.state === 'receiving') {
+    return `приём ${count} · ${currentPath}`;
+  }
+  if (folder.state === 'done') return `готово: папка ${folder.name}`;
+  if (folder.state === 'canceled') return `отменено: папка ${folder.name}`;
+  if (folder.state === 'failed') {
+    return `ошибка папки ${folder.name}: ${folder.error}`;
+  }
+  return `папка ${folder.name}`;
+};
+
+const pickDirectory = async (
+  fallback: HTMLInputElement,
+  handlers: TransferHandlers,
+) => {
+  const picker = Reflect.get(window, 'showDirectoryPicker');
+  if (typeof picker === 'function') {
+    try {
+      const handle = (await picker.call(window)) as FileSystemDirectoryHandle;
+      const walked = await collectFromDirectory(handle);
+      if (!walked.ok) {
+        handlers.onPickError(walked.message);
+        return;
+      }
+      handlers.onPickFolder(walked.value);
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
+    }
+  }
+  fallback.click();
 };
 
 export const mountTransfer = (
@@ -48,7 +116,7 @@ export const mountTransfer = (
   const panel = document.createElement('fieldset');
   panel.className = 'panel';
   const legend = document.createElement('legend');
-  legend.textContent = 'Файл';
+  legend.textContent = 'Передача';
   panel.append(legend);
 
   const pick = document.createElement('input');
@@ -60,16 +128,42 @@ export const mountTransfer = (
     pick.value = '';
   });
 
+  const pickFolder = document.createElement('input');
+  pickFolder.type = 'file';
+  pickFolder.className = 'file-input';
+  pickFolder.multiple = true;
+  pickFolder.setAttribute('webkitdirectory', '');
+  pickFolder.setAttribute('directory', '');
+  pickFolder.addEventListener('change', () => {
+    const files = pickFolder.files;
+    pickFolder.value = '';
+    if (!files || files.length === 0) return;
+    const walked = collectFromFileList(files);
+    if (!walked.ok) {
+      handlers.onPickError(walked.message);
+      return;
+    }
+    handlers.onPickFolder(walked.value);
+  });
+
   const send = document.createElement('button');
   send.type = 'button';
-  send.className = 'button';
+  send.className = 'button button-accent';
   send.textContent = 'Отправить файл';
   send.addEventListener('click', () => pick.click());
+
+  const sendFolder = document.createElement('button');
+  sendFolder.type = 'button';
+  sendFolder.className = 'button';
+  sendFolder.textContent = 'Отправить папку';
+  sendFolder.addEventListener('click', () => {
+    void pickDirectory(pickFolder, handlers);
+  });
 
   const accept = document.createElement('button');
   accept.type = 'button';
   accept.className = 'button';
-  accept.textContent = 'Принять файл';
+  accept.textContent = 'Принять';
 
   const reject = document.createElement('button');
   reject.type = 'button';
@@ -84,7 +178,7 @@ export const mountTransfer = (
 
   const actions = document.createElement('div');
   actions.className = 'home-actions';
-  actions.append(send, accept, reject, cancel);
+  actions.append(send, sendFolder, accept, reject, cancel);
 
   const status = document.createElement('p');
   status.className = 'tagline';
@@ -93,29 +187,58 @@ export const mountTransfer = (
   error.className = 'error';
   error.hidden = true;
 
-  panel.append(pick, actions, status, error);
+  panel.append(pick, pickFolder, actions, status, error);
   root.append(panel);
 
   return {
     sync(state: TransferViewState) {
-      panel.hidden = !state.connected && !state.current && !state.incoming;
-      send.disabled = !state.connected || Boolean(state.current);
-      const incoming = state.incoming;
-      accept.hidden = !incoming;
-      reject.hidden = !incoming;
+      const folder = state.incomingFolder ?? state.folder;
+      const incomingFile =
+        state.incoming && !state.incoming.folderId ? state.incoming : null;
+      const needAccept = Boolean(state.incomingFolder || incomingFile);
+      const openFolder =
+        isOpenFolder(state.folder) || Boolean(state.incomingFolder);
+      panel.hidden =
+        !state.connected && !state.current && !state.incoming && !folder;
+      const blocked =
+        !state.connected ||
+        Boolean(state.current) ||
+        Boolean(state.incoming) ||
+        openFolder;
+      send.disabled = blocked;
+      sendFolder.disabled = blocked;
+      accept.hidden = !needAccept;
+      reject.hidden = !needAccept;
+      accept.textContent = state.incomingFolder
+        ? 'Принять папку'
+        : 'Принять файл';
       accept.onclick = () => {
-        if (incoming) handlers.onAcceptFile(incoming.id);
+        if (state.incomingFolder) {
+          handlers.onAcceptFile(state.incomingFolder.id);
+          return;
+        }
+        if (incomingFile) handlers.onAcceptFile(incomingFile.id);
       };
       reject.onclick = () => {
-        if (incoming) handlers.onRejectFile(incoming.id);
+        if (state.incomingFolder) {
+          handlers.onRejectFile(state.incomingFolder.id);
+          return;
+        }
+        if (incomingFile) handlers.onRejectFile(incomingFile.id);
       };
       const busy =
         state.current?.state === 'sending' ||
-        state.current?.state === 'receiving';
+        state.current?.state === 'receiving' ||
+        state.folder?.state === 'sending' ||
+        state.folder?.state === 'receiving';
       cancel.hidden = !busy;
-      const shown = state.incoming ?? state.current;
-      status.hidden = !shown;
-      status.textContent = shown ? statusText(shown) : '';
+      const shownFolder = state.incomingFolder ?? state.folder;
+      const shownFile = incomingFile ?? state.current;
+      let text = '';
+      if (shownFolder) text = folderStatus(shownFolder, shownFile);
+      else if (shownFile) text = fileStatus(shownFile);
+      status.hidden = !text;
+      status.textContent = text;
       error.hidden = !state.error;
       error.textContent = state.error;
     },

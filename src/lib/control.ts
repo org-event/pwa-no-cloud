@@ -6,6 +6,8 @@ export type FileControl =
       size: number;
       mime: string;
       chunkSize: number;
+      folderId?: string;
+      path?: string;
     }
   | { type: 'file-accept'; transferId: string }
   | { type: 'file-reject'; transferId: string; reason: string }
@@ -14,6 +16,21 @@ export type FileControl =
   | { type: 'file-done'; transferId: string }
   | { type: 'file-error'; transferId: string; code: string }
   | { type: 'file-cancel'; transferId: string };
+
+export type FolderControl =
+  | {
+      type: 'folder-offer';
+      folderId: string;
+      name: string;
+      files: { path: string; size: number; mime: string }[];
+      totalSize: number;
+    }
+  | { type: 'folder-accept'; folderId: string }
+  | { type: 'folder-reject'; folderId: string; reason: string }
+  | { type: 'folder-done'; folderId: string }
+  | { type: 'folder-cancel'; folderId: string };
+
+export type ControlMessage = FileControl | FolderControl;
 
 const isObject = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value) && typeof value === 'object';
@@ -38,7 +55,9 @@ export const parseFileControl = (raw: unknown): FileControl | null => {
     const mime = asString(raw.mime);
     const chunkSize = asNumber(raw.chunkSize);
     if (!name || size === null || !mime || chunkSize === null) return null;
-    return { type, transferId, name, size, mime, chunkSize };
+    const folderId = asString(raw.folderId) ?? undefined;
+    const path = asString(raw.path) ?? undefined;
+    return { type, transferId, name, size, mime, chunkSize, folderId, path };
   }
   if (
     type === 'file-accept' ||
@@ -64,4 +83,42 @@ export const parseFileControl = (raw: unknown): FileControl | null => {
     return { type, transferId, code };
   }
   return null;
+};
+
+export const parseFolderControl = (raw: unknown): FolderControl | null => {
+  if (!isObject(raw)) return null;
+  const type = raw.type;
+  const folderId = asString(raw.folderId);
+  if (!folderId) return null;
+  if (type === 'folder-offer') {
+    const name = asString(raw.name);
+    const totalSize = asNumber(raw.totalSize);
+    if (!name || totalSize === null || !Array.isArray(raw.files)) return null;
+    const files: { path: string; size: number; mime: string }[] = [];
+    for (const item of raw.files) {
+      if (!isObject(item)) return null;
+      const path = asString(item.path);
+      const size = asNumber(item.size);
+      const mime = asString(item.mime);
+      if (!path || size === null || !mime) return null;
+      files.push({ path, size, mime });
+    }
+    return { type, folderId, name, files, totalSize };
+  }
+  if (
+    type === 'folder-accept' ||
+    type === 'folder-done' ||
+    type === 'folder-cancel'
+  ) {
+    return { type, folderId };
+  }
+  if (type === 'folder-reject') {
+    const reason = asString(raw.reason) ?? 'отклонено';
+    return { type, folderId, reason };
+  }
+  return null;
+};
+
+export const parseControl = (raw: unknown): ControlMessage | null => {
+  return parseFileControl(raw) ?? parseFolderControl(raw);
 };

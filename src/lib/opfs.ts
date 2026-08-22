@@ -1,3 +1,5 @@
+import { splitRelativePath } from './folder-path.ts';
+
 export type OpfsError = {
   ok: false;
   code: string;
@@ -138,21 +140,68 @@ export const appendLog = async (
   }
 };
 
+const openInboxHandle = async (
+  store: OpfsStore,
+  transferId: string,
+  path: string,
+  create: boolean,
+): Promise<OpfsResult<FileSystemFileHandle>> => {
+  if (!isSafeName(transferId)) {
+    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+  }
+  const segments = splitRelativePath(path);
+  if (!segments) return fail('unsafe-name', 'Недопустимое имя файла');
+  try {
+    let folder = await store.inbox.getDirectoryHandle(transferId, { create });
+    const last = segments[segments.length - 1];
+    if (!last) return fail('unsafe-name', 'Недопустимое имя файла');
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      const name = segments[i];
+      if (!name) return fail('unsafe-name', 'Недопустимое имя файла');
+      folder = await folder.getDirectoryHandle(name, { create });
+    }
+    return {
+      ok: true,
+      value: await folder.getFileHandle(last, { create }),
+    };
+  } catch (error) {
+    return asError(error, create ? 'write-failed' : 'read-failed');
+  }
+};
+
+const listDirFiles = async (
+  folder: FileSystemDirectoryHandle,
+  prefix: string,
+): Promise<string[]> => {
+  const names: string[] = [];
+  for await (const entry of folder.entries()) {
+    const name = entry[0];
+    const handle = entry[1];
+    const rel = prefix ? `${prefix}/${name}` : name;
+    if (handle.kind === 'file') {
+      names.push(rel);
+      continue;
+    }
+    if (handle.kind === 'directory') {
+      const nested = await listDirFiles(
+        handle as FileSystemDirectoryHandle,
+        rel,
+      );
+      for (const item of nested) names.push(item);
+    }
+  }
+  return names;
+};
+
 export const openInboxWritable = async (
   store: OpfsStore,
   transferId: string,
   name: string,
 ): Promise<OpfsResult<FileSystemWritableFileStream>> => {
-  if (!isSafeName(transferId)) {
-    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
-  }
-  if (!isSafeName(name)) return fail('unsafe-name', 'Недопустимое имя файла');
+  const handle = await openInboxHandle(store, transferId, name, true);
+  if (!handle.ok) return handle;
   try {
-    const folder = await store.inbox.getDirectoryHandle(transferId, {
-      create: true,
-    });
-    const handle = await folder.getFileHandle(name, { create: true });
-    return { ok: true, value: await handle.createWritable() };
+    return { ok: true, value: await handle.value.createWritable() };
   } catch (error) {
     return asError(error, 'write-failed');
   }
@@ -179,14 +228,13 @@ export const writeInboxFile = async (
   name: string,
   data: string | BufferSource | Blob,
 ): Promise<OpfsResult<true>> => {
-  if (!isSafeName(transferId)) {
-    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
-  }
+  const handle = await openInboxHandle(store, transferId, name, true);
+  if (!handle.ok) return handle;
   try {
-    const folder = await store.inbox.getDirectoryHandle(transferId, {
-      create: true,
-    });
-    return writeFile(folder, name, data);
+    const writable = await handle.value.createWritable();
+    await writable.write(data);
+    await writable.close();
+    return { ok: true, value: true };
   } catch (error) {
     return asError(error, 'write-failed');
   }
@@ -197,12 +245,11 @@ export const readInboxFile = async (
   transferId: string,
   name: string,
 ): Promise<OpfsResult<string>> => {
-  if (!isSafeName(transferId)) {
-    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
-  }
+  const handle = await openInboxHandle(store, transferId, name, false);
+  if (!handle.ok) return handle;
   try {
-    const folder = await store.inbox.getDirectoryHandle(transferId);
-    return readText(folder, name);
+    const file = await handle.value.getFile();
+    return { ok: true, value: await file.text() };
   } catch (error) {
     return asError(error, 'read-failed');
   }
@@ -216,13 +263,23 @@ export const removeInboxFile = async (
   if (!isSafeName(transferId)) {
     return fail('unsafe-name', 'Недопустимый идентификатор передачи');
   }
+  const segments = splitRelativePath(name);
+  if (!segments) return fail('unsafe-name', 'Недопустимое имя файла');
   try {
-    const folder = await store.inbox.getDirectoryHandle(transferId);
-    const removed = await removeFile(folder, name);
+    let folder = await store.inbox.getDirectoryHandle(transferId);
+    const last = segments[segments.length - 1];
+    if (!last) return fail('unsafe-name', 'Недопустимое имя файла');
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      const dir = segments[i];
+      if (!dir) return fail('unsafe-name', 'Недопустимое имя файла');
+      folder = await folder.getDirectoryHandle(dir);
+    }
+    const removed = await removeFile(folder, last);
     if (!removed.ok) return removed;
-    const left = await listEntries(folder);
-    if (left.ok && left.value.length === 0) {
-      await store.inbox.removeEntry(transferId);
+    const root = await store.inbox.getDirectoryHandle(transferId);
+    const left = await listDirFiles(root, '');
+    if (left.length === 0) {
+      await store.inbox.removeEntry(transferId, { recursive: true });
     }
     return { ok: true, value: true };
   } catch (error) {
@@ -240,9 +297,9 @@ export const listInbox = async (
       const handle = entry[1];
       if (handle.kind !== 'directory') continue;
       const folder = handle as FileSystemDirectoryHandle;
-      for await (const fileEntry of folder.entries()) {
-        if (fileEntry[1].kind !== 'file') continue;
-        items.push({ transferId, name: fileEntry[0] });
+      const names = await listDirFiles(folder, '');
+      for (const name of names) {
+        items.push({ transferId, name });
       }
     }
     return { ok: true, value: items };

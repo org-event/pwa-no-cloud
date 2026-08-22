@@ -14,6 +14,8 @@ export type TransferDirection = 'send' | 'receive';
 export type Transfer = {
   id: string;
   name: string;
+  path: string;
+  folderId: string;
   size: number;
   mime: string;
   chunkSize: number;
@@ -40,9 +42,13 @@ export const createSendTransfer = (input: {
   size: number;
   mime: string;
   chunkSize: number;
+  path?: string;
+  folderId?: string;
 }): Transfer => ({
   id: input.id,
   name: input.name,
+  path: input.path ?? input.name,
+  folderId: input.folderId ?? '',
   size: input.size,
   mime: input.mime,
   chunkSize: input.chunkSize,
@@ -58,6 +64,8 @@ export const createReceiveTransfer = (input: {
   size: number;
   mime: string;
   chunkSize: number;
+  path?: string;
+  folderId?: string;
 }): Transfer => ({
   ...createSendTransfer(input),
   direction: 'receive',

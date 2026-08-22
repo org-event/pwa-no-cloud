@@ -95,4 +95,46 @@ describe('file pipe', () => {
     await canceled;
     expect(alice.current()?.state ?? 'canceled').toBe('canceled');
   });
+
+  it('delivers a nested folder after one accept', async () => {
+    const { alice, bob, store } = await pair();
+    const done = new Promise<void>((resolve) => {
+      alice.on('folder', (value) => {
+        const folder = value as { state?: string };
+        if (folder.state === 'done') resolve();
+      });
+    });
+    bob.on('folder-offer', (value) => {
+      const folder = value as { id: string };
+      bob.accept(folder.id);
+    });
+    alice.sendFolder([
+      {
+        file: new File(['aa'], 'a.txt', { type: 'text/plain' }),
+        path: 'docs/a.txt',
+      },
+      {
+        file: new File(['bbbb'], 'b.txt', { type: 'text/plain' }),
+        path: 'docs/sub/b.txt',
+      },
+    ]);
+    await done;
+    const listed = await listInbox(store);
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) return;
+    const names = listed.value.map((item) => item.name).sort();
+    expect(names).toEqual(['docs/a.txt', 'docs/sub/b.txt']);
+    const a = await readInboxFile(
+      store,
+      listed.value[0]?.transferId ?? '',
+      'docs/a.txt',
+    );
+    const b = await readInboxFile(
+      store,
+      listed.value[0]?.transferId ?? '',
+      'docs/sub/b.txt',
+    );
+    expect(a.ok && a.value).toBe('aa');
+    expect(b.ok && b.value).toBe('bbbb');
+  });
 });

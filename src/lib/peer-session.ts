@@ -9,6 +9,7 @@ import {
 } from '../domain/session.ts';
 import { EventEmitter } from './events.ts';
 import { FilePipe, type DataSink } from './file-pipe.ts';
+import type { PickedFile } from './folder-walk.ts';
 import { generateId } from './id.ts';
 import type { OpfsStore } from './opfs.ts';
 import {
@@ -177,6 +178,11 @@ export class PeerSession extends EventEmitter {
     this.pipe?.sendFile(file);
   }
 
+  sendFolder(entries: PickedFile[]) {
+    this.ensurePipe();
+    this.pipe?.sendFolder(entries);
+  }
+
   acceptFile(transferId: string) {
     this.pipe?.accept(transferId);
   }
@@ -199,6 +205,14 @@ export class PeerSession extends EventEmitter {
 
   incomingFile() {
     return this.pipe?.incoming ?? null;
+  }
+
+  activeFolder() {
+    return this.pipe?.activeFolder ?? null;
+  }
+
+  incomingFolder() {
+    return this.pipe?.incomingFolder ?? null;
   }
 
   ping() {
@@ -443,6 +457,8 @@ export class PeerSession extends EventEmitter {
     });
     pipe.on('transfer', (value) => this.emit('transfer', value));
     pipe.on('offer', (value) => this.emit('file-offer', value));
+    pipe.on('folder', (value) => this.emit('folder', value));
+    pipe.on('folder-offer', (value) => this.emit('folder-offer', value));
     pipe.on('received', (value) => this.emit('file-received', value));
     pipe.on('error', (value) => this.emit('error', value));
     this.pipe = pipe;
