@@ -1,9 +1,11 @@
 import { SERVER_PRESETS } from '../config/index.ts';
-import { listIceUrls } from '../config/ice-urls.ts';
-import { isTurnUrl } from '../config/merge.ts';
+import {
+  draftIceServersFromText,
+  parseIceServersJson,
+  splitIceServers,
+} from '../config/ice-draft.ts';
 import type {
   CustomServerDraft,
-  IceServerConfig,
   ResolveResult,
   SignalingKind,
   UserSettings,
@@ -20,47 +22,27 @@ const KIND_OPTIONS: { id: SignalingKind; title: string }[] = [
   { id: 'websocket', title: 'WebSocket' },
 ];
 
-const splitIce = (servers: IceServerConfig[]) => {
-  const stun: string[] = [];
-  let turnUrl = '';
-  let username = '';
-  let credential = '';
-  for (const server of servers) {
-    const urls = listIceUrls(server.urls);
-    for (const url of urls) {
-      if (isTurnUrl(url)) {
-        turnUrl = url;
-        username = server.username ?? '';
-        credential = server.credential ?? '';
-        continue;
-      }
-      stun.push(url);
-    }
-  }
-  return { stun, turnUrl, username, credential };
-};
-
-const readCustomDraft = (form: HTMLFormElement): CustomServerDraft => {
+const readCustomDraft = (
+  form: HTMLFormElement,
+): CustomServerDraft | { error: string } => {
   const kind = form.elements.namedItem('kind') as HTMLSelectElement;
   const url = form.elements.namedItem('signalingUrl') as HTMLInputElement;
   const stun = form.elements.namedItem('stun') as HTMLTextAreaElement;
-  const turnUrl = form.elements.namedItem('turnUrl') as HTMLInputElement;
+  const turnUrl = form.elements.namedItem('turnUrl') as HTMLTextAreaElement;
   const username = form.elements.namedItem('turnUser') as HTMLInputElement;
   const credential = form.elements.namedItem('turnPass') as HTMLInputElement;
-  const iceServers: IceServerConfig[] = [];
-  const stunLines = stun.value.split('\n');
-  for (const line of stunLines) {
-    const value = line.trim();
-    if (value) iceServers.push({ urls: value });
-  }
-  const relay = turnUrl.value.trim();
-  if (relay) {
-    iceServers.push({
-      urls: relay,
-      username: username.value.trim(),
-      credential: credential.value,
-    });
-  }
+  const iceJson = form.elements.namedItem('iceJson') as HTMLTextAreaElement;
+  const parsed = parseIceServersJson(iceJson.value);
+  if (!parsed.ok) return { error: parsed.message };
+  const iceServers =
+    parsed.value.length > 0
+      ? parsed.value
+      : draftIceServersFromText({
+          stun: stun.value,
+          turn: turnUrl.value,
+          username: username.value,
+          credential: credential.value,
+        });
   const signaling = { kind: kind.value as SignalingKind };
   if (signaling.kind !== 'manual') {
     return { signaling: { ...signaling, url: url.value.trim() }, iceServers };
@@ -72,16 +54,18 @@ const fillCustomForm = (form: HTMLFormElement, draft: CustomServerDraft) => {
   const kind = form.elements.namedItem('kind') as HTMLSelectElement;
   const url = form.elements.namedItem('signalingUrl') as HTMLInputElement;
   const stun = form.elements.namedItem('stun') as HTMLTextAreaElement;
-  const turnUrl = form.elements.namedItem('turnUrl') as HTMLInputElement;
+  const turnUrl = form.elements.namedItem('turnUrl') as HTMLTextAreaElement;
   const username = form.elements.namedItem('turnUser') as HTMLInputElement;
   const credential = form.elements.namedItem('turnPass') as HTMLInputElement;
-  const ice = splitIce(draft.iceServers);
+  const iceJson = form.elements.namedItem('iceJson') as HTMLTextAreaElement;
+  const ice = splitIceServers(draft.iceServers);
   kind.value = draft.signaling.kind;
   url.value = draft.signaling.url ?? '';
   stun.value = ice.stun.join('\n');
-  turnUrl.value = ice.turnUrl;
+  turnUrl.value = ice.turn.join('\n');
   username.value = ice.username;
   credential.value = ice.credential;
+  iceJson.value = '';
 };
 
 const previewText = (result: ResolveResult): string => {
@@ -130,17 +114,18 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
         <textarea name="stun" rows="3"></textarea>
       </label>
       <p class="tagline">
-        Чужой открытый TURN не подставляем. Если устройства в разных
-        сетях и ICE падает — укажите свой релей (docs/turn.md).
+        Чужой открытый TURN в пресеты не кладём. Для теста через интернет
+        можно вписать бесплатный Open Relay: см. docs/turn.md. На сотовой
+        сети нужны несколько URL (UDP, TCP и turns на 443).
       </p>
       <label class="field">
-        <span>TURN URL</span>
-        <input
+        <span>TURN, по одному URL в строке</span>
+        <textarea
           name="turnUrl"
-          type="text"
+          rows="4"
           autocomplete="off"
           placeholder="turn:example.com:3478"
-        />
+        ></textarea>
       </label>
       <label class="field">
         <span>TURN логин</span>
@@ -149,6 +134,15 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
       <label class="field">
         <span>TURN пароль</span>
         <input name="turnPass" type="password" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span>или iceServers JSON</span>
+        <textarea
+          name="iceJson"
+          rows="5"
+          autocomplete="off"
+          placeholder='[{"urls":"turn:...","username":"...","credential":"..."}]'
+        ></textarea>
       </label>
       <button class="button" type="submit">Сохранить свой сервер</button>
     </fieldset>
@@ -160,10 +154,6 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
     node.textContent = option.title;
     kindSelect.append(node);
   }
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    handlers.onSaveCustom(readCustomDraft(form));
-  });
 
   const preview = document.createElement('pre');
   preview.className = 'resolved';
@@ -178,6 +168,17 @@ export const mountServers = (root: HTMLElement, handlers: ServersHandlers) => {
   error.hidden = true;
   error.dataset.role = 'error';
   error.setAttribute('role', 'alert');
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const draft = readCustomDraft(form);
+    if ('error' in draft) {
+      error.hidden = false;
+      error.textContent = draft.error;
+      return;
+    }
+    handlers.onSaveCustom(draft);
+  });
 
   root.append(list, hint, form, error, preview);
 

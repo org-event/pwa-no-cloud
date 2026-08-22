@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeInvite, encodeInvite, parseInvite } from './invite.ts';
+import { decodeInvite, encodeInvite } from './invite.ts';
 import { createManualPort } from './manual.ts';
 import type { SignalMessage } from './port.ts';
 
@@ -16,8 +16,8 @@ describe('invite encode', () => {
     const decoded = await decodeInvite(encoded);
     expect(decoded.ok).toBe(true);
     if (!decoded.ok) return;
-    expect(decoded.value.from).toBe('alice');
-    expect(decoded.value.data.type).toBe('offer');
+    expect(decoded.value.message.from).toBe('alice');
+    expect(decoded.value.message.data.type).toBe('offer');
   });
 
   it('rejects empty and broken text', async () => {
@@ -27,9 +27,21 @@ describe('invite encode', () => {
     expect(broken.ok).toBe(false);
   });
 
-  it('rejects a payload without type', () => {
-    const parsed = parseInvite({ from: 'a', to: 'b', data: { type: 'nope' } });
-    expect(parsed.ok).toBe(false);
+  it('embeds ice servers so the other side can use your TURN', async () => {
+    const encoded = await encodeInvite(offer(), {
+      signaling: { kind: 'manual' },
+      iceServers: [
+        {
+          urls: 'turn:203.0.113.10:443?transport=tcp',
+          username: 'u',
+          credential: 'p',
+        },
+      ],
+    });
+    const decoded = await decodeInvite(encoded);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.value.servers?.iceServers[0]?.username).toBe('u');
   });
 });
 

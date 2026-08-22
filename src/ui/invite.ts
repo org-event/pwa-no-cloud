@@ -8,12 +8,16 @@ export type InviteState = {
   connected: boolean;
   lastPongMs: number | null;
   ice: string;
+  shareWithPeer: boolean;
+  canShareServers: boolean;
 };
 
 export type InviteHandlers = {
   onApplyPaste: (text: string) => void;
   onCopy: () => void;
+  onShareLink: () => void;
   onPing: () => void;
+  onShareWithPeer: (on: boolean) => void;
 };
 
 export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
@@ -44,6 +48,12 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
   copy.textContent = 'Скопировать';
   copy.addEventListener('click', () => handlers.onCopy());
 
+  const shareLink = document.createElement('button');
+  shareLink.type = 'button';
+  shareLink.className = 'button';
+  shareLink.textContent = 'Поделиться ссылкой';
+  shareLink.addEventListener('click', () => handlers.onShareLink());
+
   const paste = document.createElement('textarea');
   paste.rows = 6;
   paste.placeholder = 'Вставьте приглашение или ответ';
@@ -62,39 +72,33 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
   ping.textContent = 'Ping';
   ping.addEventListener('click', () => handlers.onPing());
 
+  const share = document.createElement('label');
+  share.className = 'choice';
+  const shareInput = document.createElement('input');
+  shareInput.type = 'checkbox';
+  shareInput.name = 'shareServers';
+  shareInput.addEventListener('change', () => {
+    handlers.onShareWithPeer(shareInput.checked);
+  });
+  const shareText = document.createElement('span');
+  shareText.textContent =
+    'Вложить мои серверы: если у второго нет TURN/сокета — пусть возьмёт эти';
+  share.append(shareInput, shareText);
+
   const outActions = document.createElement('div');
   outActions.className = 'home-actions';
-  outActions.append(copy);
+  outActions.append(copy, shareLink);
 
   const inActions = document.createElement('div');
   inActions.className = 'home-actions';
   inActions.append(apply, ping);
-
-  const ice = document.createElement('p');
-  ice.className = 'status';
-  ice.dataset.role = 'ice';
-  ice.setAttribute('role', 'status');
-
-  const pong = document.createElement('p');
-  pong.className = 'status';
-  pong.dataset.role = 'pong';
 
   const error = document.createElement('p');
   error.className = 'error';
   error.hidden = true;
   error.setAttribute('role', 'alert');
 
-  panel.append(
-    hint,
-    qr,
-    outgoing,
-    outActions,
-    paste,
-    inActions,
-    ice,
-    pong,
-    error,
-  );
+  panel.append(hint, share, qr, outgoing, outActions, paste, inActions, error);
   root.append(panel);
 
   return {
@@ -109,10 +113,14 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
         hint.textContent =
           'Отправьте текст второму окну, затем вставьте его ответ';
       } else if (state.role === 'callee') {
-        hint.textContent = 'Вставьте приглашение, затем отдайте ответ';
+        hint.textContent =
+          'Вставьте приглашение или пакет S1. с серверов, затем отдайте ответ';
       } else {
         hint.textContent = state.connected ? 'Канал открыт' : '';
       }
+      share.hidden = !manual;
+      shareInput.checked = state.shareWithPeer;
+      shareInput.disabled = !state.canShareServers;
       qr.hidden = !manual || !state.qrUrl;
       if (state.qrUrl) qr.src = state.qrUrl;
       outgoing.hidden = !manual;
@@ -121,15 +129,9 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
       apply.hidden = !manual;
       outgoing.value = state.outgoing;
       copy.disabled = !state.outgoing;
+      shareLink.disabled = !state.outgoing;
       apply.disabled = state.connected;
       ping.disabled = !state.connected;
-      ice.hidden = !state.ice;
-      ice.textContent = state.ice;
-      ice.dataset.path = state.ice.includes('путь = relay') ? 'relay' : '';
-      pong.hidden = state.lastPongMs === null;
-      if (state.lastPongMs !== null) {
-        pong.textContent = `pong: ${state.lastPongMs} мс`;
-      }
       error.hidden = !state.error;
       error.textContent = state.error;
     },

@@ -20,6 +20,11 @@ export {
   isTurnUrl,
   resolveServers,
 } from './merge.ts';
+export {
+  decodeSharePack,
+  encodeSharePack,
+  iceOnlyShare,
+} from './share-pack.ts';
 export { SERVER_PRESETS, getPreset } from './servers.ts';
 export {
   browserStorage,
@@ -27,6 +32,7 @@ export {
   saveUserSettings,
 } from './storage.ts';
 export type {
+  CustomServerDraft,
   IceServerConfig,
   ResolveResult,
   ResolvedServerConfig,

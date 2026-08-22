@@ -7,7 +7,11 @@ PWA для обмена файлами без облака. Файловый т�
 Как пользоваться: [docs/usage.md](docs/usage.md).
 План работ: [docs/plan.md](docs/plan.md).
 Свой TURN (coturn): [docs/turn.md](docs/turn.md). Чужой открытый TURN
-в пресеты не кладём.
+в пресеты не кладём. Установщик на VPS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/org-event/pwa-no-cloud/main/deploy/install-turn.sh | sudo bash
+```
 
 Поставить PWA с GitHub Pages (HTTPS):
 https://org-event.github.io/pwa-no-cloud/

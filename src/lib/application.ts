@@ -1,4 +1,5 @@
 import { APP_BASE, SERVICE_WORKER_PATH } from '../workers/sw.ts';
+import { APP_PROTOCOL, protocolHandlerUrl } from './app-link.ts';
 import { EventEmitter } from './events.ts';
 import { getClientId, type IdStorage } from './id.ts';
 
@@ -31,6 +32,7 @@ export class Application extends EventEmitter {
     const shouldRegister = config.registerWorker ?? import.meta.env.PROD;
     this.setupNetwork();
     this.setupInstall();
+    this.setupProtocol();
     if (shouldRegister) void this.registerWorker();
   }
 
@@ -57,6 +59,21 @@ export class Application extends EventEmitter {
       this.canInstall = false;
       this.emit('installed', { accepted: true });
     });
+  }
+
+  setupProtocol() {
+    const nav = navigator as Navigator & {
+      registerProtocolHandler?: (scheme: string, url: string) => void;
+    };
+    if (typeof nav.registerProtocolHandler !== 'function') return;
+    try {
+      nav.registerProtocolHandler(
+        APP_PROTOCOL,
+        protocolHandlerUrl(globalThis.location.origin, APP_BASE),
+      );
+    } catch {
+      return;
+    }
   }
 
   async registerWorker() {

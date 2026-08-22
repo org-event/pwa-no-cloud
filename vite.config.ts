@@ -14,13 +14,19 @@ export default defineConfig({
   base: readPagesBase(),
   plugins: [shellWorker()],
   fmt: {
-    ignorePatterns: ['dist/**', 'docs/**', 'design-system/**'],
+    ignorePatterns: ['dist/**', 'docs/**', 'design-system/**', 'deploy/**'],
     singleQuote: true,
     semi: true,
     printWidth: 80,
   },
   lint: {
-    ignorePatterns: ['dist/**', 'docs/**', 'design-system/**', 'server/**'],
+    ignorePatterns: [
+      'dist/**',
+      'docs/**',
+      'design-system/**',
+      'server/**',
+      'deploy/**',
+    ],
     options: {
       typeAware: true,
       typeCheck: true,

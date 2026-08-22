@@ -1,3 +1,5 @@
+import type { CustomServerDraft } from '../../config/types.ts';
+import { parseShareDraft } from '../../config/share-pack.ts';
 import type { SignalMessage, SignalResult } from './port.ts';
 
 const COMPRESSED = 'N1.';
@@ -84,8 +86,22 @@ export const parseInvite = (raw: unknown): SignalResult<SignalMessage> => {
   };
 };
 
-export const encodeInvite = async (message: SignalMessage): Promise<string> => {
-  const json = JSON.stringify({ v: 1, ...message });
+export type DecodedInvite = {
+  message: SignalMessage;
+  servers?: CustomServerDraft;
+};
+
+export const encodeInvite = async (
+  message: SignalMessage,
+  servers?: CustomServerDraft,
+): Promise<string> => {
+  const json = JSON.stringify({
+    v: 1,
+    from: message.from,
+    to: message.to,
+    data: message.data,
+    servers,
+  });
   if (!canCompress()) return PLAIN + json;
   const bytes = await deflate(json);
   return COMPRESSED + bytesToBase64(bytes);
@@ -93,7 +109,7 @@ export const encodeInvite = async (message: SignalMessage): Promise<string> => {
 
 export const decodeInvite = async (
   text: string,
-): Promise<SignalResult<SignalMessage>> => {
+): Promise<SignalResult<DecodedInvite>> => {
   const raw = text.trim();
   if (!raw) {
     return { ok: false, code: 'invite-empty', message: 'Пустое приглашение' };
@@ -105,7 +121,20 @@ export const decodeInvite = async (
     } else if (raw.startsWith(PLAIN)) {
       json = raw.slice(PLAIN.length);
     }
-    return parseInvite(JSON.parse(json));
+    const parsedJson = JSON.parse(json) as unknown;
+    const parsed = parseInvite(parsedJson);
+    if (!parsed.ok) return parsed;
+    const servers =
+      parsedJson && typeof parsedJson === 'object'
+        ? parseShareDraft((parsedJson as { servers?: unknown }).servers)
+        : null;
+    return {
+      ok: true,
+      value: {
+        message: parsed.value,
+        servers: servers ?? undefined,
+      },
+    };
   } catch {
     return { ok: false, code: 'invite-parse', message: 'Не удалось прочитать' };
   }

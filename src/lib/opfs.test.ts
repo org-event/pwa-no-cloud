@@ -6,6 +6,7 @@ import {
   FIXTURE_TRANSFER_ID,
   appendLog,
   isSafeName,
+  readAppLog,
   listInbox,
   openStore,
   readInboxFile,
@@ -70,6 +71,18 @@ describe('opfs inbox', () => {
     expect(text.ok).toBe(true);
     if (!text.ok) return;
     expect(text.value).toBe('hello\n');
+    const again = await readAppLog(fs);
+    expect(again.ok).toBe(true);
+    if (!again.ok) return;
+    expect(again.value).toBe('hello\n');
+  });
+
+  it('returns empty text when app.log is missing', async () => {
+    const fs = await store();
+    const empty = await readAppLog(fs);
+    expect(empty.ok).toBe(true);
+    if (!empty.ok) return;
+    expect(empty.value).toBe('');
   });
 
   it('writes and lists a nested inbox path', async () => {

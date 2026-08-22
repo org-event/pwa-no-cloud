@@ -12,6 +12,7 @@ export type TransferViewState = {
   incoming: Transfer | null;
   folder: FolderTransfer | null;
   incomingFolder: FolderTransfer | null;
+  queuedNames: string[];
   error: string;
 };
 
@@ -214,19 +215,15 @@ export const mountTransfer = (
 
   return {
     sync(state: TransferViewState) {
-      const folder = state.incomingFolder ?? state.folder;
       const incomingFile =
         state.incoming && !state.incoming.folderId ? state.incoming : null;
       const needAccept = Boolean(state.incomingFolder || incomingFile);
       const openFolder =
         isOpenFolder(state.folder) || Boolean(state.incomingFolder);
-      panel.hidden =
-        !state.connected && !state.current && !state.incoming && !folder;
+      const queued = state.queuedNames.length > 0;
+      panel.hidden = false;
       const blocked =
-        !state.connected ||
-        Boolean(state.current) ||
-        Boolean(state.incoming) ||
-        openFolder;
+        Boolean(state.current) || Boolean(state.incoming) || openFolder;
       send.disabled = blocked;
       sendFolder.disabled = blocked;
       accept.hidden = !needAccept;
@@ -262,6 +259,11 @@ export const mountTransfer = (
       let text = '';
       if (shownFolder) text = folderStatus(shownFolder, shownFile);
       else if (shownFile) text = fileStatus(shownFile);
+      else if (queued) {
+        text = `в очереди: ${state.queuedNames.join(', ')} — уйдёт после соединения`;
+      } else if (!state.connected) {
+        text = 'файл можно выбрать сейчас — уйдёт после соединения';
+      }
       status.hidden = !text;
       status.textContent = text;
       error.hidden = !state.error;

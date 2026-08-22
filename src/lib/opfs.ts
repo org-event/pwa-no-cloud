@@ -14,6 +14,7 @@ export type OpfsStore = {
   outbox: FileSystemDirectoryHandle;
   transfers: FileSystemDirectoryHandle;
   logs: FileSystemDirectoryHandle;
+  secrets: FileSystemDirectoryHandle;
 };
 
 export type InboxEntry = {
@@ -37,7 +38,7 @@ export const FIXTURE_TRANSFER_ID = 'fixture';
 export const FIXTURE_FILE_NAME = 'hello.txt';
 export const FIXTURE_TEXT = 'NoCloud inbox fixture\n';
 
-const DIRS = ['inbox', 'outbox', 'transfers', 'logs'] as const;
+const DIRS = ['inbox', 'outbox', 'transfers', 'logs', 'secrets'] as const;
 
 const fail = (code: string, message: string): OpfsError => ({
   ok: false,
@@ -71,7 +72,11 @@ export const openStore = async (
     const outbox = await getDir(fs, DIRS[1]);
     const transfers = await getDir(fs, DIRS[2]);
     const logs = await getDir(fs, DIRS[3]);
-    return { ok: true, value: { root: fs, inbox, outbox, transfers, logs } };
+    const secrets = await getDir(fs, DIRS[4]);
+    return {
+      ok: true,
+      value: { root: fs, inbox, outbox, transfers, logs, secrets },
+    };
   } catch (error) {
     return asError(error, 'opfs-unavailable');
   }
@@ -135,12 +140,16 @@ export const listEntries = async (
   }
 };
 
+export const APP_LOG_NAME = 'app.log';
+
 export const appendLog = async (
   store: OpfsStore,
   line: string,
 ): Promise<OpfsResult<true>> => {
   try {
-    const handle = await store.logs.getFileHandle('app.log', { create: true });
+    const handle = await store.logs.getFileHandle(APP_LOG_NAME, {
+      create: true,
+    });
     const file = await handle.getFile();
     const writable = await handle.createWritable({ keepExistingData: true });
     const data = `${line}\n`;
@@ -150,6 +159,15 @@ export const appendLog = async (
   } catch (error) {
     return asError(error, 'log-failed');
   }
+};
+
+export const readAppLog = async (
+  store: OpfsStore,
+): Promise<OpfsResult<string>> => {
+  const text = await readText(store.logs, APP_LOG_NAME);
+  if (text.ok) return text;
+  if (text.code === 'read-failed') return { ok: true, value: '' };
+  return text;
 };
 
 const openInboxHandle = async (

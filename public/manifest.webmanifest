@@ -11,6 +11,16 @@
   "theme_color": "#0F172A",
   "lang": "ru",
   "categories": ["utilities", "productivity"],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+nocloud",
+      "url": "./?nc=%s"
+    }
+  ],
   "share_target": {
     "action": "./share",
     "method": "POST",

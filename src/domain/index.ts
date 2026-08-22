@@ -3,6 +3,16 @@ export type { IceFailContext } from './ice-fail.ts';
 export { applySessionEvent, createIdleSession } from './session.ts';
 export type { Session, SessionEvent, SessionState } from './session.ts';
 export {
+  EMPTY_TURN_HOST,
+  INSTALL_TURN_SCRIPT_URL,
+  generateHostCommands,
+  iceServersFromTurnHost,
+  installCommand,
+  sshCommand,
+  validateTurnHost,
+} from './turn-host.ts';
+export type { TurnHostDraft } from './turn-host.ts';
+export {
   applyFolderEvent,
   createReceiveFolder,
   createSendFolder,

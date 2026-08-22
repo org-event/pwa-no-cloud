@@ -1,7 +1,7 @@
 import { iceServersHaveStun, iceServersHaveTurn } from '../config/merge.ts';
 import { CHANNEL_BUFFER_HIGH, DATA_CHANNELS } from '../config/defaults.ts';
 import { explainIceFailure } from '../domain/ice-fail.ts';
-import type { IceServerConfig } from '../config/types.ts';
+import type { IceServerConfig, CustomServerDraft } from '../config/types.ts';
 import {
   applySessionEvent,
   createIdleSession,
@@ -23,6 +23,7 @@ import {
   type IceReport,
 } from './ice.ts';
 import type { SignalingHandle } from './signaling/factory.ts';
+import { isManualPort } from './signaling/factory.ts';
 import type { SignalMessage } from './signaling/port.ts';
 import {
   attachRemoteChannels,
@@ -38,6 +39,7 @@ export type PeerRole = 'idle' | 'caller' | 'callee';
 type PeerSessionConfig = {
   iceServers: IceServerConfig[];
   signaling: SignalingHandle;
+  shareServers?: CustomServerDraft | null;
 };
 
 const errorMessage = (err: unknown, fallback: string): string => {
@@ -77,6 +79,9 @@ export class PeerSession extends EventEmitter {
     this.role = 'caller';
     this.apply({ type: 'start' });
     const signaling = this.config.signaling;
+    if (isManualPort(signaling)) {
+      signaling.setShareServers(this.config.shareServers ?? null);
+    }
     await signaling.connect({ roomId: 'manual', clientId: this.clientId });
     signaling.subscribe((message) => this.onSignal(message));
     try {
