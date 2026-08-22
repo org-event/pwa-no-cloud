@@ -123,10 +123,30 @@ body {
   color: var(--color-warn);
 }
 
+.topbar-end {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
 .topbar-install {
   flex-shrink: 0;
   min-height: 44px;
   padding: 0.5rem 0.75rem;
+}
+
+.topbar-version {
+  max-width: 9.5rem;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-muted-foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .icon-button {

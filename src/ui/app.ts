@@ -1,4 +1,4 @@
-import { APP_NAME, APP_TAGLINE } from '../config/index.ts';
+import { APP_NAME, APP_TAGLINE, APP_VERSION } from '../config/index.ts';
 import type { ResolveResult, UserSettings } from '../config/types.ts';
 import type { Session, TurnHostDraft } from '../domain/index.ts';
 import type { InboxState } from './inbox.ts';
@@ -161,7 +161,16 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
   install.hidden = true;
   install.addEventListener('click', () => handlers.onInstall());
 
-  topbar.append(menu, status, install);
+  const end = document.createElement('div');
+  end.className = 'topbar-end';
+  const version = document.createElement('p');
+  version.className = 'topbar-version';
+  version.title = APP_VERSION;
+  version.textContent = APP_VERSION;
+  version.setAttribute('aria-label', `Сборка ${APP_VERSION}`);
+  end.append(install, version);
+
+  topbar.append(menu, status, end);
 
   const page = document.createElement('main');
   page.className = 'page';

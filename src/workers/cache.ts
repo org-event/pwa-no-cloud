@@ -1,4 +1,4 @@
-export const CACHE_NAME = 'nocloud-shell-v2';
+export const CACHE_NAME = 'nocloud-shell-v3';
 
 export const SHELL_ASSETS = [
   '/',

@@ -12,6 +12,7 @@ export {
   LOCAL_STUN_PORT,
   DEFAULT_ROOM,
 } from './defaults.ts';
+export { APP_VERSION } from './version.ts';
 export {
   createUserSettings,
   iceServersHaveStun,
