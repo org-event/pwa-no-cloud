@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite-plus';
 import { shellWorker } from './src/workers/plugin.ts';
 
@@ -27,7 +28,7 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_GIT_DESCRIBE': JSON.stringify(gitDescribe()),
   },
-  plugins: [shellWorker(gitDescribe())],
+  plugins: [vue(), shellWorker(gitDescribe())],
   fmt: {
     ignorePatterns: ['dist/**', 'docs/**', 'design-system/**', 'deploy/**'],
     singleQuote: true,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HELP_TOPICS } from './help.ts';
+import { HELP_TOPICS } from '../content/help-topics.ts';
 
 describe('help topics', () => {
   it('covers every app section and deep links', () => {

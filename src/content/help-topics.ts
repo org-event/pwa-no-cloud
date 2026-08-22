@@ -23,7 +23,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       },
       {
         name: 'PWA',
-        text: 'Установите на домашний экран. После нового релиза на iPhone нажмите круговую стрелку в шапке — «Проверить обновление». Если не подхватилось, подтвердите сброс кэша. Удалять иконку не нужно.',
+        text: 'Установите на домашний экран. После нового релиза на iPhone нажмите круговую стрелку в шапке — «Проверить обновление». Если не подхватилось, подтвердите сброс кэша.',
       },
     ],
   },
@@ -42,11 +42,11 @@ export const HELP_TOPICS: HelpTopic[] = [
       },
       {
         name: 'Файл в ссылке',
-        text: 'Файл по ссылке не уезжает — иначе это снова облако мессенджера. Ссылка открывает NoCloud и соединение. Файл отправляете уже внутри канала. Можно выбрать файл заранее: он встанет в очередь и уйдёт, когда канал откроется.',
+        text: 'Файл по ссылке не уезжает — иначе это снова облако мессенджера. Ссылка открывает NoCloud и соединение. Файл отправляете уже внутри канала.',
       },
       {
         name: 'Поделиться',
-        text: '«Получить ссылку» — отдать свою. Если клик по чужой не открыл PWA — вставьте её в поле «Пришло от другого» и «Принять ссылку». Ответ обратно слать не нужно.',
+        text: '«Получить ссылку» — отдать свою. Если клик по чужой не открыл PWA — вставьте её в поле «Пришло от другого» и «Принять ссылку».',
       },
     ],
   },
@@ -66,7 +66,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       },
       {
         name: 'HTTPS и сокет',
-        text: 'Pages — HTTPS, сокет должен быть https://wss-….sslip.io:8443 (wss). Установщик ставит Let’s Encrypt ~90 дней и cron. Старый S1 с http:// браузер режет: новый пакет. Пока сокета нет, «Получить ссылку» делает приглашение.',
+        text: 'Pages — HTTPS, сокет должен быть https://wss-….sslip.io:8443 (wss). Установщик ставит Let’s Encrypt ~90 дней и cron.',
       },
       {
         name: 'Свой TURN',
@@ -85,12 +85,12 @@ export const HELP_TOPICS: HelpTopic[] = [
         text: 'Это ваш постоянный id. Ник и лого меняются в «Контакты».',
       },
       {
-        name: 'Файлы → получить ссылку',
-        text: 'Выберите файл, нажмите «Получить ссылку», киньте её в Telegram или WhatsApp. Второй открывает и жмёт «Принять». Пока нет соединения, файл стоит в очереди — сам не уходит.',
+        name: 'Контакты',
+        text: 'Связь через карточку C1. — без отдельной ссылки на каждый разговор.',
       },
       {
         name: 'ICE / TURN',
-        text: 'Если «relay не появился»: оба телефона должны иметь один S1. Браузер сначала пробует TURN по TCP 443/80 — UDP на сотовой часто мёртв. Кандидаты досылаются по сокету, не только в одном SDP.',
+        text: 'Если «relay не появился»: оба телефона должны иметь один S1. Браузер сначала пробует TURN по TCP 443/80.',
       },
     ],
   },
@@ -139,45 +139,3 @@ export const HELP_TOPICS: HelpTopic[] = [
     ],
   },
 ];
-
-export const mountHelp = (root: HTMLElement) => {
-  const intro = document.createElement('fieldset');
-  intro.className = 'panel';
-  const legend = document.createElement('legend');
-  legend.textContent = 'Справка';
-  const tag = document.createElement('p');
-  tag.className = 'tagline';
-  tag.textContent =
-    'Коротко по разделам меню и кнопкам. Ссылки внутри открывают нужный экран.';
-  intro.append(legend, tag);
-  root.append(intro);
-
-  for (const topic of HELP_TOPICS) {
-    const panel = document.createElement('fieldset');
-    panel.className = 'panel';
-    panel.id = `help-${topic.id}`;
-    const head = document.createElement('legend');
-    if (topic.href) {
-      const link = document.createElement('a');
-      link.href = topic.href;
-      link.textContent = topic.title;
-      head.append(link);
-    } else {
-      head.textContent = topic.title;
-    }
-    const lead = document.createElement('p');
-    lead.className = 'tagline';
-    lead.textContent = topic.lead;
-    const list = document.createElement('dl');
-    list.className = 'help-list';
-    for (const item of topic.items) {
-      const dt = document.createElement('dt');
-      dt.textContent = item.name;
-      const dd = document.createElement('dd');
-      dd.textContent = item.text;
-      list.append(dt, dd);
-    }
-    panel.append(head, lead, list);
-    root.append(panel);
-  }
-};
