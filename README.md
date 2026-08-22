@@ -16,7 +16,7 @@ pnpm dev       # dev-сервер
 pnpm exec vp check
 pnpm exec vp test
 pnpm exec vp build
-pnpm exec vp preview
+pnpm exec vp preview   # сборка + HTTPS/localhost, можно поставить PWA
 ```
 
 В этом репозитории `vite-plus` 0.2.9. Если глобальный `vp` старше, вызывайте

@@ -5,8 +5,8 @@ import {
   saveUserSettings,
 } from './config/index.ts';
 import { createIdleSession } from './domain/index.ts';
+import { Application } from './lib/application.ts';
 import { mountApp } from './ui/app.ts';
-import { SERVICE_WORKER_PATH } from './workers/sw.ts';
 import './style.css';
 
 const root = document.querySelector<HTMLElement>('#app');
@@ -17,6 +17,7 @@ if (!root) {
 
 const storage = browserStorage();
 const session = createIdleSession();
+const app = new Application({ storage });
 let settings = loadUserSettings(storage);
 const origin = globalThis.location?.origin;
 
@@ -24,6 +25,8 @@ const currentState = () => ({
   session,
   settings,
   resolved: resolveServers(settings, origin),
+  online: app.online,
+  canInstall: app.canInstall,
 });
 
 const view = mountApp(root, {
@@ -37,7 +40,13 @@ const view = mountApp(root, {
     saveUserSettings(settings, storage);
     view.sync(currentState());
   },
+  onInstall: () => {
+    void app.install();
+  },
 });
 
-root.dataset.sw = SERVICE_WORKER_PATH;
-view.sync(currentState());
+const redraw = () => view.sync(currentState());
+app.on('network', redraw);
+app.on('install', redraw);
+app.on('installed', redraw);
+redraw();

@@ -1,0 +1,27 @@
+{
+  "name": "NoCloud",
+  "short_name": "NoCloud",
+  "description": "обмен файлами без облака",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "lang": "ru",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite-plus';
+import { shellWorker } from './src/workers/plugin.ts';
 
 export default defineConfig({
+  plugins: [shellWorker()],
   fmt: {
     ignorePatterns: ['dist/**', 'docs/**', 'design-system/**'],
     singleQuote: true,
