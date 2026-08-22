@@ -219,14 +219,9 @@ write_turn_conf() {
     printf 'denied-peer-ip=172.16.0.0-172.31.255.255\n'
     printf 'denied-peer-ip=192.168.0.0-192.168.255.255\n'
     printf 'denied-peer-ip=::1\n'
-    local port='' alt_set=0
+    local port=''
     for port in $PORTS; do
       if [ "$port" = "$main_port" ]; then
-        continue
-      fi
-      if [ "$alt_set" -eq 0 ]; then
-        printf 'alt-listening-port=%s\n' "$port"
-        alt_set=1
         continue
       fi
       printf 'aux-server=0.0.0.0:%s\n' "$port"
@@ -420,6 +415,19 @@ EOF
   chmod 700 "$dir/acme-pre.sh" "$dir/acme-post.sh" "$dir/acme-reload.sh"
 }
 
+signal_cert_usable() {
+  local pem="$INSTALL_DIR/signal/tls/fullchain.pem"
+  local ident="$1"
+  if [ -s "$pem" ] && openssl x509 -in "$pem" -noout -checkend 86400 >/dev/null 2>&1; then
+    return 0
+  fi
+  if as_root test -s "/root/.acme.sh/${ident}_ecc/fullchain.cer" ||
+    as_root test -s "/root/.acme.sh/${ident}/fullchain.cer"; then
+    return 0
+  fi
+  return 1
+}
+
 issue_signal_cert() {
   local ident="$1"
   local dir="$INSTALL_DIR/signal"
@@ -443,6 +451,10 @@ issue_signal_cert() {
     fi
   fi
   as_root docker start "$CONTAINER" >/dev/null 2>&1 || true
+  if signal_cert_usable "$ident"; then
+    say 'Сертификат уже действует — повторный выпуск Let’s Encrypt пропускаю.'
+    return 0
+  fi
   return 1
 }
 
