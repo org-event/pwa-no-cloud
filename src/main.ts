@@ -20,6 +20,7 @@ import {
 import {
   EMPTY_BOOK,
   encodeContactCard,
+  findContact,
   meetRoomId,
   parseContactCard,
   removeContact,
@@ -325,10 +326,13 @@ const applyPeerProfile = (card: ProfileCard) => {
 };
 
 const knockOn = async (ownerId: string, asHost: boolean) => {
+  const known = findContact(book, ownerId);
   if (!usesRoomLink()) {
-    contactsNotice = socketBlocked()
-      ? MIXED_CONTENT_SIGNALING
-      : 'Нужен сокет из S1. Вставьте пакет в «Настройки сервера».';
+    contactsNotice = known
+      ? `${known.nick} в списке. Чтобы быть в сети, нужен сокет из S1.`
+      : socketBlocked()
+        ? MIXED_CONTENT_SIGNALING
+        : 'Нужен сокет из S1. Вставьте пакет в «Настройки сервера».';
     view.sync(currentState());
     return;
   }
@@ -336,7 +340,9 @@ const knockOn = async (ownerId: string, asHost: boolean) => {
   if (peerIsLive() && roomId === target) {
     contactsNotice = asHost
       ? 'Уже ждём, кто вставит карточку.'
-      : 'Уже стучимся.';
+      : known
+        ? `${known.nick} в списке. Уже стучимся.`
+        : 'Уже стучимся.';
     view.sync(currentState());
     return;
   }
@@ -347,7 +353,9 @@ const knockOn = async (ownerId: string, asHost: boolean) => {
   if (!next) return;
   contactsNotice = asHost
     ? 'Карточка готова. Копируйте и не закрывайте окно.'
-    : 'Стучимся… как сойдётесь — будет в списке.';
+    : known
+      ? `${known.nick} в списке. Стучимся…`
+      : 'Стучимся…';
   view.sync(currentState());
   await next.enterRoom(target);
   view.sync(currentState());
@@ -848,14 +856,19 @@ const view = mountApp(root, {
     if (!card) {
       contactsNotice = 'Вставьте карточку C1. которую прислали.';
       view.sync(currentState());
-      return;
+      return false;
     }
     if (card.id === me.id) {
       contactsNotice = 'Это ваша карточка.';
       view.sync(currentState());
-      return;
+      return false;
     }
+    book = upsertContact(book, card);
+    persistBook();
+    contactsNotice = `В книге: ${card.nick}`;
+    view.sync(currentState());
     void knockOn(card.id, false);
+    return true;
   },
   onRemoveContact: (id) => {
     book = removeContact(book, id);

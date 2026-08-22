@@ -18,7 +18,7 @@ export type ContactsHandlers = {
   onClearAvatar: () => void;
   onGenerateCard: () => void;
   onCopyCard: () => void;
-  onAddContact: (text: string) => void;
+  onAddContact: (text: string) => boolean;
   onRemoveContact: (id: string) => void;
   onSaveGroup: (name: string, memberIds: string[]) => void;
   onRemoveGroup: (id: string) => void;
@@ -178,7 +178,7 @@ export const mountContacts = (
   addPanel.innerHTML = `
     <fieldset>
       <legend>Добавить контакт</legend>
-      <p class="tagline">Вставьте карточку, которую прислали. Как канал откроется — человек сразу в списке.</p>
+      <p class="tagline">Вставьте карточку, которую прислали, и нажмите «Добавить» — человек сразу в списке.</p>
       <label class="field"><span>Карточка</span><input name="card" autocomplete="off" placeholder="C1.{…}" aria-label="Карточка контакта" /></label>
       <button class="button" type="submit">Добавить</button>
     </fieldset>
@@ -186,8 +186,7 @@ export const mountContacts = (
   addPanel.addEventListener('submit', (event) => {
     event.preventDefault();
     const card = addPanel.elements.namedItem('card') as HTMLInputElement;
-    handlers.onAddContact(card.value);
-    card.value = '';
+    if (handlers.onAddContact(card.value)) card.value = '';
   });
 
   const listPanel = document.createElement('fieldset');
@@ -257,7 +256,7 @@ export const mountContacts = (
         const empty = document.createElement('p');
         empty.className = 'tagline';
         empty.textContent =
-          'Пока пусто. После синхронизации человек появится здесь.';
+          'Пока пусто. Вставьте чужую карточку выше — сразу появится здесь.';
         list.append(empty);
       }
       for (const contact of state.book.contacts) {

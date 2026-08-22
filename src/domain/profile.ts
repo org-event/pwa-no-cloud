@@ -46,22 +46,38 @@ export const encodeContactCard = (card: ProfileCard): string => {
 
 export const meetRoomId = (ownerId: string): string => `c-${ownerId}`;
 
+const stripCardNoise = (text: string): string => {
+  return text.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+};
+
+const cardFromRecord = (id: unknown, nick: unknown): ProfileCard | null => {
+  if (typeof id !== 'string' || !isProfileId(id)) return null;
+  const label = typeof nick === 'string' ? sanitizeNick(nick) : '';
+  return { id, nick: label || defaultNick(id), avatar: '' };
+};
+
 export const parseContactCard = (text: string): ProfileCard | null => {
-  const raw = text.trim();
+  const raw = stripCardNoise(text);
   if (!raw) return null;
-  if (raw.startsWith(CONTACT_CARD_PREFIX)) {
+  const packed = raw.match(/C1\.\s*(\{[\s\S]*\})/i);
+  if (packed?.[1]) {
     try {
-      const parsed = JSON.parse(raw.slice(CONTACT_CARD_PREFIX.length)) as {
+      const parsed = JSON.parse(packed[1]) as {
         id?: unknown;
         nick?: unknown;
       };
-      return parseProfileCard({
-        id: parsed.id,
-        nick: typeof parsed.nick === 'string' ? parsed.nick : '',
-        avatar: '',
-      });
+      return cardFromRecord(parsed.id, parsed.nick);
     } catch {
       return null;
+    }
+  }
+  if (raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw) as { id?: unknown; nick?: unknown };
+      const card = cardFromRecord(parsed.id, parsed.nick);
+      if (card) return card;
+    } catch {
+      /* not JSON */
     }
   }
   if (isProfileId(raw)) {

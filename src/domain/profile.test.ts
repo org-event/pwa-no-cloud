@@ -52,6 +52,10 @@ describe('profile card', () => {
     const card = parseContactCard(packed);
     expect(card).toEqual({ id: 'abc123xyz9', nick: 'Вася', avatar: '' });
     expect(parseContactCard('abc123xyz9')?.id).toBe('abc123xyz9');
+    expect(parseContactCard(`вот ${packed} держи`)?.nick).toBe('Вася');
+    expect(
+      parseContactCard('{"v":1,"id":"abc123xyz9","nick":"Вася"}')?.id,
+    ).toBe('abc123xyz9');
     expect(parseContactCard('не то')).toBeNull();
     expect(meetRoomId('abc123xyz9')).toBe('c-abc123xyz9');
   });
