@@ -17,7 +17,7 @@ import {
   pathsFromSdp,
   type IceReport,
 } from './ice.ts';
-import type { ManualPort } from './signaling/manual.ts';
+import type { SignalingHandle } from './signaling/factory.ts';
 import type { SignalMessage } from './signaling/port.ts';
 import {
   attachRemoteChannels,
@@ -32,7 +32,7 @@ export type PeerRole = 'idle' | 'caller' | 'callee';
 
 type PeerSessionConfig = {
   iceServers: IceServerConfig[];
-  signaling: ManualPort;
+  signaling: SignalingHandle;
 };
 
 const errorMessage = (err: unknown, fallback: string): string => {
@@ -49,6 +49,8 @@ export class PeerSession extends EventEmitter {
   ice: IceReport = emptyIceReport();
   links: PeerLinks | null = null;
   config: PeerSessionConfig;
+  waitGen = 0;
+  waitTimer: ReturnType<typeof setTimeout> | null = null;
 
   get state(): SessionState {
     return this.session.state;
@@ -60,7 +62,7 @@ export class PeerSession extends EventEmitter {
   }
 
   outgoing() {
-    return this.config.signaling.outgoing();
+    return this.config.signaling.outgoing?.() ?? '';
   }
 
   async createInvite() {
@@ -71,23 +73,51 @@ export class PeerSession extends EventEmitter {
     await signaling.connect({ roomId: 'manual', clientId: this.clientId });
     signaling.subscribe((message) => this.onSignal(message));
     try {
-      const pc = createPeerConnection(this.config.iceServers);
-      this.links = createLocalChannels(pc);
-      this.bindPeer(pc);
-      this.bindControl(this.links.control);
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await waitIceComplete(pc);
-      this.noteLocalSdp(localSdp(pc));
-      await signaling.send({
-        from: this.clientId,
-        to: '*',
-        data: { type: 'offer', payload: { sdp: localSdp(pc) } },
-      });
+      await this.offerTo('*');
       this.emit('invite');
     } catch (err) {
       this.fail(errorMessage(err, 'Не удалось создать приглашение'));
     }
+  }
+
+  async enterRoom(roomId: string) {
+    this.reset();
+    this.apply({ type: 'start' });
+    const signaling = this.config.signaling;
+    try {
+      await signaling.connect({ roomId, clientId: this.clientId });
+      signaling.subscribe((message) => this.onSignal(message));
+      const peerId = await this.waitPeer();
+      if (this.clientId < peerId) {
+        this.role = 'caller';
+        await this.offerTo(peerId);
+      } else {
+        this.role = 'callee';
+      }
+      this.emit('invite');
+    } catch (err) {
+      if (this.session.state === 'idle' || this.session.state === 'closed') {
+        return;
+      }
+      this.fail(errorMessage(err, 'Не удалось войти в комнату'));
+    }
+  }
+
+  async offerTo(to: string) {
+    const signaling = this.config.signaling;
+    const pc = createPeerConnection(this.config.iceServers);
+    this.links = createLocalChannels(pc);
+    this.bindPeer(pc);
+    this.bindControl(this.links.control);
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitIceComplete(pc);
+    this.noteLocalSdp(localSdp(pc));
+    await signaling.send({
+      from: this.clientId,
+      to,
+      data: { type: 'offer', payload: { sdp: localSdp(pc) } },
+    });
   }
 
   async acceptInvite(text: string) {
@@ -95,6 +125,15 @@ export class PeerSession extends EventEmitter {
     this.role = 'callee';
     this.apply({ type: 'start' });
     const signaling = this.config.signaling;
+    if (!signaling.accept) {
+      const failed = {
+        ok: false as const,
+        code: 'no-accept',
+        message: 'Этот signaling не принимает текст',
+      };
+      this.fail(failed.message);
+      return failed;
+    }
     await signaling.connect({ roomId: 'manual', clientId: this.clientId });
     signaling.subscribe((message) => this.onSignal(message));
     const accepted = await signaling.accept(text);
@@ -106,6 +145,15 @@ export class PeerSession extends EventEmitter {
   }
 
   async acceptAnswer(text: string) {
+    if (!this.config.signaling.accept) {
+      const failed = {
+        ok: false as const,
+        code: 'no-accept',
+        message: 'Этот signaling не принимает текст',
+      };
+      this.fail(failed.message);
+      return failed;
+    }
     const accepted = await this.config.signaling.accept(text);
     if (!accepted.ok) {
       this.fail(accepted.message);
@@ -122,6 +170,9 @@ export class PeerSession extends EventEmitter {
   }
 
   close() {
+    this.waitGen += 1;
+    if (this.waitTimer) clearTimeout(this.waitTimer);
+    this.waitTimer = null;
     this.config.signaling.close();
     const links = this.links;
     this.links = null;
@@ -137,6 +188,9 @@ export class PeerSession extends EventEmitter {
   }
 
   reset() {
+    this.waitGen += 1;
+    if (this.waitTimer) clearTimeout(this.waitTimer);
+    this.waitTimer = null;
     this.error = '';
     this.lastPongMs = null;
     this.ice = emptyIceReport();
@@ -149,6 +203,33 @@ export class PeerSession extends EventEmitter {
       links.pc.close();
     }
     this.apply({ type: 'reset' });
+  }
+
+  async waitPeer() {
+    const gen = this.waitGen;
+    if (!this.config.signaling.listPeers) {
+      throw new Error('Нет списка пиров');
+    }
+    while (gen === this.waitGen) {
+      if (
+        this.session.state === 'failed' ||
+        this.session.state === 'closed' ||
+        this.session.state === 'idle'
+      ) {
+        throw new Error('Сессия закрыта');
+      }
+      const peers = await this.config.signaling.listPeers();
+      if (gen !== this.waitGen) throw new Error('Сессия закрыта');
+      if (peers[0]) return peers[0];
+      await this.sleep(800);
+    }
+    throw new Error('Сессия закрыта');
+  }
+
+  sleep(ms: number) {
+    return new Promise<void>((resolve) => {
+      this.waitTimer = setTimeout(resolve, ms);
+    });
   }
 
   apply(event: SessionEvent) {

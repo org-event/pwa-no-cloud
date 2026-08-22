@@ -1,0 +1,62 @@
+import { describe, expect, it } from 'vitest';
+import { createWebSocketPort, toWebSocketUrl } from './websocket.ts';
+import type { SignalMessage } from './port.ts';
+
+class FakeSocket {
+  readyState = 1;
+  sent: string[] = [];
+  handlers = new Map<string, Array<(event: { data?: unknown }) => void>>();
+
+  send(data: string) {
+    this.sent.push(data);
+  }
+
+  close() {
+    this.readyState = 3;
+  }
+
+  addEventListener(name: string, fn: (event: { data?: unknown }) => void) {
+    const list = this.handlers.get(name) ?? [];
+    list.push(fn);
+    this.handlers.set(name, list);
+  }
+
+  emit(name: string, data?: unknown) {
+    const list = this.handlers.get(name) ?? [];
+    for (const fn of list) fn({ data });
+  }
+}
+
+describe('websocket signaling', () => {
+  it('maps http urls to the /ws endpoint', () => {
+    expect(toWebSocketUrl('http://192.168.1.5:8000')).toBe(
+      'ws://192.168.1.5:8000/ws',
+    );
+    expect(toWebSocketUrl('https://host/')).toBe('wss://host/ws');
+  });
+
+  it('joins and notifies on a signal frame', async () => {
+    const socket = new FakeSocket();
+    const port = createWebSocketPort('http://127.0.0.1:8000', { socket });
+    const received: SignalMessage[] = [];
+    port.subscribe((message) => {
+      received.push(message);
+    });
+    await port.connect({ roomId: 'nocloud', clientId: 'bob' });
+    expect(socket.sent[0]).toContain('"op":"join"');
+    socket.emit(
+      'message',
+      JSON.stringify({
+        op: 'signal',
+        from: 'alice',
+        to: 'bob',
+        data: { type: 'offer', payload: { sdp: 'v=0' } },
+      }),
+    );
+    expect(received[0]?.from).toBe('alice');
+    socket.emit('message', JSON.stringify({ op: 'peers', peers: ['alice'] }));
+    const peers = (await port.listPeers?.()) ?? [];
+    expect(peers).toEqual(['alice']);
+    port.close();
+  });
+});

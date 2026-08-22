@@ -17,6 +17,7 @@ export type AppViewState = {
   resolved: ResolveResult;
   online: boolean;
   canInstall: boolean;
+  roomId: string;
   inbox: InboxState;
   invite: InviteState;
 };
@@ -76,7 +77,12 @@ export const mountApp = (root: HTMLElement, handlers: AppHandlers) => {
       status.textContent = ice
         ? `сессия: ${state.session.state} · ${ice}`
         : `сессия: ${state.session.state}`;
-      home.sync({ online: state.online, canInstall: state.canInstall });
+      home.sync({
+        online: state.online,
+        canInstall: state.canInstall,
+        manual: state.invite.mode === 'manual',
+        roomId: state.roomId,
+      });
       invite.sync(state.invite);
       inbox.sync(state.inbox);
       servers.sync(state.settings, state.resolved);

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_ROOM,
   browserStorage,
   loadUserSettings,
   resolveServers,
@@ -18,7 +19,7 @@ import {
 } from './lib/opfs.ts';
 import { PeerSession } from './lib/peer-session.ts';
 import { inviteToQr } from './lib/qr.ts';
-import { createManualPort } from './lib/signaling/manual.ts';
+import { createSignalingPort } from './lib/signaling/factory.ts';
 import { mountApp } from './ui/app.ts';
 import type { InboxState } from './ui/inbox.ts';
 import type { InviteState } from './ui/invite.ts';
@@ -44,6 +45,12 @@ let inviteRole: InviteState['role'] = 'idle';
 let outgoing = '';
 let qrUrl: string | null = null;
 let inviteError = '';
+let roomId = DEFAULT_ROOM;
+
+const isManualSignaling = (): boolean => {
+  const resolved = resolveServers(settings, origin);
+  return !resolved.ok || resolved.value.signaling.kind === 'manual';
+};
 
 const inboxState = (): InboxState => ({
   items: inboxItems,
@@ -54,7 +61,11 @@ const inboxState = (): InboxState => ({
 });
 
 const inviteState = (): InviteState => ({
-  role: inviteRole,
+  role: peer?.role && peer.role !== 'idle' ? peer.role : inviteRole,
+  mode: isManualSignaling() ? 'manual' : 'room',
+  open:
+    inviteRole !== 'idle' ||
+    Boolean(peer && peer.state !== 'idle' && peer.state !== 'closed'),
   outgoing,
   qrUrl,
   error: inviteError || (peer?.error ?? ''),
@@ -69,6 +80,7 @@ const currentState = () => ({
   resolved: resolveServers(settings, origin),
   online: app.online,
   canInstall: app.canInstall,
+  roomId,
   inbox: inboxState(),
   invite: inviteState(),
 });
@@ -115,7 +127,7 @@ const startPeer = (): PeerSession | null => {
   inviteError = '';
   const next = new PeerSession({
     iceServers: resolved.value.iceServers,
-    signaling: createManualPort(),
+    signaling: createSignalingPort(resolved.value.signaling),
   });
   next.on('state', () => view.sync(currentState()));
   next.on('invite', () => {
@@ -143,12 +155,21 @@ const view = mountApp(root, {
   onInstall: () => {
     void app.install();
   },
+  onRoom: (value) => {
+    roomId = value;
+  },
   onCreateInvite: () => {
     void (async () => {
       inviteError = '';
       inviteRole = 'caller';
       const next = startPeer();
       if (!next) return;
+      if (!isManualSignaling()) {
+        await next.enterRoom(roomId.trim() || DEFAULT_ROOM);
+        inviteRole = next.role;
+        view.sync(currentState());
+        return;
+      }
       await next.createInvite();
       await refreshOutgoing();
     })();

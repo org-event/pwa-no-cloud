@@ -1,5 +1,7 @@
 export type InviteState = {
   role: 'idle' | 'caller' | 'callee';
+  mode: 'manual' | 'room';
+  open: boolean;
   outgoing: string;
   qrUrl: string | null;
   error: string;
@@ -93,8 +95,13 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
 
   return {
     sync(state: InviteState) {
-      panel.hidden = state.role === 'idle' && !state.connected;
-      if (state.role === 'caller') {
+      const manual = state.mode === 'manual';
+      panel.hidden = !state.open && state.role === 'idle' && !state.connected;
+      if (!manual) {
+        hint.textContent = state.connected
+          ? 'Канал открыт'
+          : 'Оба в одной комнате — канал откроется сам';
+      } else if (state.role === 'caller') {
         hint.textContent =
           'Отправьте текст второму окну, затем вставьте его ответ';
       } else if (state.role === 'callee') {
@@ -102,10 +109,14 @@ export const mountInvite = (root: HTMLElement, handlers: InviteHandlers) => {
       } else {
         hint.textContent = state.connected ? 'Канал открыт' : '';
       }
+      qr.hidden = !manual || !state.qrUrl;
+      if (state.qrUrl) qr.src = state.qrUrl;
+      outgoing.hidden = !manual;
+      outActions.hidden = !manual;
+      paste.hidden = !manual;
+      apply.hidden = !manual;
       outgoing.value = state.outgoing;
       copy.disabled = !state.outgoing;
-      qr.hidden = !state.qrUrl;
-      if (state.qrUrl) qr.src = state.qrUrl;
       apply.disabled = state.connected;
       ping.disabled = !state.connected;
       ice.hidden = !state.ice;

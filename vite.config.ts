@@ -10,7 +10,7 @@ export default defineConfig({
     printWidth: 80,
   },
   lint: {
-    ignorePatterns: ['dist/**', 'docs/**', 'design-system/**'],
+    ignorePatterns: ['dist/**', 'docs/**', 'design-system/**', 'server/**'],
     options: {
       typeAware: true,
       typeCheck: true,

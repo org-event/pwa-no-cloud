@@ -10,6 +10,8 @@ export const LOCAL_SIGNALING_PORT = 8000;
 
 export const LOCAL_STUN_PORT = 3478;
 
+export const DEFAULT_ROOM = 'nocloud';
+
 export const SETTINGS_STORAGE_KEY = 'nocloud.servers.v1';
 
 export const DATA_CHANNELS = {

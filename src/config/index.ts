@@ -7,6 +7,7 @@ export {
   EMPTY_CUSTOM,
   LOCAL_SIGNALING_PORT,
   LOCAL_STUN_PORT,
+  DEFAULT_ROOM,
 } from './defaults.ts';
 export { createUserSettings, resolveServers } from './merge.ts';
 export { SERVER_PRESETS, getPreset } from './servers.ts';

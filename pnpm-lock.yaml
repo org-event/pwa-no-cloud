@@ -21,6 +21,9 @@ importers:
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
+      ws:
+        specifier: ^8.21.3
+        version: 8.21.3
     devDependencies:
       typescript:
         specifier: ~6.0.2
