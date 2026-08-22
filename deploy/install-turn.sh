@@ -415,16 +415,16 @@ EOF
   chmod 700 "$dir/acme-pre.sh" "$dir/acme-post.sh" "$dir/acme-reload.sh"
 }
 
+pem_valid_24h() {
+  local file="$1"
+  as_root openssl x509 -in "$file" -noout -checkend 86400 >/dev/null 2>&1
+}
+
 signal_cert_usable() {
-  local pem="$INSTALL_DIR/signal/tls/fullchain.pem"
   local ident="$1"
-  if [ -s "$pem" ] && openssl x509 -in "$pem" -noout -checkend 86400 >/dev/null 2>&1; then
-    return 0
-  fi
-  if as_root test -s "/root/.acme.sh/${ident}_ecc/fullchain.cer" ||
-    as_root test -s "/root/.acme.sh/${ident}/fullchain.cer"; then
-    return 0
-  fi
+  pem_valid_24h "$INSTALL_DIR/signal/tls/fullchain.pem" && return 0
+  pem_valid_24h "/root/.acme.sh/${ident}_ecc/fullchain.cer" && return 0
+  pem_valid_24h "/root/.acme.sh/${ident}/fullchain.cer" && return 0
   return 1
 }
 
