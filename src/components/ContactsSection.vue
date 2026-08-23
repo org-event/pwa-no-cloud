@@ -6,7 +6,7 @@ import AvatarImg from './AvatarImg.vue';
 import PendingPeer from './PendingPeer.vue';
 
 const store = useNocloudStore();
-const { contacts } = storeToRefs(store);
+const { contacts, hasSignalingSocket } = storeToRefs(store);
 
 const nick = ref(contacts.value.me.nick);
 const addCard = ref('');
@@ -55,6 +55,17 @@ const toggleGroupMember = (id: string, checked: boolean) => {
     @skip="store.onSkipPending()"
   />
 
+  <p
+    v-if="!hasSignalingSocket"
+    class="error panel-banner"
+    role="alert"
+  >
+    Сначала вставьте пакет S1. в
+    <a href="#servers">«Настройки сервера»</a>
+    на обоих устройствах (телефон и комп). Одна Wi‑Fi без S1 канал не откроет —
+    зелёная точка не появится.
+  </p>
+
   <fieldset class="panel">
     <legend>Я</legend>
     <div class="contact-row">
@@ -73,8 +84,9 @@ const toggleGroupMember = (id: string, checked: boolean) => {
       />
     </label>
     <p class="tagline">
-      Сгенерируйте карточку и ждите. Второй только вставляет её у себя — сам
-      «Сгенерировать» не жмёт, пока вы ждёте.
+      1) Оба сохранили S1. 2) Один жмёт «Сгенерировать» и ждёт. 3) Второй
+      вставляет карточку и «Добавить». Сам «Сгенерировать» на втором не жмите,
+      пока первый ждёт.
     </p>
     <label class="field">
       <span>{{
@@ -142,8 +154,8 @@ const toggleGroupMember = (id: string, checked: boolean) => {
     <fieldset>
       <legend>Добавить контакт</legend>
       <p class="tagline">
-        Вставьте карточку, которую прислали, и нажмите «Добавить» — человек
-        сразу в списке.
+        Вставьте карточку, которую прислали. В списке появится сразу; зелёная
+        точка — только после S1 и когда первый ждёт в «Сгенерировать».
       </p>
       <label class="field">
         <span>Карточка</span>
@@ -261,5 +273,11 @@ const toggleGroupMember = (id: string, checked: boolean) => {
     </div>
   </form>
 
-  <p class="tagline" role="status">{{ contacts.notice }}</p>
+  <p
+    class="tagline"
+    :class="{ error: contacts.notice.includes('S1') }"
+    role="status"
+  >
+    {{ contacts.notice }}
+  </p>
 </template>

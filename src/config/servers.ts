@@ -29,6 +29,7 @@ export const SERVER_PRESETS: ServerPreset[] = [
     title: 'Локальная сеть',
     signaling: { kind: 'http-poll', url: localHttp },
     iceServers: [{ urls: localStun }],
+    // Note: url is this device's localhost — for phone+PC use S1 on VPS instead.
   },
   {
     id: 'google-stun',

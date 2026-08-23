@@ -356,10 +356,10 @@ export const useNocloudStore = defineStore('nocloud', () => {
     const known = findContact(state.book, ownerId);
     if (!usesRoomLink()) {
       state.contactsNotice = known
-        ? `${known.nick} в списке. Чтобы быть в сети, нужен сокет из S1.`
+        ? `${known.nick} в списке, но «в сети» не будет: вставьте пакет S1. в «Настройки сервера» на обоих устройствах. Одна Wi‑Fi без S1 не соединит.`
         : socketBlocked()
           ? MIXED_CONTENT_SIGNALING
-          : 'Нужен сокет из S1. Вставьте пакет в «Настройки сервера».';
+          : 'Нужен пакет S1. в «Настройки сервера» на обоих устройствах. Одна Wi‑Fi без сокета не соединит.';
       touch();
       return;
     }
@@ -1138,6 +1138,11 @@ export const useNocloudStore = defineStore('nocloud', () => {
     return peerIsLive() && state.roomId === meetRoomId(state.me.id);
   });
 
+  const hasSignalingSocket = computed(() => {
+    trackRevision();
+    return usesRoomLink();
+  });
+
   const statusLine = computed(() => {
     trackRevision();
     return formatStatusLine({
@@ -1203,6 +1208,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
     contacts,
     logs,
     contactsWaiting,
+    hasSignalingSocket,
     statusLine,
     online,
     canInstall,
