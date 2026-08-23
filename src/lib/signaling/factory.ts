@@ -1,4 +1,4 @@
-import type { CustomServerDraft, SignalingConfig } from '../../config/types.ts';
+import type { CustomServerDraft, SignalingConfig } from '@/config/types.ts';
 import { createHttpPollPort } from './http-poll.ts';
 import { createManualPort, type ManualPort } from './manual.ts';
 import type { SignalingPort, SignalMessage, SignalResult } from './port.ts';

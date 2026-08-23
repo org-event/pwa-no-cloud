@@ -26,145 +26,18 @@ export const collectShellAssets = (
   return assets;
 };
 
-export const createWorkerSource = (assets: string[], base = '/'): string => {
-  const list = JSON.stringify(assets);
+export const fillWorkerSource = (
+  template: string,
+  assets: string[],
+  base = '/',
+): string => {
   const root = joinBase(base);
-  const sharePath = joinBase(base, 'share');
-  const indexPath = joinBase(base, 'index.html');
-  const iconPath = joinBase(base, 'icon.svg');
-  const versionPath = joinBase(base, 'version.json');
-  return `'use strict';
-const CACHE = '${CACHE_NAME}';
-const BASE = '${root}';
-const SHARE = '${sharePath}';
-const INDEX = '${indexPath}';
-const ICON = '${iconPath}';
-const VERSION = '${versionPath}';
-const ASSETS = ${list};
-let pendingShare = null;
-
-const precache = async () => {
-  const cache = await caches.open(CACHE);
-  await cache.addAll(ASSETS);
-};
-
-const handleShare = async (request) => {
-  try {
-    const data = await request.formData();
-    const files = [];
-    const items = data.getAll('files');
-    for (const item of items) {
-      if (!item || typeof item !== 'object' || !item.arrayBuffer) continue;
-      files.push({
-        name: item.name || 'file',
-        type: item.type || 'application/octet-stream',
-        buffer: await item.arrayBuffer(),
-      });
-    }
-    pendingShare = files;
-    const windows = await self.clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true,
-    });
-    for (const client of windows) {
-      client.postMessage({ type: 'share-files', data: files });
-    }
-    if (windows.length === 0 && self.clients.openWindow) {
-      await self.clients.openWindow(BASE);
-    }
-  } catch (error) {}
-  return Response.redirect(new URL(BASE, self.location.origin), 303);
-};
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(precache().then(() => self.skipWaiting()));
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    const names = await caches.keys();
-    const stale = names.filter((name) => name !== CACHE);
-    await Promise.all(stale.map((name) => caches.delete(name)));
-    await self.clients.claim();
-  })());
-});
-
-self.addEventListener('fetch', (event) => {
-  const request = event.request;
-  const url = new URL(request.url);
-  if (request.method === 'POST' && url.pathname === SHARE) {
-    event.respondWith(handleShare(request));
-    return;
-  }
-  if (request.method !== 'GET') return;
-  if (!request.url.startsWith('http')) return;
-  if (url.pathname === VERSION) {
-    event.respondWith(fetch(request, { cache: 'no-store' }));
-    return;
-  }
-  event.respondWith((async () => {
-    const cache = await caches.open(CACHE);
-    if (request.mode === 'navigate') {
-      try {
-        const response = await fetch(request);
-        if (response.status === 200) {
-          await cache.put(request, response.clone());
-          await cache.put(INDEX, response.clone());
-        }
-        return response;
-      } catch {
-        const page = await cache.match(INDEX);
-        if (page) return page;
-        return new Response('Offline', {
-          status: 503,
-          statusText: 'Service Unavailable',
-        });
-      }
-    }
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    try {
-      const response = await fetch(request);
-      if (response.status === 200) {
-        await cache.put(request, response.clone());
-      }
-      return response;
-    } catch {
-      return new Response('Offline', {
-        status: 503,
-        statusText: 'Service Unavailable',
-      });
-    }
-  })());
-});
-
-self.addEventListener('message', (event) => {
-  const type = event.data && event.data.type;
-  if (type === 'notify' && self.registration.showNotification) {
-    const title = event.data.title || 'NoCloud';
-    const body = event.data.body || '';
-    void self.registration.showNotification(title, {
-      body,
-      icon: ICON,
-    });
-    return;
-  }
-  if (type === 'ping' && event.source) {
-    event.source.postMessage({ type: 'pong' });
-    if (pendingShare && pendingShare.length > 0) {
-      event.source.postMessage({ type: 'share-files', data: pendingShare });
-      pendingShare = null;
-    }
-  }
-});
-
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil((async () => {
-    const windows = await self.clients.matchAll({ type: 'window' });
-    if (windows[0]) return windows[0].focus();
-    return self.clients.openWindow(BASE);
-  })());
-});
-`;
+  return template
+    .replaceAll('__CACHE_NAME__', JSON.stringify(CACHE_NAME))
+    .replaceAll('__BASE__', JSON.stringify(root))
+    .replaceAll('__SHARE__', JSON.stringify(joinBase(base, 'share')))
+    .replaceAll('__INDEX__', JSON.stringify(joinBase(base, 'index.html')))
+    .replaceAll('__ICON__', JSON.stringify(joinBase(base, 'icon.svg')))
+    .replaceAll('__VERSION__', JSON.stringify(joinBase(base, 'version.json')))
+    .replaceAll('__ASSETS__', JSON.stringify(assets));
 };

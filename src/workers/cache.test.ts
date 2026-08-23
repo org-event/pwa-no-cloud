@@ -1,10 +1,14 @@
+import template from './shell-sw.js?raw';
 import { describe, expect, it } from 'vitest';
 import {
   CACHE_NAME,
   collectShellAssets,
-  createWorkerSource,
+  fillWorkerSource,
   joinBase,
 } from './cache.ts';
+
+const createWorkerSource = (assets: string[], base = '/') =>
+  fillWorkerSource(template, assets, base);
 
 describe('shell worker source', () => {
   it('includes hashed build assets and the cache name', () => {
@@ -30,6 +34,6 @@ describe('shell worker source', () => {
     expect(assets).toContain('/pwa-no-cloud/assets/index-abc.js');
     expect(source).toContain('/pwa-no-cloud/share');
     expect(source).toContain('/pwa-no-cloud/index.html');
-    expect(source).not.toContain("const SHARE = '/share'");
+    expect(source).not.toContain('const SHARE = "/share"');
   });
 });

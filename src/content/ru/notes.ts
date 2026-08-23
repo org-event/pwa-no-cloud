@@ -1,0 +1,25 @@
+export const notes = {
+  contact: (nick: string) => `контакт ${nick}`,
+  cardCopied: 'карточка скопирована',
+  cardCopyFailed: 'не удалось скопировать карточку',
+  idCopied: 'id скопирован',
+  idCopyFailed: 'не удалось скопировать id',
+  queued: (name: string) => `в очереди ${name}`,
+  customServerSaved: 'сохранён свой сервер',
+  serverInList: 'сервер в списке',
+  sharePackSaved: 'сохранён пакет S1.',
+  serversFromQrSaved: 'серверы из QR сохранены',
+  serversResolved: (message: string) => `серверы: ${message}`,
+  session: (label: string) => `сессия ${label}`,
+  channelOpen: 'канал открыт',
+  reconnect: (value: string) => `переподключение (${value})`,
+  error: (message: string) => `ошибка ${message}`,
+  fileReceived: (name: string) => `получен ${name}`,
+  linkShared: 'ссылка отправлена в «Поделиться»',
+  linkCopied: 'ссылка скопирована',
+  linkShareFailed: 'не удалось поделиться ссылкой',
+  linkCopyFailed: 'не удалось скопировать ссылку',
+  linkKind: (kind: string) => `ссылка ${kind}`,
+} as const;
+
+export const defaultFileLabel = 'файл';

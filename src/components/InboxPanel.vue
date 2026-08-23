@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { componentsCopy } from '@/content/index.ts';
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { FIXTURE_TRANSFER_ID, type InboxEntry } from '../lib/opfs.ts';
-import { useNocloudStore } from '../stores/nocloud.ts';
+import { FIXTURE_TRANSFER_ID, type InboxEntry } from '@/lib/opfs.ts';
+import { useNocloudStore } from '@/stores/nocloud.ts';
+import Card from './Card.vue';
 
 const store = useNocloudStore();
 const { inbox } = storeToRefs(store);
+const copy = componentsCopy.inbox;
 
 const keyOf = (entry: InboxEntry): string =>
   `${entry.transferId}/${entry.name}`;
@@ -32,8 +35,7 @@ const hidden = computed(
 </script>
 
 <template>
-  <fieldset v-show="!hidden" class="panel">
-    <legend>Получено на этом телефоне</legend>
+  <Card v-show="!hidden" :title="copy.legend">
     <div class="home-actions">
       <button
         type="button"
@@ -41,7 +43,7 @@ const hidden = computed(
         :disabled="!inbox.ready || !selected"
         @click="selected && store.onRead(selected)"
       >
-        Прочитать
+        {{ copy.read }}
       </button>
       <button
         type="button"
@@ -49,12 +51,12 @@ const hidden = computed(
         :disabled="!inbox.ready || !selected"
         @click="selected && store.onRemove(selected)"
       >
-        Удалить
+        {{ copy.remove }}
       </button>
     </div>
-    <div class="inbox-list" role="radiogroup" aria-label="Полученные файлы">
-      <p v-if="!inbox.ready" class="tagline">OPFS недоступен в этом браузере</p>
-      <p v-else-if="items.length === 0" class="tagline">Пока пусто</p>
+    <div class="inbox-list" role="radiogroup" :aria-label="copy.listAria">
+      <p v-if="!inbox.ready" class="tagline">{{ copy.opfsUnavailable }}</p>
+      <p v-else-if="items.length === 0" class="tagline">{{ copy.empty }}</p>
       <label v-for="item in items" :key="keyOf(item)" class="choice">
         <input
           type="radio"
@@ -68,5 +70,5 @@ const hidden = computed(
     </div>
     <p v-if="inbox.error" class="error" role="alert">{{ inbox.error }}</p>
     <pre class="resolved">{{ inbox.preview }}</pre>
-  </fieldset>
+  </Card>
 </template>

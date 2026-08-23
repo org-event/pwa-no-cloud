@@ -1,3 +1,5 @@
+import { domainCopy } from '@/content/index.ts';
+
 export type ProfileCard = {
   id: string;
   nick: string;
@@ -22,7 +24,7 @@ export const sanitizeNick = (raw: string): string => {
 
 export const defaultNick = (id: string): string => {
   const tail = id.slice(-4) || 'user';
-  return `гость-${tail}`;
+  return domainCopy.guestNick(tail);
 };
 
 export const isSafeAvatar = (value: string): boolean => {

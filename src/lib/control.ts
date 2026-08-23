@@ -1,3 +1,5 @@
+import { filePipeCopy } from '@/content/index.ts';
+
 export type FileControl =
   | {
       type: 'file-offer';
@@ -75,7 +77,7 @@ export const parseFileControl = (raw: unknown): FileControl | null => {
     return { type, transferId };
   }
   if (type === 'file-reject') {
-    const reason = asString(raw.reason) ?? 'отклонено';
+    const reason = asString(raw.reason) ?? filePipeCopy.rejected;
     return { type, transferId, reason };
   }
   if (type === 'file-chunk-meta' || type === 'file-ack') {
@@ -121,7 +123,7 @@ export const parseFolderControl = (raw: unknown): FolderControl | null => {
     return { type, folderId };
   }
   if (type === 'folder-reject') {
-    const reason = asString(raw.reason) ?? 'отклонено';
+    const reason = asString(raw.reason) ?? filePipeCopy.rejected;
     return { type, folderId, reason };
   }
   return null;

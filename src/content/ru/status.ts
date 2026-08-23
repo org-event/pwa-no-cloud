@@ -1,0 +1,41 @@
+export const statusCopy = {
+  session: {
+    idle: 'нет канала',
+    closed: 'нет канала',
+    signaling: 'сокет',
+    connecting: 'WebRTC',
+    connected: 'WebRTC',
+    failed: 'ошибка',
+  },
+  online: 'сеть',
+  offline: 'нет сети',
+  socketOn: 'Сокет',
+  socketOff: 'Сокет',
+  webrtcOn: 'WebRTC',
+  webrtcOff: 'WebRTC',
+  waitingPeer: 'ожидание',
+  withPeer: (nick: string) => nick,
+  serverUp: 'сервер ок',
+  serverDown: 'сервер недоступен',
+  serverChecking: 'проверка сервера',
+  pathRelay: 'TURN',
+  pathLocal: 'прямо',
+  latencyMs: (ms: number) => `${ms} мс`,
+  networkOnlineLabel: 'есть сеть',
+  networkOfflineLabel: 'нет сети',
+  socketOnlineLabel: 'сигналинг доступен',
+  socketOfflineLabel: 'сигналинг недоступен',
+  socketBusyLabel: 'проверка сигналинга',
+  webrtcOnlineLabel: 'WebRTC подключен',
+  webrtcOfflineLabel: 'WebRTC выключен',
+  icePathRelayMarker: 'путь = relay',
+  icePathHostPattern: /путь = host/,
+  icePathExtract: /путь = ([^·]+)/,
+  iceReportRelay: (state: string) => `сейчас путь = relay · ${state}`,
+  iceReportPair: (local: string, remote: string, state: string) =>
+    `сейчас путь = ${local} → ${remote} · ${state}`,
+  iceReportFallback: (local: string, remote: string, state: string) =>
+    `ICE local ${local} · remote ${remote} · ${state}`,
+} as const;
+
+export type SessionStatusKey = keyof typeof statusCopy.session;

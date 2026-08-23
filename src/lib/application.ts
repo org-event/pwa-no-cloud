@@ -1,4 +1,4 @@
-import { APP_BASE, SERVICE_WORKER_PATH } from '../workers/sw.ts';
+import { APP_BASE, SERVICE_WORKER_PATH } from '@/workers/sw.ts';
 import { APP_PROTOCOL, protocolHandlerUrl } from './app-link.ts';
 import {
   decideUpdate,

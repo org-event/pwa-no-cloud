@@ -1,3 +1,5 @@
+import { statusCopy } from '@/content/index.ts';
+
 export type IcePath = 'host' | 'srflx' | 'prflx' | 'relay' | 'unknown';
 
 export type IcePair = {
@@ -118,14 +120,15 @@ export const isRelayPair = (pair: IcePair | null): boolean => {
 export const formatIceReport = (report: IceReport): string => {
   if (report.selected) {
     if (isRelayPair(report.selected)) {
-      return `сейчас путь = relay · ${report.connectionState}`;
+      return statusCopy.iceReportRelay(report.connectionState);
     }
-    return (
-      `сейчас путь = ${report.selected.local} → ${report.selected.remote}` +
-      ` · ${report.connectionState}`
+    return statusCopy.iceReportPair(
+      report.selected.local,
+      report.selected.remote,
+      report.connectionState,
     );
   }
   const local = report.local.length > 0 ? report.local.join('/') : '—';
   const remote = report.remote.length > 0 ? report.remote.join('/') : '—';
-  return `ICE local ${local} · remote ${remote} · ${report.connectionState}`;
+  return statusCopy.iceReportFallback(local, remote, report.connectionState);
 };

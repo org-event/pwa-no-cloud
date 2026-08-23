@@ -1,3 +1,4 @@
+import { configCopy } from '@/content/index.ts';
 import { DEFAULT_SIGNALING, EMPTY_CUSTOM } from './defaults.ts';
 import { listIceUrls } from './ice-urls.ts';
 import { createLanPreset, getDefaultPreset, getPreset } from './servers.ts';
@@ -56,7 +57,7 @@ export const validateIceServers = (
     return {
       ok: false,
       code: 'turn-credentials-required',
-      message: 'TURN нужен логин и пароль. Чужой TURN в пресеты не кладём.',
+      message: configCopy.turnCredentialsRequired,
     };
   }
   return null;
@@ -89,8 +90,7 @@ export const resolveServers = (
     return {
       ok: false,
       code: 'signaling-url-required',
-      message:
-        'Сокет выбран, а адрес пустой. Вставьте пакет S1. из консоли VPS или в Signaling поставьте «Вручную».',
+      message: configCopy.signalingUrlRequired,
     };
   }
   return {

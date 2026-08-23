@@ -1,16 +1,19 @@
 <script setup lang="ts">
+import { componentsCopy } from '@/content/index.ts';
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { mixedContentBlocksSignaling } from '../lib/signaling/mixed-content.ts';
-import { expandRecipients } from '../domain/profile.ts';
-import { useNocloudStore } from '../stores/nocloud.ts';
+import { mixedContentBlocksSignaling } from '@/lib/signaling/mixed-content.ts';
+import { expandRecipients } from '@/domain/profile.ts';
+import { useNocloudStore } from '@/stores/nocloud.ts';
 import {
   formatHomeLead,
   formatHomeWait,
   formatRecipientHint,
   formatShareButton,
-} from '../ui/home.ts';
+} from '@/ui/home.ts';
 import AvatarImg from './AvatarImg.vue';
+import Card from './Card.vue';
+import InputAction from './InputAction.vue';
 import PendingPeer from './PendingPeer.vue';
 
 const store = useNocloudStore();
@@ -74,6 +77,8 @@ const recipientHint = computed(() =>
   ),
 );
 
+const copy = componentsCopy.home;
+
 const submitPaste = () => {
   store.onPasteLink(pasteLink.value);
 };
@@ -86,18 +91,17 @@ const submitPaste = () => {
     @skip="store.onSkipPending()"
   />
 
-  <fieldset class="panel">
-    <legend>Как связаться</legend>
-    <p class="tagline">{{ lead }}</p>
-
+  <Card :title="copy.legend" :hint="lead">
     <div class="home-actions">
-      <a href="#contacts" class="button button-accent">Открыть контакты</a>
+      <a href="#contacts" class="button button-accent">{{
+        copy.openContacts
+      }}</a>
     </div>
 
     <ol class="home-steps">
-      <li>Выберите файл в блоке «Файлы».</li>
-      <li>Нажмите «Получить ссылку».</li>
-      <li>Отправьте ссылку второму. Он открывает и принимает.</li>
+      <li>{{ copy.stepPickFile }}</li>
+      <li>{{ copy.stepGetLink }}</li>
+      <li>{{ copy.stepSendLink }}</li>
     </ol>
 
     <p
@@ -109,20 +113,16 @@ const submitPaste = () => {
       {{ wait }}
     </p>
 
-    <label class="field">
-      <span>{{
-        shareUrl
-          ? 'Эту ссылку отправьте второму — он только откроет'
-          : 'Ссылка появится здесь после «Получить ссылку»'
-      }}</span>
-      <input
-        :value="shareUrl"
-        type="text"
-        readonly
-        autocomplete="off"
-        aria-label="Ссылка для второго устройства"
-      />
-    </label>
+    <InputAction
+      :model-value="shareUrl"
+      :label="shareUrl ? copy.shareUrlReady : copy.shareUrlPending"
+      readonly
+      :input-aria-label="copy.shareUrlAria"
+      icon="copy"
+      :tooltip="copy.copyLink"
+      :disabled="!shareUrl"
+      @action="store.onCopyShareUrl()"
+    />
 
     <div class="home-actions">
       <button
@@ -133,34 +133,19 @@ const submitPaste = () => {
       >
         {{ shareButtonLabel }}
       </button>
-      <button
-        type="button"
-        :class="shareUrl ? 'button button-accent' : 'button button-secondary'"
-        :disabled="!shareUrl"
-        @click="store.onCopyShareUrl()"
-      >
-        Копировать ссылку
-      </button>
     </div>
 
-    <label class="field">
-      <span
-        >Пришло от другого — вставьте ссылку, если по клику не открылось</span
-      >
-      <input
-        v-model="pasteLink"
-        type="text"
-        autocomplete="off"
-        placeholder="https://…/#r/… или текст приглашения"
-        aria-label="Вставить чужую ссылку или приглашение"
-        @keydown.enter.prevent="submitPaste"
-      />
-    </label>
-    <div class="home-actions">
-      <button type="button" class="button" @click="submitPaste">
-        Принять ссылку
-      </button>
-    </div>
+    <InputAction
+      v-model="pasteLink"
+      :label="copy.pasteLabel"
+      :placeholder="copy.pastePlaceholder"
+      :input-aria-label="copy.pasteAria"
+      :button-label="copy.acceptLink"
+      :tooltip="copy.acceptLink"
+      button-class="button"
+      @action="submitPaste"
+      @enter="submitPaste"
+    />
 
     <div class="contact-row">
       <AvatarImg :id="contacts.me.id" :avatar="contacts.me.avatar" />
@@ -174,11 +159,11 @@ const submitPaste = () => {
       class="button button-secondary"
       @click="store.onCopyId()"
     >
-      Копировать id
+      {{ copy.copyId }}
     </button>
 
     <fieldset class="contact-pick">
-      <legend>Кому</legend>
+      <legend>{{ copy.recipientLegend }}</legend>
       <p class="tagline">{{ recipientHint }}</p>
       <div class="contact-list">
         <p
@@ -188,7 +173,7 @@ const submitPaste = () => {
           "
           class="tagline"
         >
-          Книга пуста. Ссылка всё равно сработает — карточка придёт при связи.
+          {{ copy.bookEmpty }}
         </p>
         <label
           v-for="contact in contacts.book.contacts"
@@ -213,26 +198,26 @@ const submitPaste = () => {
             :checked="state.selectedGroupIds.includes(group.id)"
             @change="store.onToggleGroup(group.id)"
           />
-          <span>группа «{{ group.name }}» · {{ group.memberIds.length }}</span>
+          <span>{{ copy.groupLabel(group.name, group.memberIds.length) }}</span>
         </label>
       </div>
     </fieldset>
 
-    <div class="home-actions">
+    <p v-if="homeState.error" class="error" role="alert">
+      {{ homeState.error }}
+    </p>
+
+    <template #actions>
       <button type="button" class="button" @click="store.onCreateInvite()">
-        Создать приглашение
+        {{ copy.createInvite }}
       </button>
       <button
         type="button"
         class="button button-secondary"
         @click="store.onJoin()"
       >
-        Я открыл чужое приглашение
+        {{ copy.openedForeignInvite }}
       </button>
-    </div>
-
-    <p v-if="homeState.error" class="error" role="alert">
-      {{ homeState.error }}
-    </p>
-  </fieldset>
+    </template>
+  </Card>
 </template>

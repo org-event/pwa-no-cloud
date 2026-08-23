@@ -1,8 +1,9 @@
+import { configCopy } from '@/content/index.ts';
 import type { CustomServerDraft, SignalingConfig } from './types.ts';
 
 export const APP_NAME = 'NoCloud';
 
-export const APP_TAGLINE = 'обмен файлами без облака';
+export const APP_TAGLINE = configCopy.appTagline;
 
 export const DEFAULT_PRESET_ID = 'manual-only';
 

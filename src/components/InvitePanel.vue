@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { componentsCopy } from '@/content/index.ts';
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useNocloudStore } from '../stores/nocloud.ts';
+import { useNocloudStore } from '@/stores/nocloud.ts';
+import Card from './Card.vue';
+import FieldInput from './FieldInput.vue';
 
 const store = useNocloudStore();
 const { invite } = storeToRefs(store);
+const copy = componentsCopy.invite;
 
 const paste = ref('');
 
@@ -12,25 +16,16 @@ const manual = computed(() => invite.value.mode === 'manual');
 
 const hint = computed(() => {
   if (!manual.value) {
-    return invite.value.connected
-      ? 'Канал открыт'
-      : 'Оба в одной комнате — канал откроется сам';
+    return invite.value.connected ? copy.channelOpen : copy.roomAutoOpen;
   }
-  if (invite.value.role === 'caller') {
-    return 'Отправьте текст второму окну, затем вставьте его ответ';
-  }
-  if (invite.value.role === 'callee') {
-    return 'Вставьте приглашение или пакет S1. с серверов, затем отдайте ответ';
-  }
-  return invite.value.connected ? 'Канал открыт' : '';
+  if (invite.value.role === 'caller') return copy.callerHint;
+  if (invite.value.role === 'callee') return copy.calleeHint;
+  return invite.value.connected ? copy.channelOpen : '';
 });
 </script>
 
 <template>
-  <fieldset v-show="manual" class="panel">
-    <legend>Приглашение</legend>
-    <p class="tagline">{{ hint }}</p>
-
+  <Card v-show="manual" :title="copy.legend" :hint="hint">
     <label v-show="manual" class="choice">
       <input
         type="checkbox"
@@ -40,26 +35,22 @@ const hint = computed(() => {
           store.onShareWithPeer(($event.target as HTMLInputElement).checked)
         "
       />
-      <span
-        >Вложить мои серверы: если у второго нет TURN/сокета — пусть возьмёт
-        эти</span
-      >
+      <span>{{ copy.shareServers }}</span>
     </label>
 
     <img
       v-if="manual && invite.qrUrl"
       :src="invite.qrUrl"
-      alt="QR приглашения"
+      :alt="copy.qrAlt"
       class="invite-qr"
     />
 
-    <textarea
+    <FieldInput
       v-show="manual"
-      :value="invite.outgoing"
+      :model-value="invite.outgoing"
+      :label="copy.outgoingAria"
       readonly
-      rows="6"
-      class="invite-out"
-      aria-label="Исходящее приглашение"
+      :rows="6"
     />
 
     <div v-show="manual" class="home-actions">
@@ -69,7 +60,7 @@ const hint = computed(() => {
         :disabled="!invite.outgoing"
         @click="store.onCopy()"
       >
-        Скопировать
+        {{ copy.copy }}
       </button>
       <button
         type="button"
@@ -77,27 +68,28 @@ const hint = computed(() => {
         :disabled="!invite.outgoing"
         @click="store.onShareLink()"
       >
-        Поделиться ссылкой
+        {{ copy.shareLink }}
       </button>
     </div>
 
-    <textarea
+    <FieldInput
       v-show="manual"
       v-model="paste"
-      rows="6"
-      placeholder="Вставьте приглашение или ответ"
-      class="invite-in"
-      aria-label="Входящее приглашение или ответ"
+      :label="copy.incomingAria"
+      :rows="6"
+      :placeholder="copy.pastePlaceholder"
     />
 
-    <div v-show="manual" class="home-actions">
+    <p v-if="invite.error" class="error" role="alert">{{ invite.error }}</p>
+
+    <template #actions>
       <button
         type="button"
         class="button"
         :disabled="invite.connected"
         @click="store.onApplyPaste(paste)"
       >
-        Принять текст
+        {{ copy.acceptText }}
       </button>
       <button
         type="button"
@@ -107,8 +99,6 @@ const hint = computed(() => {
       >
         Ping
       </button>
-    </div>
-
-    <p v-if="invite.error" class="error" role="alert">{{ invite.error }}</p>
-  </fieldset>
+    </template>
+  </Card>
 </template>

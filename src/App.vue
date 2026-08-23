@@ -2,12 +2,11 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { APP_NAME, APP_TAGLINE, APP_VERSION } from './config/index.ts';
+import { componentsCopy, shellCopy, statusCopy } from '@/content/index.ts';
 import ContactsSection from './components/ContactsSection.vue';
 import HelpSection from './components/HelpSection.vue';
-import HomeSection from './components/HomeSection.vue';
 import HostPanel from './components/HostPanel.vue';
 import InboxPanel from './components/InboxPanel.vue';
-import InvitePanel from './components/InvitePanel.vue';
 import LogsSection from './components/LogsSection.vue';
 import PlaceholderSection from './components/PlaceholderSection.vue';
 import ServersSection from './components/ServersSection.vue';
@@ -20,7 +19,7 @@ import {
 } from './ui/sections.ts';
 
 const store = useNocloudStore();
-const { statusLine, canInstall, state } = storeToRefs(store);
+const { status, canInstall, state } = storeToRefs(store);
 
 const menuOpen = ref(false);
 const lastFocus = ref<HTMLElement | null>(null);
@@ -41,12 +40,10 @@ const pageTitle = computed(
     APP_SECTIONS.find((item) => item.id === currentSection.value)?.title ?? '',
 );
 
-const statusPath = computed(() =>
-  store.invite.ice.includes('путь = relay') ? 'relay' : '',
-);
+const statusPath = computed(() => status.value.path);
 
 const updateTitle = computed(
-  () => state.value.updateNotice || 'Проверить обновление',
+  () => state.value.updateNotice || shellCopy.checkUpdate,
 );
 
 const versionTitle = computed(() =>
@@ -132,7 +129,7 @@ onUnmounted(() => {
 <template>
   <div class="app-shell" :class="{ 'is-menu-open': menuOpen }">
     <a class="skip-link" href="#content" @click="skipToContent">
-      К содержимому
+      {{ componentsCopy.app.skipToContent }}
     </a>
 
     <button
@@ -140,7 +137,7 @@ onUnmounted(() => {
       class="drawer-scrim"
       :hidden="!menuOpen"
       tabindex="-1"
-      aria-label="Закрыть меню"
+      :aria-label="componentsCopy.app.closeMenu"
       @click="setMenuOpen(false)"
     />
 
@@ -148,7 +145,7 @@ onUnmounted(() => {
       id="app-nav"
       ref="drawer"
       class="drawer"
-      aria-label="Разделы"
+      :aria-label="componentsCopy.app.sections"
       :inert="!menuOpen"
     >
       <div class="drawer-head">
@@ -160,7 +157,7 @@ onUnmounted(() => {
           ref="closeButton"
           type="button"
           class="icon-button"
-          aria-label="Закрыть меню"
+          :aria-label="componentsCopy.app.closeMenu"
           @click="setMenuOpen(false)"
         >
           <svg
@@ -179,7 +176,7 @@ onUnmounted(() => {
           </svg>
         </button>
       </div>
-      <nav class="drawer-nav" aria-label="Разделы приложения">
+      <nav class="drawer-nav" :aria-label="componentsCopy.app.appSections">
         <a
           v-for="section in APP_SECTIONS"
           :key="section.id"
@@ -199,7 +196,7 @@ onUnmounted(() => {
           ref="menuButton"
           type="button"
           class="icon-button"
-          aria-label="Меню"
+          :aria-label="componentsCopy.app.menu"
           aria-controls="app-nav"
           :aria-expanded="menuOpen"
           @click="setMenuOpen(!menuOpen)"
@@ -225,11 +222,50 @@ onUnmounted(() => {
           data-role="session"
           role="status"
           aria-live="polite"
-          :data-online="String(store.online)"
+          :data-online="String(status.networkOnline)"
+          :data-socket="String(status.socketLive)"
+          :data-webrtc="String(status.webrtcLive)"
           :data-path="statusPath"
-          :title="statusLine"
+          :title="status.title"
         >
-          {{ statusLine }}
+          <span
+            v-if="status.socketVisible"
+            class="status-chip"
+            :data-online="String(status.socketLive)"
+            :data-busy="String(status.socketBusy)"
+          >
+            <span
+              class="presence status-dot"
+              :data-online="String(status.socketLive)"
+              :data-busy="String(status.socketBusy)"
+              :aria-label="
+                status.socketBusy
+                  ? statusCopy.socketBusyLabel
+                  : status.socketLive
+                    ? statusCopy.socketOnlineLabel
+                    : statusCopy.socketOfflineLabel
+              "
+            />
+            <span>{{ statusCopy.socketOn }}</span>
+          </span>
+          <span class="status-chip" :data-online="String(status.webrtcLive)">
+            <span
+              class="presence status-dot"
+              :data-online="String(status.webrtcLive)"
+              :aria-label="
+                status.webrtcLive
+                  ? statusCopy.webrtcOnlineLabel
+                  : statusCopy.webrtcOfflineLabel
+              "
+            />
+            <span>{{ statusCopy.webrtcOn }}</span>
+          </span>
+          <span v-if="status.linkLabel" class="status-line-text">{{
+            status.linkLabel
+          }}</span>
+          <span v-if="status.latencyLabel" class="status-line-ms">{{
+            status.latencyLabel
+          }}</span>
         </p>
 
         <div class="topbar-end">
@@ -239,12 +275,12 @@ onUnmounted(() => {
             class="button button-accent topbar-install"
             @click="store.onInstall()"
           >
-            Установить
+            {{ componentsCopy.app.install }}
           </button>
           <p
             class="topbar-version"
             :title="versionTitle"
-            :aria-label="`Сборка ${APP_VERSION}`"
+            :aria-label="componentsCopy.app.buildLabel(APP_VERSION)"
           >
             {{ APP_VERSION }}
           </p>
@@ -283,17 +319,11 @@ onUnmounted(() => {
           class="page-section"
           data-section="lan"
         >
-          <div class="home">
-            <HomeSection />
-          </div>
-          <div class="invite">
-            <InvitePanel />
+          <div class="transfer">
+            <TransferPanel />
           </div>
           <div class="inbox">
             <InboxPanel />
-          </div>
-          <div class="invite" hidden>
-            <TransferPanel />
           </div>
         </section>
 
@@ -324,8 +354,8 @@ onUnmounted(() => {
           data-section="video"
         >
           <PlaceholderSection
-            title="Видео конф"
-            text="Видеозвонок ещё не собран. Сейчас приложение передаёт файлы напрямую, без облака."
+            :title="componentsCopy.app.videoTitle"
+            :text="componentsCopy.app.videoText"
           />
         </section>
 

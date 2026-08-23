@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { encodeInvite } from '../lib/signaling/invite.ts';
-import { createManualPort } from '../lib/signaling/manual.ts';
-import type { SignalMessage } from '../lib/signaling/port.ts';
+import { encodeInvite } from '@/lib/signaling/invite.ts';
+import { createManualPort } from '@/lib/signaling/manual.ts';
+import type { SignalMessage } from '@/lib/signaling/port.ts';
 import {
   applySessionEvent,
   createIdleSession,

@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { componentsCopy } from '@/content/index.ts';
+import { onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useNocloudStore } from '../stores/nocloud.ts';
+import { useNocloudStore } from '@/stores/nocloud.ts';
 import AvatarImg from './AvatarImg.vue';
+import Card from './Card.vue';
+import ContactRow from './ContactRow.vue';
+import InputAction from './InputAction.vue';
 import PendingPeer from './PendingPeer.vue';
 
 const store = useNocloudStore();
@@ -13,13 +17,21 @@ const addCard = ref('');
 const groupName = ref('');
 const groupMemberIds = ref<string[]>([]);
 const avatarInput = ref<HTMLInputElement | null>(null);
+const editing = ref(false);
 
-const onNickFocus = () => {
-  nick.value = contacts.value.me.nick;
-};
+const copy = componentsCopy.contacts;
+
+onMounted(() => {
+  void store.seedDemoContacts();
+});
 
 const onSaveNick = () => {
   store.onSaveProfile(nick.value);
+};
+
+const toggleEdit = () => {
+  if (!editing.value) nick.value = contacts.value.me.nick;
+  editing.value = !editing.value;
 };
 
 const onPickAvatar = (event: Event) => {
@@ -29,13 +41,11 @@ const onPickAvatar = (event: Event) => {
   if (file) store.onPickAvatar(file);
 };
 
-const onAddContact = (event: Event) => {
-  event.preventDefault();
+const onAddContact = () => {
   if (store.onAddContact(addCard.value)) addCard.value = '';
 };
 
-const onSaveGroup = (event: Event) => {
-  event.preventDefault();
+const onSaveGroup = () => {
   store.onSaveGroup(groupName.value, groupMemberIds.value);
   groupName.value = '';
   groupMemberIds.value = [];
@@ -46,191 +56,154 @@ const toggleGroupMember = (id: string, checked: boolean) => {
     ? [...groupMemberIds.value, id]
     : groupMemberIds.value.filter((item) => item !== id);
 };
+
+const isOnline = (id: string) =>
+  Boolean(contacts.value.connected && contacts.value.livePeerId === id);
 </script>
 
 <template>
-  <PendingPeer
-    :card="contacts.pending"
-    @accept="store.onAcceptPending()"
-    @skip="store.onSkipPending()"
-  />
-
-  <p
-    v-if="!hasSignalingSocket"
-    class="error panel-banner"
-    role="alert"
-  >
-    Сначала вставьте пакет S1. в
-    <a href="#servers">«Настройки сервера»</a>
-    на обоих устройствах (телефон и комп). Одна Wi‑Fi без S1 канал не откроет —
-    зелёная точка не появится.
-  </p>
-
-  <fieldset class="panel">
-    <legend>Я</legend>
-    <div class="contact-row">
-      <AvatarImg :id="contacts.me.id" :avatar="contacts.me.avatar" />
-    </div>
-    <label class="field">
-      <span>Ник</span>
-      <input
-        v-model="nick"
-        name="nick"
-        type="text"
-        maxlength="32"
-        autocomplete="nickname"
-        aria-label="Ник"
-        @focus="onNickFocus"
-      />
-    </label>
-    <p class="tagline">
-      1) Оба сохранили S1. 2) Один жмёт «Сгенерировать» и ждёт. 3) Второй
-      вставляет карточку и «Добавить». Сам «Сгенерировать» на втором не жмите,
-      пока первый ждёт.
-    </p>
-    <label class="field">
-      <span>{{
-        contacts.cardText
-          ? 'Эту карточку отправьте второму'
-          : 'Карточка появится после «Сгенерировать»'
-      }}</span>
-      <input
-        :value="contacts.cardText"
-        type="text"
-        readonly
-        autocomplete="off"
-        aria-label="Ваша карточка контакта"
-      />
-    </label>
-    <div class="home-actions">
-      <button type="button" class="button button-secondary" @click="onSaveNick">
-        Сохранить ник
-      </button>
-      <button
-        type="button"
-        class="button button-secondary"
-        @click="avatarInput?.click()"
-      >
-        Своё фото
-      </button>
-      <button
-        type="button"
-        class="button button-secondary"
-        @click="store.onClearAvatar()"
-      >
-        Сгенерировать лого
-      </button>
-      <button
-        type="button"
-        :class="
-          contacts.waiting ? 'button button-secondary' : 'button button-accent'
-        "
-        @click="store.onGenerateCard()"
-      >
-        {{ contacts.waiting ? 'Ждём второго' : 'Сгенерировать' }}
-      </button>
-      <button
-        type="button"
-        :class="
-          contacts.cardText ? 'button button-accent' : 'button button-secondary'
-        "
-        :disabled="!contacts.cardText"
-        @click="store.onCopyCard()"
-      >
-        Копировать
-      </button>
-    </div>
-    <input
-      ref="avatarInput"
-      type="file"
-      accept="image/*"
-      class="file-input"
-      aria-hidden="true"
-      @change="onPickAvatar"
+  <div class="card-stack">
+    <PendingPeer
+      :card="contacts.pending"
+      @accept="store.onAcceptPending()"
+      @skip="store.onSkipPending()"
     />
-  </fieldset>
 
-  <form class="panel" @submit="onAddContact">
-    <fieldset>
-      <legend>Добавить контакт</legend>
-      <p class="tagline">
-        Вставьте карточку, которую прислали. В списке появится сразу; зелёная
-        точка — только после S1 и когда первый ждёт в «Сгенерировать».
-      </p>
-      <label class="field">
-        <span>Карточка</span>
-        <input
-          v-model="addCard"
-          name="card"
-          autocomplete="off"
-          placeholder="C1.{…}"
-          aria-label="Карточка контакта"
+    <p v-if="!hasSignalingSocket" class="error panel-banner" role="alert">
+      {{ copy.needS1Before }}
+      <a href="#servers">{{ copy.needS1Link }}</a>
+      {{ copy.needS1After }}
+    </p>
+
+    <Card :title="copy.meLegend">
+      <ContactRow :name="contacts.me.nick || copy.nick">
+        <template #leading>
+          <AvatarImg :id="contacts.me.id" :avatar="contacts.me.avatar" />
+        </template>
+        <template #actions>
+          <button
+            type="button"
+            class="icon-button"
+            :title="copy.edit"
+            :aria-label="copy.edit"
+            :aria-expanded="editing"
+            @click="toggleEdit"
+          >
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+              />
+            </svg>
+          </button>
+        </template>
+      </ContactRow>
+      <div v-show="editing" class="profile-edit">
+        <InputAction
+          v-model="nick"
+          :label="copy.nick"
+          name="nick"
+          type="text"
+          :maxlength="32"
+          autocomplete="nickname"
+          :input-aria-label="copy.nickAria"
+          icon="check"
+          :tooltip="copy.saveNick"
+          @action="onSaveNick"
+          @enter="onSaveNick"
         />
-      </label>
-      <button class="button" type="submit">Добавить</button>
-    </fieldset>
-  </form>
-
-  <fieldset class="panel">
-    <legend>Контакты</legend>
-    <div class="contact-list">
-      <p v-if="contacts.book.contacts.length === 0" class="tagline">
-        Пока пусто. Вставьте чужую карточку выше — сразу появится здесь.
-      </p>
-      <div
-        v-for="contact in contacts.book.contacts"
-        :key="contact.id"
-        class="contact-row"
-      >
-        <AvatarImg :id="contact.id" :avatar="contact.avatar" />
-        <div>
-          <div class="contact-name">
-            <span
-              class="presence"
-              :data-online="
-                String(contacts.connected && contacts.livePeerId === contact.id)
-              "
-              :aria-label="
-                contacts.connected && contacts.livePeerId === contact.id
-                  ? 'в сети'
-                  : 'не в сети'
-              "
-              :title="
-                contacts.connected && contacts.livePeerId === contact.id
-                  ? 'в сети'
-                  : 'не в сети'
-              "
-            />
-            <strong>{{ contact.nick }}</strong>
-          </div>
-          <p class="tagline">
-            {{
-              contacts.connected && contacts.livePeerId === contact.id
-                ? 'в сети'
-                : 'не в сети'
-            }}
-          </p>
-        </div>
         <button
           type="button"
           class="button button-secondary"
-          @click="store.onRemoveContact(contact.id)"
+          @click="avatarInput?.click()"
         >
-          Удалить
+          {{ copy.pickPhoto }}
         </button>
       </div>
-    </div>
-  </fieldset>
+      <InputAction
+        :model-value="contacts.cardText"
+        :label="copy.cardReady"
+        readonly
+        :input-aria-label="copy.cardAria"
+        icon="copy"
+        :tooltip="copy.copy"
+        :disabled="!contacts.cardText"
+        @action="store.onCopyCard()"
+      />
+      <input
+        ref="avatarInput"
+        type="file"
+        accept="image/*"
+        class="file-input"
+        aria-hidden="true"
+        @change="onPickAvatar"
+      />
+    </Card>
 
-  <form class="panel" @submit="onSaveGroup">
-    <fieldset>
-      <legend>Группа</legend>
-      <p class="tagline">Локальный ярлык. Канал всё равно 1:1.</p>
-      <label class="field">
-        <span>Название</span>
-        <input v-model="groupName" name="groupName" autocomplete="off" />
-      </label>
-      <div data-role="group-members">
+    <Card :title="copy.addLegend" :hint="copy.addHint">
+      <InputAction
+        v-model="addCard"
+        :label="copy.cardField"
+        name="card"
+        placeholder="C1.{…}"
+        :input-aria-label="copy.cardFieldAria"
+        icon="plus"
+        :tooltip="copy.add"
+        @action="onAddContact"
+        @enter="onAddContact"
+      />
+    </Card>
+
+    <Card :title="copy.listLegend">
+      <div class="contact-list">
+        <p v-if="contacts.book.contacts.length === 0" class="tagline">
+          {{ copy.listEmpty }}
+        </p>
+        <ContactRow
+          v-for="contact in contacts.book.contacts"
+          :key="contact.id"
+          :name="contact.nick"
+          :detail="isOnline(contact.id) ? copy.online : copy.offline"
+          :online="isOnline(contact.id)"
+          :online-label="copy.online"
+          :offline-label="copy.offline"
+        >
+          <template #leading>
+            <AvatarImg :id="contact.id" :avatar="contact.avatar" />
+          </template>
+          <template #actions>
+            <button
+              type="button"
+              class="button button-secondary"
+              @click="store.onRemoveContact(contact.id)"
+            >
+              {{ copy.remove }}
+            </button>
+          </template>
+        </ContactRow>
+      </div>
+    </Card>
+
+    <Card :title="copy.groupLegend" :hint="copy.groupHint">
+      <InputAction
+        v-model="groupName"
+        :label="copy.groupName"
+        name="groupName"
+        icon="plus"
+        :tooltip="copy.saveGroup"
+        @action="onSaveGroup"
+        @enter="onSaveGroup"
+      />
+      <div class="contact-pick" data-role="group-members">
         <label
           v-for="contact in contacts.book.contacts"
           :key="contact.id"
@@ -250,34 +223,32 @@ const toggleGroupMember = (id: string, checked: boolean) => {
           <span>{{ contact.nick }}</span>
         </label>
       </div>
-      <button class="button" type="submit">Сохранить группу</button>
-    </fieldset>
-    <div class="contact-list">
-      <div
-        v-for="group in contacts.book.groups"
-        :key="group.id"
-        class="contact-row"
-      >
-        <div>
-          <strong>{{ group.name }}</strong>
-          <p class="tagline">{{ group.memberIds.length }} чел.</p>
-        </div>
-        <button
-          type="button"
-          class="button button-secondary"
-          @click="store.onRemoveGroup(group.id)"
+      <div class="contact-list">
+        <ContactRow
+          v-for="group in contacts.book.groups"
+          :key="group.id"
+          :name="group.name"
+          :detail="copy.groupMembers(group.memberIds.length)"
         >
-          Удалить
-        </button>
+          <template #actions>
+            <button
+              type="button"
+              class="button button-secondary"
+              @click="store.onRemoveGroup(group.id)"
+            >
+              {{ copy.remove }}
+            </button>
+          </template>
+        </ContactRow>
       </div>
-    </div>
-  </form>
+    </Card>
 
-  <p
-    class="tagline"
-    :class="{ error: contacts.notice.includes('S1') }"
-    role="status"
-  >
-    {{ contacts.notice }}
-  </p>
+    <p
+      class="tagline"
+      :class="{ error: contacts.notice.includes('S1') }"
+      role="status"
+    >
+      {{ contacts.notice }}
+    </p>
+  </div>
 </template>

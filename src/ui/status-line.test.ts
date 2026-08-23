@@ -1,26 +1,72 @@
 import { describe, expect, it } from 'vitest';
-import { formatStatusLine } from './status-line.ts';
+import { buildStatusLineView, formatStatusLine } from './status-line.ts';
 
 describe('status line', () => {
-  it('joins network, session, ice path and pong', () => {
+  it('shows socket ready from server reach without an open peer', () => {
+    expect(
+      buildStatusLineView({
+        online: true,
+        session: 'idle',
+        ice: '',
+        pongMs: null,
+        peerNick: '',
+        hasSocket: true,
+        peerLive: false,
+        serverReach: 'up',
+      }),
+    ).toMatchObject({
+      socketLive: true,
+      socketBusy: false,
+      webrtcLive: false,
+      linkLabel: '',
+    });
+  });
+
+  it('keeps socket red when the selected server is down', () => {
+    expect(
+      buildStatusLineView({
+        online: true,
+        session: 'idle',
+        ice: '',
+        pongMs: null,
+        peerNick: '',
+        hasSocket: true,
+        peerLive: false,
+        serverReach: 'down',
+      }).socketLive,
+    ).toBe(false);
+  });
+
+  it('marks socket busy while probing', () => {
+    expect(
+      buildStatusLineView({
+        online: true,
+        session: 'idle',
+        ice: '',
+        pongMs: null,
+        peerNick: '',
+        hasSocket: true,
+        peerLive: false,
+        serverReach: 'checking',
+      }),
+    ).toMatchObject({
+      socketLive: false,
+      socketBusy: true,
+    });
+  });
+
+  it('shows webrtc and latency when the peer channel is open', () => {
     expect(
       formatStatusLine({
         online: true,
         session: 'connected',
         ice: 'сейчас путь = host → host · connected',
         pongMs: 12,
+        peerNick: 'Анна',
+        hasSocket: true,
+        peerLive: true,
+        serverReach: 'up',
       }),
-    ).toBe('сеть · связь · локально · 12 мс');
-  });
-
-  it('skips missing ice and pong', () => {
-    expect(
-      formatStatusLine({
-        online: false,
-        session: 'idle',
-        ice: '',
-        pongMs: null,
-      }),
-    ).toBe('нет сети · нет пары');
+    ).toBe('Сокет · WebRTC · сервер ок · Анна · прямо · 12 мс');
   });
 });

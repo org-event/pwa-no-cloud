@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { componentsCopy } from '@/content/index.ts';
 import { computed } from 'vue';
-import type { ProfileCard } from '../domain/profile.ts';
+import type { ProfileCard } from '@/domain/profile.ts';
 import AvatarImg from './AvatarImg.vue';
+import Card from './Card.vue';
+import ContactRow from './ContactRow.vue';
 
 const props = defineProps<{
   card: ProfileCard | null;
@@ -13,26 +16,27 @@ const emit = defineEmits<{
 }>();
 
 const visible = computed(() => props.card !== null);
+const copy = componentsCopy.pendingPeer;
 </script>
 
 <template>
-  <fieldset v-if="visible" class="panel">
-    <legend>Новый человек</legend>
-    <div class="contact-row">
-      <AvatarImg v-if="card" :id="card.id" :avatar="card.avatar" />
-    </div>
-    <p v-if="card" class="tagline">{{ card.nick }} · {{ card.id }}</p>
-    <div class="home-actions">
+  <Card v-if="visible" :title="copy.legend">
+    <ContactRow v-if="card" :name="card.nick" :detail="card.id">
+      <template #leading>
+        <AvatarImg :id="card.id" :avatar="card.avatar" />
+      </template>
+    </ContactRow>
+    <template #actions>
       <button type="button" class="button" @click="emit('accept')">
-        В адресную книгу
+        {{ copy.accept }}
       </button>
       <button
         type="button"
         class="button button-secondary"
         @click="emit('skip')"
       >
-        Не сейчас
+        {{ copy.skip }}
       </button>
-    </div>
-  </fieldset>
+    </template>
+  </Card>
 </template>

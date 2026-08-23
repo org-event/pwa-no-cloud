@@ -1,5 +1,6 @@
-import type { CustomServerDraft } from '../../config/types.ts';
-import { parseShareDraft } from '../../config/share-pack.ts';
+import { signalingLibCopy } from '@/content/index.ts';
+import type { CustomServerDraft } from '@/config/types.ts';
+import { parseShareDraft } from '@/config/share-pack.ts';
 import type { SignalMessage, SignalResult } from './port.ts';
 
 const COMPRESSED = 'N1.';
@@ -59,7 +60,7 @@ export const parseInvite = (raw: unknown): SignalResult<SignalMessage> => {
     return {
       ok: false,
       code: 'invite-invalid',
-      message: 'Приглашение не JSON',
+      message: signalingLibCopy.inviteNotJson,
     };
   }
   const from = raw.from;
@@ -69,7 +70,7 @@ export const parseInvite = (raw: unknown): SignalResult<SignalMessage> => {
     return {
       ok: false,
       code: 'invite-invalid',
-      message: 'Сломано поле from/to',
+      message: signalingLibCopy.brokenFromTo,
     };
   }
   const type = data.type;
@@ -77,7 +78,7 @@ export const parseInvite = (raw: unknown): SignalResult<SignalMessage> => {
     return {
       ok: false,
       code: 'invite-type',
-      message: 'Неизвестный тип сигнала',
+      message: signalingLibCopy.unknownSignalType,
     };
   }
   return {
@@ -112,7 +113,11 @@ export const decodeInvite = async (
 ): Promise<SignalResult<DecodedInvite>> => {
   const raw = text.trim();
   if (!raw) {
-    return { ok: false, code: 'invite-empty', message: 'Пустое приглашение' };
+    return {
+      ok: false,
+      code: 'invite-empty',
+      message: signalingLibCopy.inviteEmpty,
+    };
   }
   try {
     let json = raw;
@@ -136,6 +141,10 @@ export const decodeInvite = async (
       },
     };
   } catch {
-    return { ok: false, code: 'invite-parse', message: 'Не удалось прочитать' };
+    return {
+      ok: false,
+      code: 'invite-parse',
+      message: signalingLibCopy.inviteUnreadable,
+    };
   }
 };

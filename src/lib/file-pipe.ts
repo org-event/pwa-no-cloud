@@ -1,22 +1,23 @@
+import { filePipeCopy } from '@/content/index.ts';
 import {
   CHANNEL_BUFFER_HIGH,
   CHUNK_SIZE_BYTES,
   MAX_FILE_BYTES,
   MAX_FOLDER_FILES,
-} from '../config/defaults.ts';
+} from '@/config/defaults.ts';
 import {
   applyFolderEvent,
   createReceiveFolder,
   createSendFolder,
   type FolderTransfer,
-} from '../domain/folder.ts';
+} from '@/domain/folder.ts';
 import {
   applyTransferEvent,
   createReceiveTransfer,
   createSendTransfer,
   transferChunks,
   type Transfer,
-} from '../domain/transfer.ts';
+} from '@/domain/transfer.ts';
 import { chunkLength, chunkOffset, fileBaseName, waitDrain } from './chunk.ts';
 import {
   parseControl,
@@ -136,7 +137,7 @@ export class FilePipe extends EventEmitter {
     void this.acceptOffer(transferId);
   }
 
-  reject(transferId: string, reason = 'отклонено') {
+  reject(transferId: string, reason: string = filePipeCopy.rejected) {
     if (this.incomingFolder?.id === transferId) {
       this.rejectFolder(transferId, reason);
       return;
@@ -339,7 +340,7 @@ export class FilePipe extends EventEmitter {
       this.sendControl({
         type: 'file-reject',
         transferId: message.transferId,
-        reason: 'занято',
+        reason: filePipeCopy.busy,
       });
       return;
     }
@@ -347,7 +348,7 @@ export class FilePipe extends EventEmitter {
       this.sendControl({
         type: 'file-reject',
         transferId: message.transferId,
-        reason: 'занято',
+        reason: filePipeCopy.busy,
       });
       return;
     }
@@ -359,7 +360,7 @@ export class FilePipe extends EventEmitter {
       this.sendControl({
         type: 'file-reject',
         transferId: message.transferId,
-        reason: 'файл слишком большой или имя недопустимо',
+        reason: filePipeCopy.fileTooLargeOrBadName,
       });
       return;
     }
@@ -401,7 +402,7 @@ export class FilePipe extends EventEmitter {
       this.sendControl({
         type: 'folder-reject',
         folderId: message.folderId,
-        reason: 'занято',
+        reason: filePipeCopy.busy,
       });
       return;
     }
@@ -412,7 +413,7 @@ export class FilePipe extends EventEmitter {
       this.sendControl({
         type: 'folder-reject',
         folderId: message.folderId,
-        reason: 'папка пуста или имя недопустимо',
+        reason: filePipeCopy.folderEmptyOrBadName,
       });
       return;
     }
@@ -420,7 +421,7 @@ export class FilePipe extends EventEmitter {
       this.sendControl({
         type: 'folder-reject',
         folderId: message.folderId,
-        reason: 'слишком много файлов',
+        reason: filePipeCopy.tooManyFiles,
       });
       return;
     }
@@ -431,7 +432,7 @@ export class FilePipe extends EventEmitter {
         this.sendControl({
           type: 'folder-reject',
           folderId: message.folderId,
-          reason: 'файл слишком большой или путь недопустим',
+          reason: filePipeCopy.fileTooLargeOrBadPath,
         });
         return;
       }
@@ -477,7 +478,7 @@ export class FilePipe extends EventEmitter {
     const incoming = this.incoming;
     if (!incoming || incoming.id !== transferId) return;
     if (!this.store) {
-      this.reject(transferId, 'нет OPFS');
+      this.reject(transferId, filePipeCopy.noOpfs);
       return;
     }
     const resume = this.resumeCursor;
@@ -490,7 +491,7 @@ export class FilePipe extends EventEmitter {
       ? await this.config.estimate()
       : await estimateQuota();
     if (estimate && remaining > estimate.free) {
-      this.reject(transferId, 'нет места');
+      this.reject(transferId, filePipeCopy.noSpace);
       return;
     }
     const persist = this.config.persist ?? requestPersist;
@@ -524,11 +525,11 @@ export class FilePipe extends EventEmitter {
 
   async startSend(file: File, extra?: { folderId: string; path: string }) {
     if (this.active || this.incoming || this.incomingFolder) {
-      this.emit('error', 'Уже идёт передача');
+      this.emit('error', filePipeCopy.transferInProgress);
       return;
     }
     if (isOpen(this.activeFolder) && !extra) {
-      this.emit('error', 'Уже идёт передача');
+      this.emit('error', filePipeCopy.transferInProgress);
       return;
     }
     const maxSize = this.config.maxSize ?? MAX_FILE_BYTES;
@@ -537,15 +538,15 @@ export class FilePipe extends EventEmitter {
       : fileBaseName(file.name);
     const name = fileBaseName(path ?? file.name);
     if (!path) {
-      this.emit('error', 'Недопустимый путь');
+      this.emit('error', filePipeCopy.invalidPath);
       return;
     }
     if (file.size > maxSize) {
-      this.emit('error', 'Файл больше лимита');
+      this.emit('error', filePipeCopy.fileOverLimit);
       return;
     }
     if (!isSafeName(name)) {
-      this.emit('error', 'Недопустимое имя файла');
+      this.emit('error', filePipeCopy.invalidFileName);
       return;
     }
     const chunkSize = this.config.chunkSize ?? CHUNK_SIZE_BYTES;
@@ -578,17 +579,17 @@ export class FilePipe extends EventEmitter {
 
   async startFolder(entries: PickedFile[]) {
     if (this.busy()) {
-      this.emit('error', 'Уже идёт передача');
+      this.emit('error', filePipeCopy.transferInProgress);
       return;
     }
     const maxFiles = this.config.maxFiles ?? MAX_FOLDER_FILES;
     const maxSize = this.config.maxSize ?? MAX_FILE_BYTES;
     if (entries.length === 0) {
-      this.emit('error', 'Папка пуста');
+      this.emit('error', filePipeCopy.folderEmpty);
       return;
     }
     if (entries.length > maxFiles) {
-      this.emit('error', 'Слишком много файлов в папке');
+      this.emit('error', filePipeCopy.tooManyFolderFiles);
       return;
     }
     const files = [];
@@ -597,11 +598,11 @@ export class FilePipe extends EventEmitter {
     for (const entry of entries) {
       const path = normalizeRelativePath(entry.path);
       if (!path) {
-        this.emit('error', 'Недопустимый путь в папке');
+        this.emit('error', filePipeCopy.invalidFolderPath);
         return;
       }
       if (entry.file.size > maxSize) {
-        this.emit('error', 'Файл в папке больше лимита');
+        this.emit('error', filePipeCopy.folderFileOverLimit);
         return;
       }
       totalSize += entry.file.size;

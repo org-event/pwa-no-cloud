@@ -1,3 +1,4 @@
+import { sharePackCopy } from '@/content/index.ts';
 import { parseIceServersJson } from './ice-draft.ts';
 import type { CustomServerDraft, SignalingKind } from './types.ts';
 
@@ -35,17 +36,17 @@ export const decodeSharePack = (
 ): { ok: true; value: CustomServerDraft } | { ok: false; message: string } => {
   const raw = text.trim();
   if (!raw.startsWith(SHARE_PACK_PREFIX)) {
-    return { ok: false, message: 'Это не пакет серверов NoCloud' };
+    return { ok: false, message: sharePackCopy.notPack };
   }
   try {
     const parsed = JSON.parse(raw.slice(SHARE_PACK_PREFIX.length)) as unknown;
     const draft = parseShareDraft(parsed);
     if (!draft) {
-      return { ok: false, message: 'Пакет серверов сломан' };
+      return { ok: false, message: sharePackCopy.broken };
     }
     return { ok: true, value: draft };
   } catch {
-    return { ok: false, message: 'Не удалось прочитать пакет серверов' };
+    return { ok: false, message: sharePackCopy.unreadable };
   }
 };
 

@@ -1,4 +1,5 @@
-import type { AppSection } from '../ui/sections.ts';
+import { appLinkCopy } from '@/content/index.ts';
+import type { AppSection } from '@/ui/sections.ts';
 
 export const APP_PROTOCOL = 'web+nocloud';
 
@@ -178,9 +179,5 @@ export const shareMessage = (
   httpsLink: string,
   protocolLink: string,
 ): string => {
-  return (
-    `NoCloud — открой ссылку в браузере или в установленном приложении:\n` +
-    `${httpsLink}\n\n` +
-    `Если PWA уже стоит (Chrome/Android): ${protocolLink}`
-  );
+  return appLinkCopy.shareMessage(httpsLink, protocolLink);
 };

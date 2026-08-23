@@ -1,5 +1,6 @@
+import { signalingLibCopy } from '@/content/index.ts';
 import { decodeInvite, encodeInvite } from './invite.ts';
-import type { CustomServerDraft } from '../../config/types.ts';
+import type { CustomServerDraft } from '@/config/types.ts';
 import type { SignalingPort, SignalMessage, SignalResult } from './port.ts';
 
 export type ManualPort = SignalingPort & {
@@ -44,7 +45,7 @@ export const createManualPort = (): ManualPort => {
         return {
           ok: false,
           code: 'invite-self',
-          message: 'Это своё приглашение, нужен ответ второго окна',
+          message: signalingLibCopy.ownInviteNeedsAnswer,
         };
       }
       for (const listener of listeners) await listener(parsed.value.message);

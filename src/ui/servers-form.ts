@@ -2,17 +2,10 @@ import {
   draftIceServersFromText,
   parseIceServersJson,
   splitIceServers,
-} from '../config/ice-draft.ts';
-import type { CustomServerDraft, SignalingKind } from '../config/types.ts';
-
-export const SIGNALING_KIND_OPTIONS: { id: SignalingKind; title: string }[] = [
-  { id: 'manual', title: 'Вручную (QR / текст)' },
-  { id: 'http-poll', title: 'HTTP poll' },
-  { id: 'websocket', title: 'WebSocket' },
-];
+} from '@/config/ice-draft.ts';
+import type { CustomServerDraft } from '@/config/types.ts';
 
 export const readCustomDraft = (input: {
-  kind: SignalingKind;
   signalingUrl: string;
   stun: string;
   turnUrl: string;
@@ -31,20 +24,17 @@ export const readCustomDraft = (input: {
           username: input.turnUser,
           credential: input.turnPass,
         });
-  const signaling = { kind: input.kind };
-  if (signaling.kind !== 'manual') {
-    return {
-      signaling: { ...signaling, url: input.signalingUrl.trim() },
-      iceServers,
-    };
-  }
-  return { signaling, iceServers };
+  const url = input.signalingUrl.trim();
+  if (!url) return { signaling: { kind: 'manual' }, iceServers };
+  return {
+    signaling: { kind: 'websocket', url },
+    iceServers,
+  };
 };
 
 export const customDraftToForm = (draft: CustomServerDraft) => {
   const ice = splitIceServers(draft.iceServers);
   return {
-    kind: draft.signaling.kind,
     signalingUrl: draft.signaling.url ?? '',
     stun: ice.stun.join('\n'),
     turnUrl: ice.turn.join('\n'),

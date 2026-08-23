@@ -1,22 +1,35 @@
 <script setup lang="ts">
+import { componentsCopy, transferCopy } from '@/content/index.ts';
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import {
   collectFromDirectory,
+  collectFromDrop,
   collectFromFileList,
-} from '../lib/folder-walk.ts';
-import { useNocloudStore } from '../stores/nocloud.ts';
+} from '@/lib/folder-walk.ts';
+import { useNocloudStore } from '@/stores/nocloud.ts';
 import {
   fileStatus,
+  folderPercent,
   folderStatus,
+  formatSizeLabel,
   isOpenFolder,
-} from '../ui/transfer-status.ts';
+  transferBytes,
+  transferPercent,
+} from '@/ui/transfer-status.ts';
+import AvatarImg from './AvatarImg.vue';
+import Card from './Card.vue';
+import ContactRow from './ContactRow.vue';
+import PendingPeer from './PendingPeer.vue';
 
 const store = useNocloudStore();
-const { transfer } = storeToRefs(store);
+const { contacts, transfer, state } = storeToRefs(store);
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const folderInput = ref<HTMLInputElement | null>(null);
+const dragging = ref(false);
+
+const copy = componentsCopy.transfer;
 
 const incomingFile = computed(() => {
   const incoming = transfer.value.incoming;
@@ -48,40 +61,100 @@ const busy = computed(
     transfer.value.folder?.state === 'receiving',
 );
 
-const paused = computed(() => transfer.value.current?.state === 'paused');
+const stagedFiles = computed(() => transfer.value.queuedItems);
 
-const statusText = computed(() => {
+const stagedFolder = computed(() => {
+  if (!transfer.value.queuedFolderName) return null;
+  return {
+    name: transfer.value.queuedFolderName,
+    count: transfer.value.queuedFolderCount,
+    bytes: transfer.value.queuedFolderBytes,
+  };
+});
+
+const hasStaged = computed(
+  () => stagedFiles.value.length > 0 || Boolean(stagedFolder.value),
+);
+
+const canSend = computed(
+  () =>
+    hasStaged.value &&
+    state.value.selectedContactIds.length > 0 &&
+    !blocked.value,
+);
+
+const isOnline = (id: string) =>
+  Boolean(contacts.value.connected && contacts.value.livePeerId === id);
+
+const sortedContacts = computed(() => {
+  const list = [...contacts.value.book.contacts];
+  list.sort((a, b) => Number(isOnline(b.id)) - Number(isOnline(a.id)));
+  return list;
+});
+
+const progress = computed(() => {
   const shownFolder = transfer.value.incomingFolder ?? transfer.value.folder;
   const shownFile = incomingFile.value ?? transfer.value.current;
-  if (shownFolder) return folderStatus(shownFolder, shownFile);
-  if (shownFile) return fileStatus(shownFile);
-  if (transfer.value.queuedNames.length > 0) {
-    return `в очереди: ${transfer.value.queuedNames.join(', ')} — уйдёт после соединения`;
+  if (shownFolder && !shownFile) {
+    const percent = folderPercent(shownFolder);
+    return {
+      percent,
+      label: transferCopy.progressLabel(
+        percent,
+        formatSizeLabel(
+          shownFolder.files
+            .slice(0, shownFolder.index)
+            .reduce((sum, file) => sum + file.size, 0),
+        ),
+        formatSizeLabel(shownFolder.totalSize),
+      ),
+      status: folderStatus(shownFolder, null),
+    };
   }
-  if (!transfer.value.connected) {
-    return 'файл можно выбрать сейчас — уйдёт после соединения';
+  if (shownFile) {
+    const bytes = transferBytes(shownFile);
+    const percent = transferPercent(shownFile);
+    const status = shownFolder
+      ? folderStatus(shownFolder, shownFile)
+      : fileStatus(shownFile);
+    return {
+      percent,
+      label: transferCopy.progressLabel(
+        percent,
+        formatSizeLabel(bytes.done),
+        formatSizeLabel(bytes.total),
+      ),
+      status,
+    };
   }
-  return '';
+  return null;
 });
+
+const stageFiles = (files: File[]) => {
+  if (files.length === 0) return;
+  store.onPickFiles(files);
+};
 
 const onPickFile = (event: Event) => {
   const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
+  const files = input.files ? Array.from(input.files) : [];
   input.value = '';
-  if (file) store.onPickFile(file);
+  if (files.length === 0) return;
+  stageFiles(files);
 };
 
 const onPickFolderLegacy = (event: Event) => {
   const input = event.target as HTMLInputElement;
-  const files = input.files;
+  const files = input.files ? Array.from(input.files) : [];
   input.value = '';
-  if (!files || files.length === 0) return;
+  if (files.length === 0) return;
   const walked = collectFromFileList(files);
   if (!walked.ok) {
     store.onPickError(walked.message);
     return;
   }
-  store.onPickFolder(walked.value);
+  const label = walked.value[0]?.path.split('/')[0] || '';
+  store.onPickFolder(walked.value, label);
 };
 
 const pickDirectory = async () => {
@@ -94,13 +167,29 @@ const pickDirectory = async () => {
         store.onPickError(walked.message);
         return;
       }
-      store.onPickFolder(walked.value);
+      store.onPickFolder(walked.value, handle.name);
       return;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
     }
   }
   folderInput.value?.click();
+};
+
+const onDrop = async (event: DragEvent) => {
+  dragging.value = false;
+  event.preventDefault();
+  if (blocked.value) return;
+  const walked = await collectFromDrop(event.dataTransfer);
+  if (!walked.ok) {
+    store.onPickError(walked.message);
+    return;
+  }
+  if (walked.folderName) {
+    store.onPickFolder(walked.value, walked.folderName);
+    return;
+  }
+  stageFiles(walked.value.map((item) => item.file));
 };
 
 const acceptIncoming = () => {
@@ -121,13 +210,19 @@ const rejectIncoming = () => {
 </script>
 
 <template>
-  <fieldset class="panel">
-    <legend>Файлы</legend>
+  <div class="card-stack">
+    <PendingPeer
+      :card="contacts.pending"
+      @accept="store.onAcceptPending()"
+      @skip="store.onSkipPending()"
+    />
+
     <input
       ref="fileInput"
       type="file"
       class="file-input"
-      aria-label="Выбрать файл для отправки"
+      multiple
+      :aria-label="copy.pickFileAria"
       @change="onPickFile"
     />
     <input
@@ -137,72 +232,170 @@ const rejectIncoming = () => {
       multiple
       webkitdirectory
       directory
-      aria-label="Выбрать папку для отправки"
+      :aria-label="copy.pickFolderAria"
       @change="onPickFolderLegacy"
     />
-    <div class="home-actions">
-      <button
-        type="button"
-        class="button button-accent"
-        :disabled="blocked"
-        @click="fileInput?.click()"
+
+    <Card :title="copy.filesLegend">
+      <div
+        class="transfer-drop"
+        :data-dragging="String(dragging)"
+        :data-blocked="String(blocked)"
+        @dragenter.prevent="dragging = true"
+        @dragover.prevent="dragging = true"
+        @dragleave.prevent="dragging = false"
+        @drop="onDrop"
       >
-        {{ transfer.connected ? 'Отправить файл' : 'Выбрать файл' }}
-      </button>
-      <button
-        type="button"
-        class="button"
-        :disabled="blocked"
-        @click="pickDirectory()"
+        <div class="home-actions">
+          <button
+            type="button"
+            class="button"
+            :disabled="blocked"
+            @click="fileInput?.click()"
+          >
+            {{ copy.pickFiles }}
+          </button>
+          <button
+            type="button"
+            class="button"
+            :disabled="blocked"
+            @click="pickDirectory()"
+          >
+            {{ copy.pickFolder }}
+          </button>
+        </div>
+      </div>
+
+      <p v-if="!hasStaged" class="tagline">{{ copy.filesEmpty }}</p>
+
+      <ul v-else class="transfer-staged" aria-live="polite">
+        <li
+          v-if="stagedFolder"
+          class="transfer-staged-item transfer-staged-folder"
+        >
+          <span class="transfer-staged-name">{{ stagedFolder.name }}</span>
+          <span class="tagline">
+            {{ copy.folderFiles(stagedFolder.count) }} ·
+            {{ formatSizeLabel(stagedFolder.bytes) }}
+          </span>
+        </li>
+        <template v-else>
+          <li
+            v-for="item in stagedFiles"
+            :key="item.key"
+            class="transfer-staged-item"
+          >
+            <span class="transfer-staged-name">{{ item.name }}</span>
+            <span class="tagline">{{ formatSizeLabel(item.size) }}</span>
+          </li>
+        </template>
+      </ul>
+
+      <template #actions>
+        <button
+          v-if="hasStaged"
+          type="button"
+          class="button button-secondary"
+          :disabled="blocked"
+          @click="store.onClearStaged()"
+        >
+          {{ copy.clear }}
+        </button>
+      </template>
+    </Card>
+
+    <Card :title="copy.toLegend">
+      <div class="contact-list">
+        <p v-if="contacts.book.contacts.length === 0" class="tagline">
+          {{ copy.bookEmpty }}
+        </p>
+        <label
+          v-for="contact in sortedContacts"
+          :key="contact.id"
+          class="choice transfer-to"
+        >
+          <input
+            type="radio"
+            name="transfer-to"
+            :checked="state.selectedContactIds[0] === contact.id"
+            :disabled="blocked"
+            @change="store.onSelectContact(contact.id)"
+          />
+          <ContactRow
+            :name="contact.nick"
+            :detail="isOnline(contact.id) ? copy.online : copy.offline"
+            :online="isOnline(contact.id)"
+            :online-label="copy.online"
+            :offline-label="copy.offline"
+          >
+            <template #leading>
+              <AvatarImg :id="contact.id" :avatar="contact.avatar" />
+            </template>
+          </ContactRow>
+        </label>
+      </div>
+
+      <template #actions>
+        <button
+          type="button"
+          class="button button-accent"
+          :disabled="!canSend"
+          @click="store.onSendTransfer()"
+        >
+          {{ copy.send }}
+        </button>
+        <button
+          v-show="needAccept"
+          type="button"
+          class="button"
+          @click="acceptIncoming"
+        >
+          {{ transfer.incomingFolder ? copy.acceptFolder : copy.acceptFile }}
+        </button>
+        <button
+          v-show="needAccept"
+          type="button"
+          class="button button-secondary"
+          @click="rejectIncoming"
+        >
+          {{ copy.reject }}
+        </button>
+        <button
+          v-show="busy"
+          type="button"
+          class="button button-secondary"
+          @click="store.onCancelFile()"
+        >
+          {{ copy.cancel }}
+        </button>
+      </template>
+    </Card>
+
+    <Card v-if="progress || transfer.error" :title="copy.progressLegend">
+      <div
+        v-if="progress"
+        class="transfer-progress"
+        role="status"
+        aria-live="polite"
       >
-        {{ transfer.connected ? 'Отправить папку' : 'Выбрать папку' }}
-      </button>
-      <button
-        v-show="needAccept"
-        type="button"
-        class="button"
-        @click="acceptIncoming"
-      >
-        {{ transfer.incomingFolder ? 'Принять папку' : 'Принять файл' }}
-      </button>
-      <button
-        v-show="needAccept"
-        type="button"
-        class="button button-secondary"
-        @click="rejectIncoming"
-      >
-        Отклонить
-      </button>
-      <button
-        v-show="busy"
-        type="button"
-        class="button button-secondary"
-        @click="store.onPauseFile()"
-      >
-        Пауза
-      </button>
-      <button
-        v-show="paused"
-        type="button"
-        class="button"
-        @click="store.onResumeFile()"
-      >
-        Продолжить
-      </button>
-      <button
-        v-show="busy || paused"
-        type="button"
-        class="button button-secondary"
-        @click="store.onCancelFile()"
-      >
-        Отменить
-      </button>
-    </div>
-    <p v-if="statusText" class="tagline" role="status" aria-live="polite">
-      {{ statusText }}
-    </p>
-    <p v-if="transfer.error" class="error" role="alert">
-      {{ transfer.error }}
-    </p>
-  </fieldset>
+        <p class="tagline">{{ progress.status }}</p>
+        <div
+          class="transfer-progress-track"
+          role="progressbar"
+          :aria-valuenow="progress.percent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          <div
+            class="transfer-progress-fill"
+            :style="{ width: `${progress.percent}%` }"
+          />
+        </div>
+        <p class="tagline">{{ progress.label }}</p>
+      </div>
+      <p v-if="transfer.error" class="error" role="alert">
+        {{ transfer.error }}
+      </p>
+    </Card>
+  </div>
 </template>

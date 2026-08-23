@@ -3,7 +3,7 @@ import {
   parseProfileCard,
   sanitizeNick,
   type ProfileCard,
-} from '../domain/profile.ts';
+} from '@/domain/profile.ts';
 import type { IdStorage } from './id.ts';
 import { getClientId } from './id.ts';
 

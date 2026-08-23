@@ -1,3 +1,4 @@
+import { configCopy } from '@/content/index.ts';
 import {
   DEFAULT_PRESET_ID,
   EMPTY_CUSTOM,
@@ -14,32 +15,32 @@ const localStun = `stun:127.0.0.1:${LOCAL_STUN_PORT}`;
 export const SERVER_PRESETS: ServerPreset[] = [
   {
     id: 'manual-only',
-    title: 'Вручную + STUN Google',
+    title: configCopy.presetManualGoogle,
     signaling: { kind: 'manual' },
     iceServers: [{ urls: GOOGLE_STUN }],
   },
   {
     id: 'local-dev',
-    title: 'Локальный dev',
+    title: configCopy.presetLocalDev,
     signaling: { kind: 'http-poll', url: localHttp },
     iceServers: [{ urls: localStun }],
   },
   {
     id: 'lan',
-    title: 'Локальная сеть',
+    title: configCopy.presetLan,
     signaling: { kind: 'http-poll', url: localHttp },
     iceServers: [{ urls: localStun }],
     // Note: url is this device's localhost — for phone+PC use S1 on VPS instead.
   },
   {
     id: 'google-stun',
-    title: 'Интернет: STUN Google (без TURN)',
+    title: configCopy.presetGoogleStun,
     signaling: { kind: 'manual' },
     iceServers: [{ urls: [GOOGLE_STUN, GOOGLE_STUN_BACKUP] }],
   },
   {
     id: 'custom',
-    title: 'Свой сервер',
+    title: configCopy.presetCustom,
     signaling: EMPTY_CUSTOM.signaling,
     iceServers: [],
   },
@@ -73,7 +74,7 @@ export const createLanPreset = (origin: string): ServerPreset => {
   const stunUrl = `stun:${host}:${LOCAL_STUN_PORT}`;
   return {
     id: 'lan',
-    title: 'Локальная сеть',
+    title: configCopy.presetLan,
     signaling: { kind: 'http-poll', url: origin },
     iceServers: [{ urls: stunUrl }],
   };

@@ -1,5 +1,5 @@
-import type { TurnHostDraft } from '../domain/turn-host.ts';
-import { EMPTY_TURN_HOST, validateTurnHost } from '../domain/turn-host.ts';
+import type { TurnHostDraft } from '@/domain/turn-host.ts';
+import { EMPTY_TURN_HOST, validateTurnHost } from '@/domain/turn-host.ts';
 import type { OpfsResult, OpfsStore } from './opfs.ts';
 import { readText, writeFile } from './opfs.ts';
 

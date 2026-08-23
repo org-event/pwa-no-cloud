@@ -1,3 +1,5 @@
+import { notifyCopy } from '@/content/index.ts';
+
 export const requestNotifyPermission = async (): Promise<boolean> => {
   if (typeof Notification === 'undefined') return false;
   if (Notification.permission === 'granted') return true;
@@ -13,7 +15,7 @@ export const requestNotifyPermission = async (): Promise<boolean> => {
 export const notifyFileReceived = async (name: string): Promise<boolean> => {
   if (typeof Notification === 'undefined') return false;
   if (Notification.permission !== 'granted') return false;
-  const title = 'Файл получен';
+  const title = notifyCopy.fileReceived;
   const body = name;
   try {
     if (navigator.serviceWorker) {

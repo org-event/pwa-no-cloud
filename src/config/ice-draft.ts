@@ -1,3 +1,4 @@
+import { configCopy } from '@/content/index.ts';
 import { listIceUrls, sortIceUrls } from './ice-urls.ts';
 import { isTurnUrl } from './merge.ts';
 import type { IceServerConfig } from './types.ts';
@@ -93,7 +94,7 @@ export const parseIceServersJson = (
     if (!Array.isArray(list) || list.length === 0) {
       return {
         ok: false,
-        message: 'iceServers JSON должен быть непустым массивом',
+        message: configCopy.iceJsonEmpty,
       };
     }
     const servers: IceServerConfig[] = [];
@@ -101,7 +102,7 @@ export const parseIceServersJson = (
       if (!isIceServer(item)) {
         return {
           ok: false,
-          message: 'В iceServers JSON есть некорректная запись',
+          message: configCopy.iceJsonInvalidEntry,
         };
       }
       servers.push({
@@ -112,6 +113,6 @@ export const parseIceServersJson = (
     }
     return { ok: true, value: servers };
   } catch {
-    return { ok: false, message: 'Не удалось прочитать iceServers JSON' };
+    return { ok: false, message: configCopy.iceJsonUnreadable };
   }
 };

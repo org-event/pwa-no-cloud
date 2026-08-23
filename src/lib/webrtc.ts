@@ -1,6 +1,6 @@
-import { DATA_CHANNELS } from '../config/defaults.ts';
-import { orderIceServersForBrowser } from '../config/ice-urls.ts';
-import type { IceServerConfig } from '../config/types.ts';
+import { DATA_CHANNELS } from '@/config/defaults.ts';
+import { orderIceServersForBrowser } from '@/config/ice-urls.ts';
+import type { IceServerConfig } from '@/config/types.ts';
 import { pathsFromSdp } from './ice.ts';
 
 const ICE_TIMEOUT_MS = 8000;

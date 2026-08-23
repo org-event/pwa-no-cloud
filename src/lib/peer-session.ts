@@ -1,15 +1,16 @@
-import { iceServersHaveStun, iceServersHaveTurn } from '../config/merge.ts';
-import { CHANNEL_BUFFER_HIGH, DATA_CHANNELS } from '../config/defaults.ts';
-import { explainIceFailure } from '../domain/ice-fail.ts';
-import type { IceServerConfig, CustomServerDraft } from '../config/types.ts';
-import { parseProfileCard, type ProfileCard } from '../domain/profile.ts';
+import { peerSessionCopy } from '@/content/index.ts';
+import { iceServersHaveStun, iceServersHaveTurn } from '@/config/merge.ts';
+import { CHANNEL_BUFFER_HIGH, DATA_CHANNELS } from '@/config/defaults.ts';
+import { explainIceFailure } from '@/domain/ice-fail.ts';
+import type { IceServerConfig, CustomServerDraft } from '@/config/types.ts';
+import { parseProfileCard, type ProfileCard } from '@/domain/profile.ts';
 import {
   applySessionEvent,
   createIdleSession,
   type Session,
   type SessionEvent,
   type SessionState,
-} from '../domain/session.ts';
+} from '@/domain/session.ts';
 import { EventEmitter } from './events.ts';
 import { FilePipe, type DataSink } from './file-pipe.ts';
 import type { PickedFile } from './folder-walk.ts';
@@ -66,6 +67,11 @@ export class PeerSession extends EventEmitter {
   store: OpfsStore | null = null;
   peerId = '';
   pendingCandidates: IceCandidateInit[] = [];
+  /** Meet/room flow: rejoin after lock, ICE drop, or channel close. */
+  roomId = '';
+  keepRoom = false;
+  recoverTimer: ReturnType<typeof setTimeout> | null = null;
+  recovering = false;
 
   get state(): SessionState {
     return this.session.state;
@@ -100,11 +106,14 @@ export class PeerSession extends EventEmitter {
       await this.offerTo('*');
       this.emit('invite');
     } catch (err) {
-      this.fail(errorMessage(err, 'Не удалось создать приглашение'));
+      this.fail(errorMessage(err, peerSessionCopy.inviteCreateFailed));
     }
   }
 
   async enterRoom(roomId: string) {
+    this.keepRoom = true;
+    this.roomId = roomId;
+    this.cancelRecover();
     this.reset();
     this.apply({ type: 'start' });
     const signaling = this.config.signaling;
@@ -124,7 +133,59 @@ export class PeerSession extends EventEmitter {
       if (this.session.state === 'idle' || this.session.state === 'closed') {
         return;
       }
-      this.fail(errorMessage(err, 'Не удалось войти в комнату'));
+      if (this.keepRoom && this.roomId) {
+        this.scheduleRecover('enter-failed', 1_200);
+        return;
+      }
+      this.fail(errorMessage(err, peerSessionCopy.roomEnterFailed));
+    }
+  }
+
+  /** After phone unlock / network back: rejoin room if the channel dropped. */
+  resumeRoom() {
+    if (!this.keepRoom || !this.roomId) return;
+    if (this.session.state === 'connected') return;
+    if (
+      this.session.state === 'signaling' ||
+      this.session.state === 'connecting'
+    ) {
+      // Signaling socket may be dead while session still looks busy.
+      this.scheduleRecover('resume', 200);
+      return;
+    }
+    this.scheduleRecover('resume', 0);
+  }
+
+  cancelRecover() {
+    if (this.recoverTimer) clearTimeout(this.recoverTimer);
+    this.recoverTimer = null;
+  }
+
+  scheduleRecover(reason: string, delayMs: number) {
+    if (!this.keepRoom || !this.roomId) return;
+    if (this.recoverTimer) return;
+    this.recoverTimer = setTimeout(() => {
+      this.recoverTimer = null;
+      void this.recoverRoom(reason);
+    }, delayMs);
+  }
+
+  async recoverRoom(reason: string) {
+    if (!this.keepRoom || !this.roomId || this.recovering) return;
+    // ICE can fail while session still says connected — still rejoin.
+    if (
+      this.session.state === 'connected' &&
+      this.links?.control?.readyState === 'open'
+    ) {
+      return;
+    }
+    this.recovering = true;
+    const room = this.roomId;
+    this.emit('recover', reason);
+    try {
+      await this.enterRoom(room);
+    } finally {
+      this.recovering = false;
     }
   }
 
@@ -164,7 +225,7 @@ export class PeerSession extends EventEmitter {
       const failed = {
         ok: false as const,
         code: 'no-accept',
-        message: 'Этот signaling не принимает текст',
+        message: peerSessionCopy.signalingNoText,
       };
       this.fail(failed.message);
       return failed;
@@ -184,7 +245,7 @@ export class PeerSession extends EventEmitter {
       const failed = {
         ok: false as const,
         code: 'no-accept',
-        message: 'Этот signaling не принимает текст',
+        message: peerSessionCopy.signalingNoText,
       };
       this.fail(failed.message);
       return failed;
@@ -260,6 +321,9 @@ export class PeerSession extends EventEmitter {
   }
 
   close() {
+    this.keepRoom = false;
+    this.roomId = '';
+    this.cancelRecover();
     this.waitGen += 1;
     if (this.waitTimer) clearTimeout(this.waitTimer);
     this.waitTimer = null;
@@ -281,6 +345,7 @@ export class PeerSession extends EventEmitter {
   }
 
   reset() {
+    this.cancelRecover();
     this.waitGen += 1;
     if (this.waitTimer) clearTimeout(this.waitTimer);
     this.waitTimer = null;
@@ -304,7 +369,7 @@ export class PeerSession extends EventEmitter {
   async waitPeer() {
     const gen = this.waitGen;
     if (!this.config.signaling.listPeers) {
-      throw new Error('Нет списка пиров');
+      throw new Error(peerSessionCopy.noPeerList);
     }
     while (gen === this.waitGen) {
       if (
@@ -312,14 +377,14 @@ export class PeerSession extends EventEmitter {
         this.session.state === 'closed' ||
         this.session.state === 'idle'
       ) {
-        throw new Error('Сессия закрыта');
+        throw new Error(peerSessionCopy.sessionClosed);
       }
       const peers = await this.config.signaling.listPeers();
-      if (gen !== this.waitGen) throw new Error('Сессия закрыта');
+      if (gen !== this.waitGen) throw new Error(peerSessionCopy.sessionClosed);
       if (peers[0]) return peers[0];
       await this.sleep(800);
     }
-    throw new Error('Сессия закрыта');
+    throw new Error(peerSessionCopy.sessionClosed);
   }
 
   sleep(ms: number) {
@@ -369,7 +434,7 @@ export class PeerSession extends EventEmitter {
   async handleOffer(message: SignalMessage) {
     const payload = message.data.payload as { sdp?: string };
     if (!payload.sdp) {
-      this.fail('В приглашении нет SDP');
+      this.fail(peerSessionCopy.inviteNoSdp);
       return;
     }
     try {
@@ -405,7 +470,7 @@ export class PeerSession extends EventEmitter {
       });
       this.emit('invite');
     } catch (err) {
-      this.fail(errorMessage(err, 'Не удалось ответить на приглашение'));
+      this.fail(errorMessage(err, peerSessionCopy.inviteAnswerFailed));
     }
   }
 
@@ -413,7 +478,7 @@ export class PeerSession extends EventEmitter {
     const pc = this.links?.pc;
     const payload = message.data.payload as { sdp?: string };
     if (!pc || !payload.sdp) {
-      this.fail('Нет соединения или SDP ответа');
+      this.fail(peerSessionCopy.noConnectionOrSdp);
       return;
     }
     try {
@@ -423,7 +488,7 @@ export class PeerSession extends EventEmitter {
       await this.flushCandidates();
       this.apply({ type: 'remote-ready' });
     } catch (err) {
-      this.fail(errorMessage(err, 'Не удалось принять ответ'));
+      this.fail(errorMessage(err, peerSessionCopy.acceptAnswerFailed));
     }
   }
 
@@ -495,7 +560,19 @@ export class PeerSession extends EventEmitter {
       this.ice = { ...this.ice, connectionState: pc.connectionState };
       this.emit('ice', this.ice);
       void this.pullSelected();
-      if (pc.connectionState === 'failed') this.failIce();
+      if (pc.connectionState === 'connected') this.cancelRecover();
+      if (pc.connectionState === 'failed') {
+        if (this.keepRoom && this.roomId) {
+          this.scheduleRecover('ice-failed', 600);
+        } else {
+          this.failIce();
+        }
+      }
+      if (pc.connectionState === 'disconnected') {
+        if (this.keepRoom && this.roomId) {
+          this.scheduleRecover('ice-disconnected', 4_000);
+        }
+      }
       if (pc.connectionState === 'closed') this.apply({ type: 'close' });
     };
   }
@@ -546,7 +623,11 @@ export class PeerSession extends EventEmitter {
       this.emit('channel-open');
     };
     channel.onclose = () => {
-      if (this.session.state === 'connected') this.apply({ type: 'close' });
+      if (this.session.state !== 'connected') return;
+      this.apply({ type: 'close' });
+      if (this.keepRoom && this.roomId) {
+        this.scheduleRecover('channel-close', 400);
+      }
     };
     channel.onmessage = (event) => {
       this.onControl(String(event.data));
@@ -635,7 +716,7 @@ export class PeerSession extends EventEmitter {
         this.emit('pong', this.lastPongMs);
       }
     } catch {
-      this.emit('error', 'Сломан control-кадр');
+      this.emit('error', peerSessionCopy.brokenControlFrame);
     }
   }
 }

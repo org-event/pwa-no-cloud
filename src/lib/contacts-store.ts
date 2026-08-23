@@ -1,9 +1,8 @@
 import {
-  EMPTY_BOOK,
   parseProfileCard,
   type AddressBook,
   type ContactGroup,
-} from '../domain/profile.ts';
+} from '@/domain/profile.ts';
 import { generateId } from './id.ts';
 import type { OpfsResult, OpfsStore } from './opfs.ts';
 import { readText, writeFile } from './opfs.ts';
@@ -16,7 +15,8 @@ const parseBook = (raw: string): AddressBook => {
       contacts?: unknown;
       groups?: unknown;
     };
-    if (!data || !Array.isArray(data.contacts)) return { ...EMPTY_BOOK };
+    if (!data || !Array.isArray(data.contacts))
+      return { contacts: [], groups: [] };
     const contacts = [];
     for (const item of data.contacts) {
       if (!item || typeof item !== 'object') continue;
@@ -62,7 +62,7 @@ const parseBook = (raw: string): AddressBook => {
     }
     return { contacts, groups };
   } catch {
-    return { ...EMPTY_BOOK };
+    return { contacts: [], groups: [] };
   }
 };
 
@@ -70,7 +70,7 @@ export const loadAddressBook = async (
   store: OpfsStore,
 ): Promise<AddressBook> => {
   const text = await readText(store.secrets, CONTACTS_FILE);
-  if (!text.ok) return { ...EMPTY_BOOK };
+  if (!text.ok) return { contacts: [], groups: [] };
   return parseBook(text.value);
 };
 

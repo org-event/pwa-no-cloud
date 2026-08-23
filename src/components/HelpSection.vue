@@ -1,31 +1,24 @@
 <script setup lang="ts">
-import { HELP_TOPICS } from '../content/help-topics.ts';
+import { HELP_TOPICS, componentsCopy } from '@/content/index.ts';
+import Card from './Card.vue';
+
+const copy = componentsCopy.help;
 </script>
 
 <template>
-  <fieldset class="panel">
-    <legend>Справка</legend>
-    <p class="tagline">
-      Коротко по разделам меню и кнопкам. Ссылки внутри открывают нужный экран.
-    </p>
-  </fieldset>
-
-  <fieldset
-    v-for="topic in HELP_TOPICS"
-    :id="`help-${topic.id}`"
-    :key="topic.id"
-    class="panel"
-  >
-    <legend>
-      <a v-if="topic.href" :href="topic.href">{{ topic.title }}</a>
-      <template v-else>{{ topic.title }}</template>
-    </legend>
-    <p class="tagline">{{ topic.lead }}</p>
-    <dl class="help-list">
-      <template v-for="item in topic.items" :key="item.name">
-        <dt>{{ item.name }}</dt>
-        <dd>{{ item.text }}</dd>
-      </template>
-    </dl>
-  </fieldset>
+  <Card class="help-topics" :title="copy.legend" :hint="copy.hint">
+    <article v-for="topic in HELP_TOPICS" :key="topic.id" class="help-topic">
+      <h2>
+        <a v-if="topic.href" :href="topic.href">{{ topic.title }}</a>
+        <span v-else>{{ topic.title }}</span>
+      </h2>
+      <p class="tagline">{{ topic.lead }}</p>
+      <dl>
+        <div v-for="item in topic.items" :key="item.name">
+          <dt>{{ item.name }}</dt>
+          <dd>{{ item.text }}</dd>
+        </div>
+      </dl>
+    </article>
+  </Card>
 </template>

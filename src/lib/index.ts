@@ -3,6 +3,7 @@ export { EventEmitter } from './events.ts';
 export { generateId, getClientId } from './id.ts';
 export {
   appendLog,
+  clearAppLog,
   listInbox,
   openStore,
   readInboxFile,

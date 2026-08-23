@@ -1,7 +1,7 @@
 import type { Plugin } from 'vite-plus';
-import { collectShellAssets, createWorkerSource } from './cache.ts';
+import { collectShellAssets, fillWorkerSource } from './cache.ts';
 
-export const shellWorker = (version = 'unknown'): Plugin => {
+export const shellWorker = (version = 'unknown', template: string): Plugin => {
   let base = '/';
   return {
     name: 'nocloud-shell-worker',
@@ -21,7 +21,7 @@ export const shellWorker = (version = 'unknown'): Plugin => {
       this.emitFile({
         type: 'asset',
         fileName: 'sw.js',
-        source: createWorkerSource(assets, base),
+        source: fillWorkerSource(template, assets, base),
       });
     },
   };

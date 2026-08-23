@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Card from './Card.vue';
+
 defineProps<{
   title: string;
   text: string;
@@ -6,8 +8,5 @@ defineProps<{
 </script>
 
 <template>
-  <fieldset class="panel">
-    <legend>{{ title }}</legend>
-    <p class="tagline">{{ text }}</p>
-  </fieldset>
+  <Card :title="title" :hint="text" />
 </template>

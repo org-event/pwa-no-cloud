@@ -1,3 +1,4 @@
+import { opfsCopy } from '@/content/index.ts';
 import { splitRelativePath } from './folder-path.ts';
 
 export type OpfsError = {
@@ -87,7 +88,7 @@ export const writeFile = async (
   name: string,
   data: string | BufferSource | Blob,
 ): Promise<OpfsResult<true>> => {
-  if (!isSafeName(name)) return fail('unsafe-name', 'Недопустимое имя файла');
+  if (!isSafeName(name)) return fail('unsafe-name', opfsCopy.unsafeFileName);
   try {
     const handle = await dir.getFileHandle(name, { create: true });
     const writable = await handle.createWritable();
@@ -103,7 +104,7 @@ export const readText = async (
   dir: FileSystemDirectoryHandle,
   name: string,
 ): Promise<OpfsResult<string>> => {
-  if (!isSafeName(name)) return fail('unsafe-name', 'Недопустимое имя файла');
+  if (!isSafeName(name)) return fail('unsafe-name', opfsCopy.unsafeFileName);
   try {
     const handle = await dir.getFileHandle(name);
     const file = await handle.getFile();
@@ -117,7 +118,7 @@ export const removeFile = async (
   dir: FileSystemDirectoryHandle,
   name: string,
 ): Promise<OpfsResult<true>> => {
-  if (!isSafeName(name)) return fail('unsafe-name', 'Недопустимое имя файла');
+  if (!isSafeName(name)) return fail('unsafe-name', opfsCopy.unsafeFileName);
   try {
     await dir.removeEntry(name);
     return { ok: true, value: true };
@@ -170,6 +171,22 @@ export const readAppLog = async (
   return text;
 };
 
+export const clearAppLog = async (
+  store: OpfsStore,
+): Promise<OpfsResult<true>> => {
+  try {
+    const handle = await store.logs.getFileHandle(APP_LOG_NAME, {
+      create: true,
+    });
+    const writable = await handle.createWritable();
+    await writable.write('');
+    await writable.close();
+    return { ok: true, value: true };
+  } catch (error) {
+    return asError(error, 'log-failed');
+  }
+};
+
 const openInboxHandle = async (
   store: OpfsStore,
   transferId: string,
@@ -177,17 +194,17 @@ const openInboxHandle = async (
   create: boolean,
 ): Promise<OpfsResult<FileSystemFileHandle>> => {
   if (!isSafeName(transferId)) {
-    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+    return fail('unsafe-name', opfsCopy.unsafeTransferId);
   }
   const segments = splitRelativePath(path);
-  if (!segments) return fail('unsafe-name', 'Недопустимое имя файла');
+  if (!segments) return fail('unsafe-name', opfsCopy.unsafeFileName);
   try {
     let folder = await store.inbox.getDirectoryHandle(transferId, { create });
     const last = segments[segments.length - 1];
-    if (!last) return fail('unsafe-name', 'Недопустимое имя файла');
+    if (!last) return fail('unsafe-name', opfsCopy.unsafeFileName);
     for (let i = 0; i < segments.length - 1; i += 1) {
       const name = segments[i];
-      if (!name) return fail('unsafe-name', 'Недопустимое имя файла');
+      if (!name) return fail('unsafe-name', opfsCopy.unsafeFileName);
       folder = await folder.getDirectoryHandle(name, { create });
     }
     return {
@@ -288,7 +305,7 @@ export const writeTransferCursor = async (
   cursor: TransferCursor,
 ): Promise<OpfsResult<true>> => {
   if (!isSafeName(cursor.id)) {
-    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+    return fail('unsafe-name', opfsCopy.unsafeTransferId);
   }
   return writeFile(
     store.transfers,
@@ -302,7 +319,7 @@ export const removeTransferCursor = async (
   id: string,
 ): Promise<OpfsResult<true>> => {
   if (!isSafeName(id)) {
-    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+    return fail('unsafe-name', opfsCopy.unsafeTransferId);
   }
   try {
     await store.transfers.removeEntry(cursorFileName(id));
@@ -345,7 +362,7 @@ export const removeInboxTransfer = async (
   transferId: string,
 ): Promise<OpfsResult<true>> => {
   if (!isSafeName(transferId)) {
-    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+    return fail('unsafe-name', opfsCopy.unsafeTransferId);
   }
   try {
     await store.inbox.removeEntry(transferId, { recursive: true });
@@ -394,17 +411,17 @@ export const removeInboxFile = async (
   name: string,
 ): Promise<OpfsResult<true>> => {
   if (!isSafeName(transferId)) {
-    return fail('unsafe-name', 'Недопустимый идентификатор передачи');
+    return fail('unsafe-name', opfsCopy.unsafeTransferId);
   }
   const segments = splitRelativePath(name);
-  if (!segments) return fail('unsafe-name', 'Недопустимое имя файла');
+  if (!segments) return fail('unsafe-name', opfsCopy.unsafeFileName);
   try {
     let folder = await store.inbox.getDirectoryHandle(transferId);
     const last = segments[segments.length - 1];
-    if (!last) return fail('unsafe-name', 'Недопустимое имя файла');
+    if (!last) return fail('unsafe-name', opfsCopy.unsafeFileName);
     for (let i = 0; i < segments.length - 1; i += 1) {
       const dir = segments[i];
-      if (!dir) return fail('unsafe-name', 'Недопустимое имя файла');
+      if (!dir) return fail('unsafe-name', opfsCopy.unsafeFileName);
       folder = await folder.getDirectoryHandle(dir);
     }
     const removed = await removeFile(folder, last);

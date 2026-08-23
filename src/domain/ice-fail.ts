@@ -1,3 +1,5 @@
+import { domainCopy } from '@/content/index.ts';
+
 export type IceFailContext = {
   local: string[];
   remote: string[];
@@ -17,37 +19,19 @@ export const explainIceFailure = (ctx: IceFailContext): string => {
   const sawRelay = hasPath(ctx.local, 'relay') || hasPath(ctx.remote, 'relay');
   const sawSrflx = hasPath(ctx.local, 'srflx') || hasPath(ctx.remote, 'srflx');
   if (ctx.hasTurn && sawRelay) {
-    return (
-      'ICE не собрался даже через TURN. ' +
-      'Проверьте URL, логин и пароль своего релей-сервера.'
-    );
+    return domainCopy.iceFailTurnRelay;
   }
   if (ctx.hasTurn && !sawRelay) {
     if (ctx.gathering && ctx.gathering !== 'complete') {
-      return (
-        'ICE оборвался, пока TURN ещё собирал relay. ' +
-        'Попробуйте ещё раз — кандидаты теперь досылаются по сокету, не только в SDP.'
-      );
+      return domainCopy.iceFailTurnGathering;
     }
-    return (
-      'ICE не собрался. TURN задан, но relay-кандидат не появился — ' +
-      'сервер недоступен, порты закрыты или логин/пароль неверны.'
-    );
+    return domainCopy.iceFailTurnNoRelay;
   }
   if (!ctx.hasStun && !ctx.hasTurn) {
-    return (
-      'Нет STUN и TURN. Видны только локальные адреса — ' +
-      'в разных сетях этого мало. Нужен свой TURN.'
-    );
+    return domainCopy.iceFailNoStunTurn;
   }
   if (sawSrflx) {
-    return (
-      'Прямой путь закрыт NAT. STUN нашёл внешний адрес, ' +
-      'но соединение не прошло. Нужен свой TURN.'
-    );
+    return domainCopy.iceFailNatStun;
   }
-  return (
-    'Прямой путь закрыт NAT. Свой TURN не задан — ' +
-    'без него через интернет часто не соединиться.'
-  );
+  return domainCopy.iceFailNatNoTurn;
 };

@@ -1,5 +1,6 @@
-import type { IceServerConfig } from '../config/types.ts';
-import { sortIceUrls } from '../config/ice-urls.ts';
+import { domainCopy } from '@/content/index.ts';
+import type { IceServerConfig } from '@/config/types.ts';
+import { sortIceUrls } from '@/config/ice-urls.ts';
 
 export type TurnHostDraft = {
   host: string;
@@ -70,18 +71,12 @@ export const validateTurnHost = (
 ): TurnHostResult<TurnHostDraft> => {
   const host = draft.host.trim();
   const sshUser = draft.sshUser.trim() || EMPTY_TURN_HOST.sshUser;
-  if (!host) return fail('host-required', 'Укажите IP или DNS сервера');
+  if (!host) return fail('host-required', domainCopy.hostRequired);
   if (!isIpv4(host) && !isHostName(host)) {
-    return fail(
-      'host-invalid',
-      'Хост должен быть IPv4 или DNS-именем, без URL',
-    );
+    return fail('host-invalid', domainCopy.hostInvalid);
   }
   if (!/^[A-Za-z0-9._-]{1,32}$/.test(sshUser)) {
-    return fail(
-      'user-invalid',
-      'SSH-логин: латиница, цифры, точка, _ или -, до 32 символов',
-    );
+    return fail('user-invalid', domainCopy.sshUserInvalid);
   }
   return { ok: true, value: { host, sshUser } };
 };
@@ -95,17 +90,13 @@ export const installCommand = (): string =>
 export const generateHostCommands = (draft: TurnHostDraft): string => {
   const checked = validateTurnHost(draft);
   if (!checked.ok) {
-    return [
-      '# Заполните SSH-логин и IP, затем скопируйте команды.',
-      `# ${checked.message}`,
-      '',
-    ].join('\n');
+    return [domainCopy.hostCommandsFill, `# ${checked.message}`, ''].join('\n');
   }
   return [
-    '# 1. Войдите на VPS',
+    domainCopy.hostCommandsSsh,
     sshCommand(checked.value),
     '',
-    '# 2. На сервере: Docker если нет, порты, пароль — спросит скрипт',
+    domainCopy.hostCommandsInstall,
     installCommand(),
     '',
   ].join('\n');

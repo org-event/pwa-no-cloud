@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { avatarSrc } from '../lib/avatar.ts';
+import { avatarSrc } from '@/lib/avatar.ts';
 
 const props = defineProps<{
   id: string;
