@@ -60,6 +60,7 @@ export class PeerSession extends EventEmitter {
   error = '';
   ice: IceReport = emptyIceReport();
   links: PeerLinks | null = null;
+  localStream: MediaStream | null = null;
   config: PeerSessionConfig;
   waitGen = 0;
   waitTimer: ReturnType<typeof setTimeout> | null = null;
@@ -207,12 +208,68 @@ export class PeerSession extends EventEmitter {
     return !isManualPort(this.config.signaling);
   }
 
+  clearLocalStream() {
+    if (!this.localStream) return;
+    for (const track of this.localStream.getTracks()) track.stop();
+    this.localStream = null;
+  }
+
+  attachLocalTracks(pc: RTCPeerConnection) {
+    if (!this.localStream) return;
+    for (const track of this.localStream.getTracks()) {
+      const sent = pc.getSenders().some((item) => item.track?.id === track.id);
+      if (!sent) pc.addTrack(track, this.localStream);
+    }
+  }
+
+  setLocalStream(stream: MediaStream | null) {
+    if (this.localStream && this.localStream !== stream) {
+      for (const track of this.localStream.getTracks()) track.stop();
+    }
+    this.localStream = stream;
+    const pc = this.links?.pc;
+    if (pc && stream) {
+      this.attachLocalTracks(pc);
+      if (
+        pc.signalingState === 'stable' &&
+        this.peerId &&
+        this.peerId !== '*'
+      ) {
+        void this.renegotiateOffer();
+      }
+    }
+  }
+
+  async renegotiateOffer() {
+    const pc = this.links?.pc;
+    const signaling = this.config.signaling;
+    if (!pc || !this.peerId || this.peerId === '*') return;
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      if (!this.canTrickle()) {
+        await waitIceGathering(pc, {
+          wantRelay: iceServersHaveTurn(this.config.iceServers),
+        });
+      }
+      this.noteLocalSdp(localSdp(pc));
+      await signaling.send({
+        from: this.clientId,
+        to: this.peerId,
+        data: { type: 'offer', payload: { sdp: localSdp(pc) } },
+      });
+    } catch (err) {
+      this.fail(errorMessage(err, peerSessionCopy.inviteCreateFailed));
+    }
+  }
+
   async offerTo(to: string) {
     const signaling = this.config.signaling;
     this.peerId = to;
     this.dropLinks();
     const pc = createPeerConnection(this.config.iceServers);
     this.links = createLocalChannels(pc);
+    this.attachLocalTracks(pc);
     this.bindPeer(pc);
     this.bindControl(this.links.control);
     this.bindBytes(this.links.bytes);
@@ -457,6 +514,7 @@ export class PeerSession extends EventEmitter {
       this.dropLinks();
       const pc = createPeerConnection(this.config.iceServers);
       this.links = { pc, control: null, bytes: null };
+      this.attachLocalTracks(pc);
       this.bindPeer(pc);
       pc.ondatachannel = (event) => {
         attachRemoteChannels(this.links as PeerLinks, event.channel);
@@ -554,6 +612,11 @@ export class PeerSession extends EventEmitter {
   }
 
   bindPeer(pc: RTCPeerConnection) {
+    pc.ontrack = (event) => {
+      if (this.links?.pc !== pc) return;
+      const stream = event.streams[0] ?? new MediaStream([event.track]);
+      this.emit('track', stream);
+    };
     pc.onicecandidate = (event) => {
       if (this.links?.pc !== pc) return;
       const candidate = event.candidate;

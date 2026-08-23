@@ -57,7 +57,7 @@ export function createShellSlice(ctx: NocloudContext) {
           : app.online;
       if (online) {
         ctx.refs.resumeMeetRoom?.();
-        void ctx.refs.resumePresence?.();
+        void ctx.refs.ensurePresenceActive?.();
       }
     });
     app.on('install', redraw);
@@ -75,8 +75,16 @@ export function createShellSlice(ctx: NocloudContext) {
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           ctx.refs.resumeMeetRoom?.();
-          void ctx.refs.resumePresence?.();
+          void ctx.refs.ensurePresenceActive?.();
         }
+      });
+    }
+    if (typeof globalThis.addEventListener === 'function') {
+      globalThis.addEventListener('pageshow', () => {
+        void ctx.refs.ensurePresenceActive?.();
+      });
+      globalThis.addEventListener('focus', () => {
+        void ctx.refs.ensurePresenceActive?.();
       });
     }
 
@@ -104,6 +112,7 @@ export function createShellSlice(ctx: NocloudContext) {
     globalThis.addEventListener('hashchange', () =>
       ctx.refs.consumeDeepLink?.(),
     );
+    void ctx.refs.ensurePresenceActive?.();
   }
 
   function onClearLogs() {

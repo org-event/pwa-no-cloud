@@ -3,7 +3,8 @@ export const presenceCopy = {
   startFailed: 'Не удалось войти в лобби presence. Проверьте S1.',
   available: 'Вы в сети — контакты видят вас онлайн. Экран не засыпает.',
   availableNote: 'presence: доступны',
-  unavailable: 'Вы офлайн для контактов.',
+  unavailable:
+    'Офлайн для контактов. Снова откройте приложение или нажмите «Я в сети».',
   incomingKnock: 'Кто-то стучится в ваше лобби — открываем канал…',
   busyIncoming: (peerId: string) =>
     `Стук от ${peerId.slice(0, 6)}…, но вы уже в канале.`,

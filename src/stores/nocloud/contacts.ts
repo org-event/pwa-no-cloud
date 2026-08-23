@@ -6,6 +6,7 @@ import {
   notes,
 } from '@/content/index.ts';
 import {
+  defaultNick,
   encodeContactCard,
   findContact,
   meetRoomId,
@@ -40,15 +41,42 @@ export function createContactsSlice(ctx: NocloudContext) {
     if (card.id === state.me.id) return;
     state.peerNick = card.nick;
     state.livePeerId = card.id;
-    if (skippedPeers.has(card.id)) {
-      touch();
-      return;
-    }
+    // Skip was “not now” — a live channel / transfer re-opens the door.
+    skippedPeers.delete(card.id);
+    const known = findContact(state.book, card.id);
     state.book = upsertContact(state.book, card);
     state.pending = null;
     void persistBook();
-    state.contactsNotice = contactsCopy.inBook(card.nick);
-    note(notes.contact(card.nick));
+    if (!known) {
+      state.contactsNotice = contactsCopy.inBook(card.nick);
+      note(notes.contact(card.nick));
+    }
+    touch();
+    ctx.refs.syncPresenceContacts?.();
+  };
+
+  /** After delete mid-call, put the live peer back into the book. */
+  const ensureLivePeerInBook = () => {
+    const id = state.livePeerId;
+    if (!id || id === state.me.id) return;
+    skippedPeers.delete(id);
+    const known = findContact(state.book, id);
+    if (!known) {
+      const card = {
+        id,
+        nick: state.peerNick || defaultNick(id),
+        avatar: '',
+      };
+      state.book = upsertContact(state.book, card);
+      void persistBook();
+      state.contactsNotice = contactsCopy.inBook(card.nick);
+      note(notes.contact(card.nick));
+      ctx.refs.syncPresenceContacts?.();
+    }
+    if (state.selectedContactIds[0] !== id) {
+      state.selectedContactIds = [id];
+      state.selectedGroupIds = [];
+    }
     touch();
   };
 
@@ -195,6 +223,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     state.selectedContactIds = state.selectedContactIds.filter(
       (item) => item !== id,
     );
+    skippedPeers.delete(id);
     state.contactsNotice = contactsCopy.removed;
     void persistBook();
     touch();
@@ -262,6 +291,7 @@ export function createContactsSlice(ctx: NocloudContext) {
   return {
     persistBook,
     applyPeerProfile,
+    ensureLivePeerInBook,
     knockOn,
     onAcceptPending,
     onSkipPending,

@@ -140,25 +140,6 @@ const contactDetail = (id: string) => {
           {{ copy.pickPhoto }}
         </button>
       </div>
-      <div class="home-actions">
-        <button
-          v-if="!contacts.presenceAvailable"
-          type="button"
-          class="button button-accent"
-          :disabled="!hasSignalingSocket"
-          @click="store.onStartPresence()"
-        >
-          {{ copy.goAvailable }}
-        </button>
-        <button
-          v-else
-          type="button"
-          class="button button-secondary"
-          @click="store.onStopPresence()"
-        >
-          {{ copy.goUnavailable }}
-        </button>
-      </div>
       <InputAction
         :model-value="contacts.cardText"
         :label="copy.cardReady"

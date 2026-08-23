@@ -62,6 +62,7 @@ export function createPeerSlice(
         state.livePeerId = next.peerId;
       }
       note(notes.channelOpen);
+      ctx.refs.ensureLivePeerInBook?.();
       deps.flushQueue();
       touch();
     });
@@ -73,6 +74,11 @@ export function createPeerSlice(
     next.on('profile', (value) => {
       const card = value as ProfileCard;
       ctx.refs.applyPeerProfile?.(card);
+    });
+    next.on('track', (value) => {
+      const stream = value as MediaStream;
+      ctx.refs.onRemoteTrack?.(stream);
+      touch();
     });
     next.on('ice', () => touch());
     next.on('pong', () => touch());
@@ -95,6 +101,7 @@ export function createPeerSlice(
       const label = transfer.path || transfer.name || defaultFileLabel;
       void notifyFileReceived(label);
       note(notes.fileReceived(label));
+      ctx.refs.ensureLivePeerInBook?.();
       void (async () => {
         await deps.refreshInbox();
         touch();

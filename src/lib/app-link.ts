@@ -71,11 +71,14 @@ const parseBody = (body: string): DeepLink => {
     id === 'servers' ||
     id === 'lan' ||
     id === 'contacts' ||
-    id === 'video' ||
+    id === 'calls' ||
     id === 'logs' ||
     id === 'help'
   ) {
     return { kind: 'section', section: id };
+  }
+  if (id === 'video') {
+    return { kind: 'section', section: 'calls' };
   }
   if (id === 'my-server' || id === 'transfer') {
     return {

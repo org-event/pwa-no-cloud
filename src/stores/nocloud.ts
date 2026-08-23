@@ -7,6 +7,7 @@ import type { TransferViewState } from '@/ui/transfer-status.ts';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { createNocloudContext } from './nocloud/context.ts';
+import { createCallsSlice } from './nocloud/calls.ts';
 import { createContactsSlice } from './nocloud/contacts.ts';
 import { createPresenceSlice } from './nocloud/presence.ts';
 import { createServersSlice } from './nocloud/servers.ts';
@@ -57,11 +58,14 @@ export const useNocloudStore = defineStore('nocloud', () => {
   const servers = createServersSlice(ctx);
   const contacts = createContactsSlice(ctx);
   const presence = createPresenceSlice(ctx);
+  const calls = createCallsSlice(ctx);
+  ctx.refs.onRemoteTrack = calls.onRemoteTrack;
   const session = createSessionSlice(ctx, servers.shareDraftForInvite);
   const shell = createShellSlice(ctx);
 
   ctx.refs.startPeer = session.startPeer;
   ctx.refs.applyPeerProfile = contacts.applyPeerProfile;
+  ctx.refs.ensureLivePeerInBook = contacts.ensureLivePeerInBook;
   ctx.refs.applyShareDraft = servers.applyShareDraft;
   ctx.refs.probeAndMark = servers.probeAndMark;
   ctx.refs.refreshInbox = session.refreshInbox;
@@ -74,6 +78,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
   ctx.refs.knockOn = contacts.knockOn;
   ctx.refs.startPresence = presence.startPresence;
   ctx.refs.syncPresenceContacts = presence.syncPresenceContacts;
+  ctx.refs.ensurePresenceActive = presence.ensurePresenceActive;
   ctx.refs.resumePresence = presence.resumePresence;
   ctx.refs.copyText = session.copyText;
   ctx.refs.seedDemoContacts = contacts.seedDemoContacts;
@@ -237,6 +242,13 @@ export const useNocloudStore = defineStore('nocloud', () => {
     onKnockContact: presence.onKnockContact,
     isPresenceOnline: presence.isPresenceOnline,
     isChannelOpen: presence.isChannelOpen,
+    localMedia: calls.localMedia,
+    remoteMedia: calls.remoteMedia,
+    callKind: calls.callKind,
+    callPeerId: calls.callPeerId,
+    callError: calls.callError,
+    onStartCall: calls.onStartCall,
+    onHangUp: calls.onHangUp,
     onRemoveContact: contacts.onRemoveContact,
     onSaveGroup: contacts.onSaveGroup,
     onRemoveGroup: contacts.onRemoveGroup,

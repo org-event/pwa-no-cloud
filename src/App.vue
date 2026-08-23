@@ -8,8 +8,9 @@ import HelpSection from './components/HelpSection.vue';
 import HostPanel from './components/HostPanel.vue';
 import InboxPanel from './components/InboxPanel.vue';
 import LogsSection from './components/LogsSection.vue';
-import PlaceholderSection from './components/PlaceholderSection.vue';
+import CallsSection from './components/CallsSection.vue';
 import ServersSection from './components/ServersSection.vue';
+import SessionTools from './components/SessionTools.vue';
 import TransferPanel from './components/TransferPanel.vue';
 import { useNocloudStore } from './stores/nocloud.ts';
 import {
@@ -19,7 +20,8 @@ import {
 } from './ui/sections.ts';
 
 const store = useNocloudStore();
-const { status, canInstall, state } = storeToRefs(store);
+const { status, canInstall, state, contacts, hasSignalingSocket } =
+  storeToRefs(store);
 
 const menuOpen = ref(false);
 const lastFocus = ref<HTMLElement | null>(null);
@@ -27,6 +29,17 @@ const menuButton = ref<HTMLButtonElement | null>(null);
 const closeButton = ref<HTMLButtonElement | null>(null);
 const drawer = ref<HTMLElement | null>(null);
 const page = ref<HTMLElement | null>(null);
+
+const TOOLS_MQ = '(max-width: 920px)';
+const toolsInDrawer = ref(
+  typeof globalThis.matchMedia === 'function' &&
+    globalThis.matchMedia(TOOLS_MQ).matches,
+);
+let toolsMq: MediaQueryList | null = null;
+
+const syncToolsPlacement = () => {
+  toolsInDrawer.value = Boolean(toolsMq?.matches);
+};
 
 const currentSection = ref<AppSection>(
   parseSectionHash(
@@ -118,11 +131,18 @@ const skipToContent = (event: Event) => {
 onMounted(() => {
   globalThis.addEventListener('hashchange', onHash);
   document.addEventListener('keydown', onKeydown);
+  if (typeof globalThis.matchMedia === 'function') {
+    toolsMq = globalThis.matchMedia(TOOLS_MQ);
+    syncToolsPlacement();
+    toolsMq.addEventListener('change', syncToolsPlacement);
+  }
 });
 
 onUnmounted(() => {
   globalThis.removeEventListener('hashchange', onHash);
   document.removeEventListener('keydown', onKeydown);
+  toolsMq?.removeEventListener('change', syncToolsPlacement);
+  toolsMq = null;
 });
 </script>
 
@@ -188,6 +208,14 @@ onUnmounted(() => {
           {{ section.title }}
         </a>
       </nav>
+      <div class="drawer-tools">
+        <SessionTools
+          v-if="toolsInDrawer"
+          in-drawer
+          :version-title="versionTitle"
+          :update-title="updateTitle"
+        />
+      </div>
     </aside>
 
     <div class="app-frame" :inert="menuOpen">
@@ -269,45 +297,11 @@ onUnmounted(() => {
         </p>
 
         <div class="topbar-end">
-          <button
-            v-show="canInstall"
-            type="button"
-            class="button button-accent topbar-install"
-            @click="store.onInstall()"
-          >
-            {{ componentsCopy.app.install }}
-          </button>
-          <p
-            class="topbar-version"
-            :title="versionTitle"
-            :aria-label="componentsCopy.app.buildLabel(APP_VERSION)"
-          >
-            {{ APP_VERSION }}
-          </p>
-          <button
-            type="button"
-            class="icon-button topbar-update"
-            :disabled="state.updateChecking"
-            :title="updateTitle"
-            :aria-label="updateTitle"
-            @click="store.onCheckUpdate()"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              focusable="false"
-              class="icon"
-            >
-              <path
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M20 12a8 8 0 1 1-2.2-5.5M20 4v5h-5"
-              />
-            </svg>
-          </button>
+          <SessionTools
+            v-if="!toolsInDrawer"
+            :version-title="versionTitle"
+            :update-title="updateTitle"
+          />
         </div>
       </header>
 
@@ -349,14 +343,11 @@ onUnmounted(() => {
         </section>
 
         <section
-          v-show="currentSection === 'video'"
+          v-show="currentSection === 'calls'"
           class="page-section"
-          data-section="video"
+          data-section="calls"
         >
-          <PlaceholderSection
-            :title="componentsCopy.app.videoTitle"
-            :text="componentsCopy.app.videoText"
-          />
+          <CallsSection />
         </section>
 
         <section

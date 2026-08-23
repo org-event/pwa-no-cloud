@@ -12,6 +12,7 @@ import { peerSignaling, usesRoomLink } from './views.ts';
 export function createPresenceSlice(ctx: NocloudContext) {
   const { state, touch, note } = ctx;
   let hub: PresenceHub | null = null;
+  let hubKey = '';
 
   const publish = () => {
     touch();
@@ -19,14 +20,21 @@ export function createPresenceSlice(ctx: NocloudContext) {
 
   const contactIds = (): string[] => state.book.contacts.map((item) => item.id);
 
+  const signalingKey = (signaling: ReturnType<typeof peerSignaling>): string =>
+    `${signaling.kind}:${'url' in signaling ? (signaling.url ?? '') : ''}`;
+
   const ensureHub = (): PresenceHub | null => {
     if (!usesRoomLink(ctx)) return null;
     const signaling = peerSignaling(ctx);
     if (signaling.kind === 'manual' || !signaling.url) return null;
-    if (hub) {
+    const key = signalingKey(signaling);
+    if (hub && hubKey === key) {
       hub.setContacts(contactIds());
       return hub;
     }
+    hub?.stop();
+    hub = null;
+    hubKey = key;
     hub = new PresenceHub({
       meId: state.me.id,
       signaling,
@@ -53,28 +61,40 @@ export function createPresenceSlice(ctx: NocloudContext) {
 
   const peerIsConnected = (): boolean => state.peer?.state === 'connected';
 
-  async function startPresence() {
+  async function startPresence(options?: { quiet?: boolean }) {
+    const quiet = options?.quiet === true;
     if (!usesRoomLink(ctx)) {
-      state.contactsNotice = presenceCopy.needS1;
-      publish();
+      if (!quiet) {
+        state.contactsNotice = presenceCopy.needS1;
+        publish();
+      }
       return false;
     }
     const next = ensureHub();
     if (!next) {
-      state.contactsNotice = presenceCopy.needS1;
-      publish();
+      if (!quiet) {
+        state.contactsNotice = presenceCopy.needS1;
+        publish();
+      }
       return false;
     }
     next.setContacts(contactIds());
+    const wasAvailable = state.presenceAvailable && next.available;
     const ok = await next.start();
     if (!ok) {
-      state.contactsNotice = presenceCopy.startFailed;
-      publish();
+      if (!quiet) {
+        state.contactsNotice = presenceCopy.startFailed;
+        publish();
+      }
       return false;
     }
     state.presenceAvailable = true;
-    state.contactsNotice = presenceCopy.available;
-    note(presenceCopy.availableNote);
+    if (!quiet) {
+      state.contactsNotice = presenceCopy.available;
+      note(presenceCopy.availableNote);
+    } else if (!wasAvailable) {
+      state.contactsNotice = presenceCopy.available;
+    }
     void requestWakeLock();
     publish();
     return true;
@@ -83,6 +103,7 @@ export function createPresenceSlice(ctx: NocloudContext) {
   function stopPresence() {
     hub?.stop();
     hub = null;
+    hubKey = '';
     state.presenceAvailable = false;
     state.presenceOnlineIds = [];
     state.contactsNotice = presenceCopy.unavailable;
@@ -94,15 +115,20 @@ export function createPresenceSlice(ctx: NocloudContext) {
     hub?.setContacts(contactIds());
   }
 
+  /** Join lobby when the app is in the foreground and S1 is ready. */
+  async function ensurePresenceActive() {
+    if (
+      typeof document !== 'undefined' &&
+      document.visibilityState !== 'visible'
+    ) {
+      return;
+    }
+    await startPresence({ quiet: true });
+  }
+
   async function resumePresence() {
     void resumeWakeLock();
-    if (!state.presenceAvailable && !hub) return;
-    const next = ensureHub();
-    if (!next) return;
-    next.setContacts(contactIds());
-    await next.start();
-    void resumeWakeLock();
-    publish();
+    await ensurePresenceActive();
   }
 
   /**
@@ -136,6 +162,7 @@ export function createPresenceSlice(ctx: NocloudContext) {
     startPresence,
     stopPresence,
     syncPresenceContacts,
+    ensurePresenceActive,
     resumePresence,
     onKnockContact,
     isPresenceOnline,

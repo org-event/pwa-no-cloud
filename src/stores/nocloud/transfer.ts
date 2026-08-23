@@ -111,7 +111,13 @@ export function createTransferSlice(ctx: NocloudContext) {
 
   async function onSendTransfer() {
     state.transferError = '';
-    const contactId = state.selectedContactIds[0];
+    ctx.refs.ensureLivePeerInBook?.();
+    let contactId = state.selectedContactIds[0];
+    if (!contactId && state.livePeerId && state.livePeerId !== state.me.id) {
+      contactId = state.livePeerId;
+      state.selectedContactIds = [contactId];
+      state.selectedGroupIds = [];
+    }
     if (!contactId) {
       state.transferError = transferCopy.needContact;
       touch();
@@ -144,6 +150,7 @@ export function createTransferSlice(ctx: NocloudContext) {
 
   function onAcceptFile(transferId: string) {
     state.transferError = '';
+    ctx.refs.ensureLivePeerInBook?.();
     void requestNotifyPermission();
     state.peer?.acceptFile(transferId);
     touch();

@@ -33,6 +33,7 @@ export function createServersSlice(ctx: NocloudContext) {
     saveUserSettings(state.settings, storage);
     state.activeServerId = server.id;
     if (notice) state.hostNotice = notice;
+    void ctx.refs.ensurePresenceActive?.();
   };
 
   const probeAndMark = async (serverId: string) => {

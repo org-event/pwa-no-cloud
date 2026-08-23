@@ -155,6 +155,51 @@ body {
   margin-left: auto;
 }
 
+.topbar-end:empty {
+  display: none;
+}
+
+.session-tools {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.session-tools.is-in-drawer {
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.session-tools.is-in-drawer .topbar-presence,
+.session-tools.is-in-drawer .topbar-install {
+  width: 100%;
+  justify-content: center;
+}
+
+.session-tools.is-in-drawer .topbar-version {
+  max-width: none;
+  text-align: center;
+}
+
+.session-tools.is-in-drawer .topbar-update {
+  align-self: center;
+}
+
+.topbar-presence {
+  flex-shrink: 0;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.topbar-presence .status-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+}
+
 .topbar-install {
   flex-shrink: 0;
   min-height: 44px;
@@ -251,8 +296,22 @@ body {
 
 .drawer-nav {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 0.25rem;
+  overflow: auto;
+}
+
+.drawer-tools {
+  display: flex;
+  flex-direction: column;
+  margin-top: auto;
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.drawer-tools:empty {
+  display: none;
 }
 
 .drawer-link {
@@ -936,4 +995,50 @@ form.panel > fieldset {
 .logs-body {
   max-height: min(70vh, 40rem);
   overflow: auto;
+}
+
+.call-stage {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.call-book {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.call-tile {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: var(--color-muted);
+  aspect-ratio: 16 / 10;
+}
+
+.call-tile-local {
+  max-width: 12rem;
+  margin-left: auto;
+  aspect-ratio: 4 / 3;
+}
+
+.call-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #0b1220;
+}
+
+.call-tile-label {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  margin: 0;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  background: rgb(15 23 42 / 0.7);
+  color: #f8fafc;
+  font-size: 0.75rem;
 }

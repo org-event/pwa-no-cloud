@@ -330,6 +330,16 @@ const rejectIncoming = () => {
             <template #leading>
               <AvatarImg :id="contact.id" :avatar="contact.avatar" />
             </template>
+            <template #actions>
+              <button
+                type="button"
+                class="button button-secondary"
+                :disabled="blocked"
+                @click.prevent.stop="store.onKnockContact(contact.id)"
+              >
+                {{ copy.knock }}
+              </button>
+            </template>
           </ContactRow>
         </label>
       </div>

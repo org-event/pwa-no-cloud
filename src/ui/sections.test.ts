@@ -16,8 +16,10 @@ describe('app sections', () => {
     expect(parseSectionHash('#servers')).toBe('servers');
     expect(parseSectionHash('#my-server')).toBe('servers');
     expect(parseSectionHash('#transfer')).toBe('lan');
-    expect(parseSectionHash('#video')).toBe('video');
+    expect(parseSectionHash('#calls')).toBe('calls');
+    expect(parseSectionHash('#video')).toBe('calls');
     expect(parseSectionHash('#help')).toBe('help');
+    expect(sectionTitle('calls')).toBe('Звонки');
     expect(parseSectionHash('#j/N1.x')).toBe('lan');
   });
 

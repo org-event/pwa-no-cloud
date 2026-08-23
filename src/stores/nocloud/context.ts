@@ -9,6 +9,7 @@ import type { NocloudState } from './state.ts';
 export type NocloudRefs = {
   startPeer?: () => PeerSession | null;
   applyPeerProfile?: (card: ProfileCard) => void;
+  ensureLivePeerInBook?: () => void;
   applyShareDraft?: (draft: CustomServerDraft, notice: string) => void;
   probeAndMark?: (serverId: string) => Promise<void>;
   refreshInbox?: () => Promise<void>;
@@ -19,11 +20,13 @@ export type NocloudRefs = {
   consumeDeepLink?: () => void;
   queueFile?: (file: File) => void;
   knockOn?: (ownerId: string, asHost: boolean) => Promise<void>;
-  startPresence?: () => Promise<boolean>;
+  startPresence?: (options?: { quiet?: boolean }) => Promise<boolean>;
   syncPresenceContacts?: () => void;
+  ensurePresenceActive?: () => Promise<void>;
   resumePresence?: () => Promise<void>;
   copyText?: (text: string) => Promise<boolean>;
   seedDemoContacts?: () => void | Promise<void>;
+  onRemoteTrack?: (stream: MediaStream) => void;
 };
 
 export type NocloudContext = {
