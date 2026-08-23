@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { APP_NAME, APP_TAGLINE, APP_VERSION } from './config/index.ts';
 import ContactsSection from './components/ContactsSection.vue';
@@ -26,6 +26,7 @@ const menuOpen = ref(false);
 const lastFocus = ref<HTMLElement | null>(null);
 const menuButton = ref<HTMLButtonElement | null>(null);
 const closeButton = ref<HTMLButtonElement | null>(null);
+const drawer = ref<HTMLElement | null>(null);
 const page = ref<HTMLElement | null>(null);
 
 const currentSection = ref<AppSection>(
@@ -54,21 +55,47 @@ const versionTitle = computed(() =>
     : APP_VERSION,
 );
 
-const setMenuOpen = (open: boolean) => {
-  menuOpen.value = open;
-  if (open) {
-    lastFocus.value =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : menuButton.value;
-    closeButton.value?.focus();
-    return;
-  }
+const focusOutsideDrawer = () => {
+  const active = document.activeElement;
+  const inside =
+    active instanceof HTMLElement && Boolean(drawer.value?.contains(active));
+  if (!inside) return;
   const back =
-    lastFocus.value && document.contains(lastFocus.value)
+    lastFocus.value &&
+    document.contains(lastFocus.value) &&
+    !drawer.value?.contains(lastFocus.value)
       ? lastFocus.value
       : menuButton.value;
   back?.focus();
+  if (document.activeElement === active && active instanceof HTMLElement) {
+    active.blur();
+  }
+};
+
+const setMenuOpen = (open: boolean) => {
+  if (open) {
+    lastFocus.value =
+      document.activeElement instanceof HTMLElement &&
+      !drawer.value?.contains(document.activeElement)
+        ? document.activeElement
+        : menuButton.value;
+    menuOpen.value = true;
+    void nextTick(() => closeButton.value?.focus());
+    return;
+  }
+  if (!menuOpen.value) return;
+  // Move focus out before inert hides the drawer from AT.
+  focusOutsideDrawer();
+  menuOpen.value = false;
+  void nextTick(() => {
+    const back =
+      lastFocus.value &&
+      document.contains(lastFocus.value) &&
+      !drawer.value?.contains(lastFocus.value)
+        ? lastFocus.value
+        : menuButton.value;
+    back?.focus();
+  });
 };
 
 const onHash = () => {
@@ -119,10 +146,10 @@ onUnmounted(() => {
 
     <aside
       id="app-nav"
+      ref="drawer"
       class="drawer"
       aria-label="Разделы"
       :inert="!menuOpen"
-      :aria-hidden="!menuOpen"
     >
       <div class="drawer-head">
         <div>
@@ -152,17 +179,14 @@ onUnmounted(() => {
           </svg>
         </button>
       </div>
-      <nav
-        class="drawer-nav"
-        aria-label="Разделы приложения"
-        @click="setMenuOpen(false)"
-      >
+      <nav class="drawer-nav" aria-label="Разделы приложения">
         <a
           v-for="section in APP_SECTIONS"
           :key="section.id"
           class="drawer-link"
           :href="`#${section.id}`"
           :aria-current="currentSection === section.id ? 'page' : undefined"
+          @click="setMenuOpen(false)"
         >
           {{ section.title }}
         </a>
