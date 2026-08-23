@@ -14,18 +14,19 @@ import AvatarImg from './AvatarImg.vue';
 import PendingPeer from './PendingPeer.vue';
 
 const store = useNocloudStore();
-const { contacts, invite, resolved, session, shareUrl, state, peerNick } =
+const { contacts, invite, resolved, session, shareUrl, state } =
   storeToRefs(store);
 
 const pasteLink = ref('');
 
 const homeState = computed(() => {
+  const servers = resolved.value;
   const manual = invite.value.mode === 'manual';
-  const hasTurn = resolved.value.ok && resolved.value.value.hasTurn;
+  const hasTurn = servers.ok && servers.value.hasTurn;
   const socketBlocked =
-    resolved.value.ok &&
-    Boolean(resolved.value.value.signaling.url) &&
-    mixedContentBlocksSignaling(resolved.value.value.signaling.url ?? '');
+    servers.ok &&
+    Boolean(servers.value.signaling.url) &&
+    mixedContentBlocksSignaling(servers.value.signaling.url ?? '');
   const waiting =
     session.value.state === 'signaling' || session.value.state === 'connecting';
   const connected = session.value.state === 'connected';
@@ -38,7 +39,7 @@ const homeState = computed(() => {
     fromLink: state.value.openedFromLink,
     role: invite.value.role,
     shareUrl: shareUrl.value,
-    peerNick: peerNick.value,
+    peerNick: state.value.peerNick,
     queuedCount: store.transfer.queuedNames.length,
     error: invite.value.error,
     me: contacts.value.me,

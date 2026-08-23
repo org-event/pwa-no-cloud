@@ -1151,6 +1151,10 @@ export const useNocloudStore = defineStore('nocloud', () => {
   const online = computed(() => app.online);
   const canInstall = computed(() => app.canInstall);
   const clientId = computed(() => app.clientId);
+  const peerNick = computed(() => {
+    trackRevision();
+    return state.peerNick;
+  });
 
   const redraw = () => touch();
 
@@ -1203,6 +1207,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
     online,
     canInstall,
     clientId,
+    peerNick,
     init,
     onPreset,
     onSaveCustom,
