@@ -162,6 +162,8 @@ export function createContactsSlice(ctx: NocloudContext) {
         : contactsCopy.cardCopyFailed;
       note(ok ? notes.cardCopied : notes.cardCopyFailed);
       touch();
+      // Host must sit in c-{me.id}; callers knock into that room.
+      if (ok) await knockOn(state.me.id, true);
     })();
   }
 

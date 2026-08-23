@@ -135,7 +135,7 @@ export function createTransferSlice(ctx: NocloudContext) {
       touch();
       return;
     }
-    await knock(contactId, true);
+    await knock(contactId, false);
     flushQueue();
     touch();
   }
