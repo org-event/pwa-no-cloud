@@ -162,8 +162,11 @@ export function createContactsSlice(ctx: NocloudContext) {
         : contactsCopy.cardCopyFailed;
       note(ok ? notes.cardCopied : notes.cardCopyFailed);
       touch();
-      // Host must sit in c-{me.id}; callers knock into that room.
-      if (ok) await knockOn(state.me.id, true);
+      // Publish lobby presence; keep waiting for WebRTC guests too.
+      if (ok) {
+        await ctx.refs.startPresence?.();
+        await knockOn(state.me.id, true);
+      }
     })();
   }
 
@@ -183,7 +186,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     void persistBook();
     state.contactsNotice = contactsCopy.inBook(card.nick);
     touch();
-    void knockOn(card.id, false);
+    ctx.refs.syncPresenceContacts?.();
     return true;
   }
 
@@ -195,6 +198,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     state.contactsNotice = contactsCopy.removed;
     void persistBook();
     touch();
+    ctx.refs.syncPresenceContacts?.();
   }
 
   function onSaveGroup(name: string, memberIds: string[]) {

@@ -55,7 +55,10 @@ export function createShellSlice(ctx: NocloudContext) {
         data && typeof data === 'object' && 'online' in data
           ? Boolean((data as { online: boolean }).online)
           : app.online;
-      if (online) ctx.refs.resumeMeetRoom?.();
+      if (online) {
+        ctx.refs.resumeMeetRoom?.();
+        void ctx.refs.resumePresence?.();
+      }
     });
     app.on('install', redraw);
     app.on('installed', redraw);
@@ -70,7 +73,10 @@ export function createShellSlice(ctx: NocloudContext) {
 
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') ctx.refs.resumeMeetRoom?.();
+        if (document.visibilityState === 'visible') {
+          ctx.refs.resumeMeetRoom?.();
+          void ctx.refs.resumePresence?.();
+        }
       });
     }
 

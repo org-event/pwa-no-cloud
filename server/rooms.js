@@ -35,6 +35,12 @@ export const createRooms = () => {
       if (!client) return;
       client.sockets.delete(socket);
     },
+    /** True when the client still has at least one live socket in the room. */
+    hasSockets(roomId, clientId) {
+      const room = rooms.get(roomId || 'default');
+      const client = room?.get(clientId);
+      return Boolean(client && client.sockets.size > 0);
+    },
     leave(roomId, clientId) {
       const key = roomId || 'default';
       const room = rooms.get(key);

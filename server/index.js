@@ -97,8 +97,22 @@ const getPeers = (req, res, url) => {
   sendJSON(res, 200, { peers: rooms.peers(roomId, clientId) });
 };
 
+const leaveRoom = async (req, res) => {
+  const body = await parseBody(req);
+  const roomId = body.roomId || 'default';
+  const clientId = body.clientId ?? '';
+  if (!clientId) {
+    sendJSON(res, 400, { error: 'clientId required' });
+    return;
+  }
+  rooms.leave(roomId, clientId);
+  rooms.broadcastPeers(roomId);
+  sendJSON(res, 200, { ok: true });
+};
+
 const routes = new Map([
   ['/join', { post: joinRoom }],
+  ['/leave', { post: leaveRoom }],
   ['/signal', { post: sendSignal, get: getSignal }],
   ['/peers', { get: getPeers }],
 ]);
@@ -199,6 +213,8 @@ const attachSockets = (server) => {
     socket.on('close', () => {
       if (!clientId) return;
       rooms.detach(roomId, clientId, socket);
+      // Presence + call can share the same clientId with two sockets.
+      if (rooms.hasSockets(roomId, clientId)) return;
       rooms.leave(roomId, clientId);
       rooms.broadcastPeers(roomId);
     });

@@ -110,6 +110,22 @@ export const createHttpPollPort = (
       if (timer) clearTimeout(timer);
       timer = null;
       listeners.clear();
+      if (roomId && clientId) {
+        const leftRoom = roomId;
+        const leftClient = clientId;
+        roomId = '';
+        clientId = '';
+        void request(`${root}/leave`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomId: leftRoom, clientId: leftClient }),
+        }).catch(() => {
+          /* best-effort leave */
+        });
+        return;
+      }
+      roomId = '';
+      clientId = '';
     },
   };
 };

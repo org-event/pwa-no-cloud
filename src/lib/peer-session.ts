@@ -170,21 +170,9 @@ export class PeerSession extends EventEmitter {
     const links = this.links;
     this.links = null;
     if (!links) return;
-    try {
-      links.control?.close();
-    } catch {
-      /* ignore */
-    }
-    try {
-      links.bytes?.close();
-    } catch {
-      /* ignore */
-    }
-    try {
-      links.pc.close();
-    } catch {
-      /* ignore */
-    }
+    links.control?.close();
+    links.bytes?.close();
+    links.pc.close();
   }
 
   cancelRecover() {
@@ -365,20 +353,13 @@ export class PeerSession extends EventEmitter {
     this.waitGen += 1;
     if (this.waitTimer) clearTimeout(this.waitTimer);
     this.waitTimer = null;
-    this.dropPipe();
+    this.dropLinks();
     this.config.signaling.close();
-    const links = this.links;
-    this.links = null;
     this.role = 'idle';
     this.lastPongMs = null;
     this.ice = emptyIceReport();
     this.peerId = '';
     this.pendingCandidates = [];
-    if (links) {
-      links.control?.close();
-      links.bytes?.close();
-      links.pc.close();
-    }
     this.apply({ type: 'close' });
   }
 
@@ -388,20 +369,13 @@ export class PeerSession extends EventEmitter {
     this.waitGen += 1;
     if (this.waitTimer) clearTimeout(this.waitTimer);
     this.waitTimer = null;
-    this.dropPipe();
+    this.dropLinks();
     this.error = '';
     this.lastPongMs = null;
     this.ice = emptyIceReport();
     this.peerId = '';
     this.pendingCandidates = [];
     this.config.signaling.close();
-    const links = this.links;
-    this.links = null;
-    if (links) {
-      links.control?.close();
-      links.bytes?.close();
-      links.pc.close();
-    }
     this.apply({ type: 'reset' });
   }
 
@@ -420,7 +394,8 @@ export class PeerSession extends EventEmitter {
       }
       const peers = await this.config.signaling.listPeers();
       if (gen !== this.waitGen) throw new Error(peerSessionCopy.sessionClosed);
-      if (peers[0]) return peers[0];
+      const real = peers.find((id) => !id.startsWith('watch:'));
+      if (real) return real;
       await this.sleep(800);
     }
     throw new Error(peerSessionCopy.sessionClosed);

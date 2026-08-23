@@ -39,4 +39,6 @@ export type ContactsState = {
   waiting: boolean;
   connected: boolean;
   livePeerId: string | null;
+  presenceAvailable: boolean;
+  presenceOnlineIds: string[];
 };

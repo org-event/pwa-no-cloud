@@ -19,6 +19,9 @@ export type NocloudRefs = {
   consumeDeepLink?: () => void;
   queueFile?: (file: File) => void;
   knockOn?: (ownerId: string, asHost: boolean) => Promise<void>;
+  startPresence?: () => Promise<boolean>;
+  syncPresenceContacts?: () => void;
+  resumePresence?: () => Promise<void>;
   copyText?: (text: string) => Promise<boolean>;
   seedDemoContacts?: () => void | Promise<void>;
 };

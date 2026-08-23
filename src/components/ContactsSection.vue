@@ -57,8 +57,13 @@ const toggleGroupMember = (id: string, checked: boolean) => {
     : groupMemberIds.value.filter((item) => item !== id);
 };
 
-const isOnline = (id: string) =>
-  Boolean(contacts.value.connected && contacts.value.livePeerId === id);
+const isOnline = (id: string) => store.isPresenceOnline(id);
+
+const contactDetail = (id: string) => {
+  if (store.isChannelOpen(id)) return copy.inCall;
+  if (store.isPresenceOnline(id)) return copy.online;
+  return copy.offline;
+};
 </script>
 
 <template>
@@ -75,8 +80,14 @@ const isOnline = (id: string) =>
       {{ copy.needS1After }}
     </p>
 
-    <Card :title="copy.meLegend">
-      <ContactRow :name="contacts.me.nick || copy.nick">
+    <Card :title="copy.meLegend" :hint="copy.availableHint">
+      <ContactRow
+        :name="contacts.me.nick || copy.nick"
+        :detail="contacts.presenceAvailable ? copy.online : copy.offline"
+        :online="contacts.presenceAvailable"
+        :online-label="copy.online"
+        :offline-label="copy.offline"
+      >
         <template #leading>
           <AvatarImg :id="contacts.me.id" :avatar="contacts.me.avatar" />
         </template>
@@ -129,6 +140,25 @@ const isOnline = (id: string) =>
           {{ copy.pickPhoto }}
         </button>
       </div>
+      <div class="home-actions">
+        <button
+          v-if="!contacts.presenceAvailable"
+          type="button"
+          class="button button-accent"
+          :disabled="!hasSignalingSocket"
+          @click="store.onStartPresence()"
+        >
+          {{ copy.goAvailable }}
+        </button>
+        <button
+          v-else
+          type="button"
+          class="button button-secondary"
+          @click="store.onStopPresence()"
+        >
+          {{ copy.goUnavailable }}
+        </button>
+      </div>
       <InputAction
         :model-value="contacts.cardText"
         :label="copy.cardReady"
@@ -172,7 +202,7 @@ const isOnline = (id: string) =>
           v-for="contact in contacts.book.contacts"
           :key="contact.id"
           :name="contact.nick"
-          :detail="isOnline(contact.id) ? copy.online : copy.offline"
+          :detail="contactDetail(contact.id)"
           :online="isOnline(contact.id)"
           :online-label="copy.online"
           :offline-label="copy.offline"
@@ -181,6 +211,14 @@ const isOnline = (id: string) =>
             <AvatarImg :id="contact.id" :avatar="contact.avatar" />
           </template>
           <template #actions>
+            <button
+              type="button"
+              class="button button-accent"
+              :disabled="!hasSignalingSocket"
+              @click="store.onKnockContact(contact.id)"
+            >
+              {{ copy.knock }}
+            </button>
             <button
               type="button"
               class="button button-secondary"

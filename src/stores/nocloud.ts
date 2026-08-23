@@ -8,6 +8,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { createNocloudContext } from './nocloud/context.ts';
 import { createContactsSlice } from './nocloud/contacts.ts';
+import { createPresenceSlice } from './nocloud/presence.ts';
 import { createServersSlice } from './nocloud/servers.ts';
 import { createSessionSlice } from './nocloud/session.ts';
 import { createShellSlice } from './nocloud/shell.ts';
@@ -55,6 +56,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
 
   const servers = createServersSlice(ctx);
   const contacts = createContactsSlice(ctx);
+  const presence = createPresenceSlice(ctx);
   const session = createSessionSlice(ctx, servers.shareDraftForInvite);
   const shell = createShellSlice(ctx);
 
@@ -70,6 +72,9 @@ export const useNocloudStore = defineStore('nocloud', () => {
   ctx.refs.consumeDeepLink = session.consumeDeepLink;
   ctx.refs.queueFile = session.queueFile;
   ctx.refs.knockOn = contacts.knockOn;
+  ctx.refs.startPresence = presence.startPresence;
+  ctx.refs.syncPresenceContacts = presence.syncPresenceContacts;
+  ctx.refs.resumePresence = presence.resumePresence;
   ctx.refs.copyText = session.copyText;
   ctx.refs.seedDemoContacts = contacts.seedDemoContacts;
 
@@ -227,6 +232,11 @@ export const useNocloudStore = defineStore('nocloud', () => {
     onPickAvatar: contacts.onPickAvatar,
     onCopyCard: contacts.onCopyCard,
     onAddContact: contacts.onAddContact,
+    onStartPresence: presence.startPresence,
+    onStopPresence: presence.stopPresence,
+    onKnockContact: presence.onKnockContact,
+    isPresenceOnline: presence.isPresenceOnline,
+    isChannelOpen: presence.isChannelOpen,
     onRemoveContact: contacts.onRemoveContact,
     onSaveGroup: contacts.onSaveGroup,
     onRemoveGroup: contacts.onRemoveGroup,

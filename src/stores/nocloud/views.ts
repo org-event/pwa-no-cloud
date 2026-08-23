@@ -172,5 +172,7 @@ export function contactsState(ctx: NocloudContext): ContactsState {
     waiting: peerIsLive(ctx) && state.roomId === meetRoomId(state.me.id),
     connected: state.peer?.state === 'connected',
     livePeerId: state.livePeerId,
+    presenceAvailable: state.presenceAvailable,
+    presenceOnlineIds: state.presenceOnlineIds,
   };
 }

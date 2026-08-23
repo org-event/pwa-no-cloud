@@ -83,8 +83,7 @@ const canSend = computed(
     !blocked.value,
 );
 
-const isOnline = (id: string) =>
-  Boolean(contacts.value.connected && contacts.value.livePeerId === id);
+const isOnline = (id: string) => store.isPresenceOnline(id);
 
 const sortedContacts = computed(() => {
   const list = [...contacts.value.book.contacts];

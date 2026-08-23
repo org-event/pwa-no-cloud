@@ -52,6 +52,8 @@ export type NocloudState = {
   selectedGroupIds: string[];
   peerNick: string;
   livePeerId: string | null;
+  presenceAvailable: boolean;
+  presenceOnlineIds: string[];
   cardText: string;
   updateChecking: boolean;
   updateNotice: string;
@@ -96,6 +98,8 @@ export function createNocloudState(storage: StorageLike) {
     selectedGroupIds: [] as string[],
     peerNick: '',
     livePeerId: null as string | null,
+    presenceAvailable: false,
+    presenceOnlineIds: [] as string[],
     cardText: encodeContactCard(me),
     updateChecking: false,
     updateNotice: '',

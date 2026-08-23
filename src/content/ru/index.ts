@@ -1,4 +1,5 @@
 export * from './contacts.ts';
+export * from './presence.ts';
 export * from './signaling.ts';
 export * from './help-topics.ts';
 export * from './servers.ts';
