@@ -39,11 +39,11 @@ const hidden = computed(
     <div class="home-actions">
       <button
         type="button"
-        class="button button-secondary"
+        class="button button-accent"
         :disabled="!inbox.ready || !selected"
-        @click="selected && store.onRead(selected)"
+        @click="selected && store.onSave(selected)"
       >
-        {{ copy.read }}
+        {{ copy.save }}
       </button>
       <button
         type="button"
@@ -69,6 +69,8 @@ const hidden = computed(
       </label>
     </div>
     <p v-if="inbox.error" class="error" role="alert">{{ inbox.error }}</p>
-    <pre class="resolved">{{ inbox.preview }}</pre>
+    <p v-if="inbox.preview" class="tagline" role="status">
+      {{ inbox.preview }}
+    </p>
   </Card>
 </template>

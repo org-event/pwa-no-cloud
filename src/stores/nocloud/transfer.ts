@@ -4,9 +4,11 @@ import type { InboxEntry } from '@/lib/opfs.ts';
 import {
   appendLog,
   listInbox,
-  readInboxFile,
+  readInboxBlob,
   removeInboxFile,
 } from '@/lib/opfs.ts';
+import { saveFileToDevice } from '@/lib/save-file.ts';
+import { componentsCopy } from '@/content/index.ts';
 import { requestNotifyPermission } from '@/lib/notify.ts';
 import type { PickedFile } from '@/lib/folder-walk.ts';
 import { markRaw } from 'vue';
@@ -167,23 +169,35 @@ export function createTransferSlice(ctx: NocloudContext) {
     touch();
   }
 
-  function onRead(entry: InboxEntry) {
+  function onSave(entry: InboxEntry) {
     void (async () => {
       if (!state.store) return;
-      const text = await readInboxFile(
+      const blob = await readInboxBlob(
         state.store,
         entry.transferId,
         entry.name,
       );
-      if (!text.ok) {
-        setInboxError(text.message);
+      if (!blob.ok) {
+        setInboxError(blob.message);
         touch();
         return;
       }
-      state.inboxError = '';
-      state.preview = text.value;
-      await appendLog(state.store, `read ${entry.transferId}/${entry.name}`);
-      touch();
+      try {
+        const result = await saveFileToDevice(blob.value);
+        if (result === 'aborted') {
+          state.inboxError = '';
+          state.preview = componentsCopy.inbox.saveAborted;
+          touch();
+          return;
+        }
+        state.inboxError = '';
+        state.preview = componentsCopy.inbox.saved;
+        await appendLog(state.store, `save ${entry.transferId}/${entry.name}`);
+        touch();
+      } catch {
+        setInboxError(componentsCopy.inbox.saveFailed);
+        touch();
+      }
     })();
   }
 
@@ -231,7 +245,7 @@ export function createTransferSlice(ctx: NocloudContext) {
     onCancelFile,
     onPauseFile,
     onResumeFile,
-    onRead,
+    onSave,
     onRemove,
     onSelect,
   };

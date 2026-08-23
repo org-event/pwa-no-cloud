@@ -54,7 +54,7 @@ export function createSessionSlice(
     onCancelFile: transfer.onCancelFile,
     onPauseFile: transfer.onPauseFile,
     onResumeFile: transfer.onResumeFile,
-    onRead: transfer.onRead,
+    onSave: transfer.onSave,
     onRemove: transfer.onRemove,
     onSelect: transfer.onSelect,
   };

@@ -405,6 +405,20 @@ export const readInboxFile = async (
   }
 };
 
+export const readInboxBlob = async (
+  store: OpfsStore,
+  transferId: string,
+  name: string,
+): Promise<OpfsResult<File>> => {
+  const handle = await openInboxHandle(store, transferId, name, false);
+  if (!handle.ok) return handle;
+  try {
+    return { ok: true, value: await handle.value.getFile() };
+  } catch (error) {
+    return asError(error, 'read-failed');
+  }
+};
+
 export const removeInboxFile = async (
   store: OpfsStore,
   transferId: string,

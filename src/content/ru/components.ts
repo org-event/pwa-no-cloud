@@ -82,11 +82,14 @@ export const componentsCopy = {
   },
   inbox: {
     legend: 'Получено на этом телефоне',
-    read: 'Прочитать',
+    save: 'Сохранить',
     remove: 'Удалить',
     listAria: 'Полученные файлы',
     opfsUnavailable: 'OPFS недоступен в этом браузере',
     empty: 'Пока пусто',
+    saved: 'Сохранено на устройство.',
+    saveAborted: 'Сохранение отменено.',
+    saveFailed: 'Не удалось сохранить файл.',
   },
   host: {
     installLegend: 'Установить на VPS',

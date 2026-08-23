@@ -72,6 +72,7 @@ export class PeerSession extends EventEmitter {
   keepRoom = false;
   recoverTimer: ReturnType<typeof setTimeout> | null = null;
   recovering = false;
+  keepAliveTimer: ReturnType<typeof setInterval> | null = null;
 
   get state(): SessionState {
     return this.session.state;
@@ -144,7 +145,7 @@ export class PeerSession extends EventEmitter {
   /** After phone unlock / network back: rejoin room if the channel dropped. */
   resumeRoom() {
     if (!this.keepRoom || !this.roomId) return;
-    if (this.session.state === 'connected') return;
+    if (this.isLinkHealthy()) return;
     if (
       this.session.state === 'signaling' ||
       this.session.state === 'connecting'
@@ -154,6 +155,36 @@ export class PeerSession extends EventEmitter {
       return;
     }
     this.scheduleRecover('resume', 0);
+  }
+
+  isLinkHealthy() {
+    return (
+      this.session.state === 'connected' &&
+      this.links?.control?.readyState === 'open' &&
+      this.links?.pc.connectionState === 'connected'
+    );
+  }
+
+  dropLinks() {
+    this.dropPipe();
+    const links = this.links;
+    this.links = null;
+    if (!links) return;
+    try {
+      links.control?.close();
+    } catch {
+      /* ignore */
+    }
+    try {
+      links.bytes?.close();
+    } catch {
+      /* ignore */
+    }
+    try {
+      links.pc.close();
+    } catch {
+      /* ignore */
+    }
   }
 
   cancelRecover() {
@@ -172,13 +203,8 @@ export class PeerSession extends EventEmitter {
 
   async recoverRoom(reason: string) {
     if (!this.keepRoom || !this.roomId || this.recovering) return;
-    // ICE can fail while session still says connected — still rejoin.
-    if (
-      this.session.state === 'connected' &&
-      this.links?.control?.readyState === 'open'
-    ) {
-      return;
-    }
+    // DataChannel can stay "open" after ICE dies — require live ICE too.
+    if (this.isLinkHealthy()) return;
     this.recovering = true;
     const room = this.roomId;
     this.emit('recover', reason);
@@ -196,6 +222,7 @@ export class PeerSession extends EventEmitter {
   async offerTo(to: string) {
     const signaling = this.config.signaling;
     this.peerId = to;
+    this.dropLinks();
     const pc = createPeerConnection(this.config.iceServers);
     this.links = createLocalChannels(pc);
     this.bindPeer(pc);
@@ -320,9 +347,20 @@ export class PeerSession extends EventEmitter {
     channel.send(payload);
   }
 
+  startKeepAlive() {
+    this.stopKeepAlive();
+    this.keepAliveTimer = setInterval(() => this.ping(), 12_000);
+  }
+
+  stopKeepAlive() {
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+    this.keepAliveTimer = null;
+  }
+
   close() {
     this.keepRoom = false;
     this.roomId = '';
+    this.stopKeepAlive();
     this.cancelRecover();
     this.waitGen += 1;
     if (this.waitTimer) clearTimeout(this.waitTimer);
@@ -345,6 +383,7 @@ export class PeerSession extends EventEmitter {
   }
 
   reset() {
+    this.stopKeepAlive();
     this.cancelRecover();
     this.waitGen += 1;
     if (this.waitTimer) clearTimeout(this.waitTimer);
@@ -439,6 +478,8 @@ export class PeerSession extends EventEmitter {
     }
     try {
       this.peerId = message.from;
+      this.cancelRecover();
+      this.dropLinks();
       const pc = createPeerConnection(this.config.iceServers);
       this.links = { pc, control: null, bytes: null };
       this.bindPeer(pc);
@@ -563,6 +604,7 @@ export class PeerSession extends EventEmitter {
       if (pc.connectionState === 'connected') this.cancelRecover();
       if (pc.connectionState === 'failed') {
         if (this.keepRoom && this.roomId) {
+          this.cancelRecover();
           this.scheduleRecover('ice-failed', 600);
         } else {
           this.failIce();
@@ -620,9 +662,11 @@ export class PeerSession extends EventEmitter {
       this.ensurePipe();
       void this.pullSelected();
       this.sendProfile();
+      this.startKeepAlive();
       this.emit('channel-open');
     };
     channel.onclose = () => {
+      this.stopKeepAlive();
       if (this.session.state !== 'connected') return;
       this.apply({ type: 'close' });
       if (this.keepRoom && this.roomId) {

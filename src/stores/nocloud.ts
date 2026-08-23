@@ -244,7 +244,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
     onCancelFile: session.onCancelFile,
     onPauseFile: session.onPauseFile,
     onResumeFile: session.onResumeFile,
-    onRead: session.onRead,
+    onSave: session.onSave,
     onRemove: session.onRemove,
     onSelect: session.onSelect,
   };
