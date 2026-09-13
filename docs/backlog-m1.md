@@ -159,7 +159,7 @@
 | S2.2 | done | 3 |
 | S2.3 | done | 5 |
 | S2.4 | done | 3 |
-| S3.1 | todo | 2 |
+| S3.1 | done | 2 |
 | S3.2 | todo | 5 |
 | S3.3 | todo | 3 |
 | S3.4 | todo | 5 |

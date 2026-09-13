@@ -92,7 +92,17 @@ export { emptyRelayBundle } from './discovery/index.ts';
 export type {
   RelayCapabilities,
   RelayChallenge,
+  RelayChallengeAnswer,
+  RelayChallengeOffer,
   RelayChallengeResponse,
+} from './relay/index.ts';
+export {
+  RELAY_CHALLENGE_VERSION,
+  canonicalRelayChallenge,
+  isRelayChallenge,
+  isRelayChallengeResponse,
+  parseRelayChallengeAnswer,
+  parseRelayChallengeOffer,
 } from './relay/index.ts';
 export type { AddressBook, Contact, ProfileCard } from './contacts/index.ts';
 export {
