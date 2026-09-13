@@ -145,7 +145,7 @@
 
 | id | status | SP |
 |---|---|---|
-| S0.1 | todo | 2 |
+| S0.1 | done | 2 |
 | S0.2 | todo | 3 |
 | S0.3 | done | 1 |
 | S1.1 | todo | 3 |
