@@ -22,4 +22,12 @@ export const shellCopy = {
   openCalls: 'Звонок',
   openContacts: 'Карточка',
   knock: 'Постучаться',
+  transferTitle: 'Файлы',
+  transferHint:
+    'Тот же transfer, что в «Передача» — прямо из сессии с контактом.',
+  transferIdle: 'Выберите файлы и отправьте этому контакту.',
+  transferStaged: (count: number) =>
+    count === 1 ? 'В очереди 1 файл' : `В очереди ${count} файлов`,
+  transferSend: 'Отправить',
+  transferMore: 'Полная передача',
 } as const;

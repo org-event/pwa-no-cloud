@@ -172,7 +172,7 @@
 | S4.5 | done | 2 |
 | S5.1 | done | 5 |
 | S5.2 | done | 3 |
-| S5.3 | todo | 3 |
+| S5.3 | done | 3 |
 | S5.4 | todo | 2 |
 | S6.1 | todo | 3 |
 | S6.2 | todo | 5 |

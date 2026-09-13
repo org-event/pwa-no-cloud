@@ -462,6 +462,7 @@ onUnmounted(() => {
                 :peer-id="parseShellContactId(activeNav) || ''"
                 @open-calls="openContactCalls"
                 @open-book="openContactBook"
+                @open-transfer="openPane('lan')"
               />
             </section>
 
