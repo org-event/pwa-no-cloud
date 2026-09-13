@@ -18,6 +18,9 @@ importers:
 
   .:
     dependencies:
+      '@noble/ed25519':
+        specifier: ^3.2.0
+        version: 3.2.0
       pinia:
         specifier: ^3.0.3
         version: 3.0.4(typescript@6.0.3)(vue@3.5.41(typescript@6.0.3))
@@ -79,6 +82,9 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
+
+  '@noble/ed25519@3.2.0':
+    resolution: {integrity: sha512-criDgRlnUA09hchYrTy/JUWPIEap5rZxQe6wDWzRx51oWWpDRcUpuNzlgPxDJaOK6AsW9c0wKcj3rKRv6t+bPQ==}
 
   '@oxc-project/runtime@0.143.0':
     resolution: {integrity: sha512-zIuXUf+YGIgsPk0xlQmzTY8NCSc8jE/pSfDodlQ9H3EGZABmr+AtIjXRrnpQAXuXzhDSNqZz9cuhud8hDDLvpg==}
@@ -1228,6 +1234,8 @@ snapshots:
   '@blazediff/core@1.9.1': {}
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
+
+  '@noble/ed25519@3.2.0': {}
 
   '@oxc-project/runtime@0.143.0': {}
 

@@ -6,7 +6,7 @@ describe('domain module barrels', () => {
   it('exposes identity and call type shapes', () => {
     const pair: KeyPair = {
       publicKey: new Uint8Array(32),
-      secretKey: new Uint8Array(64),
+      secretKey: new Uint8Array(32),
     };
     expect(pair.publicKey).toHaveLength(32);
 

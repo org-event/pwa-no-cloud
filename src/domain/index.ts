@@ -33,10 +33,23 @@ export {
 export type { Transfer, TransferEvent, TransferState } from './transfer.ts';
 
 export type {
+  CryptoErr,
+  CryptoOk,
+  CryptoResult,
   IdentityId,
   KeyPair,
   PublicKeyBytes,
   SecretKeyBytes,
+  SignatureBytes,
+} from './identity/index.ts';
+export {
+  generateKeyPair,
+  publicKeyFromSecret,
+  signBytes,
+  signPayload,
+  signText,
+  verifyBytes,
+  verifyText,
 } from './identity/index.ts';
 export type { Call, CallLeg, CallLegId, CallState } from './call/index.ts';
 export type { PresenceEntry, PresenceStatus } from './presence/index.ts';
