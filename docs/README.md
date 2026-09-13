@@ -16,7 +16,8 @@ PWA для обмена файлами и папками между устрой
 8. [adr/](./adr/) — архитектурные решения (почему так).
 9. [roadmap-wide.md](./roadmap-wide.md) — пошаговый план горизонта + вопросы на закрытие пунктов.
 10. [backlog-m1.md](./backlog-m1.md) — нарезка M1 на стори (закрыт).
-10b. [backlog-m2.md](./backlog-m2.md) — нарезка M2 на стори (1–5 SP).
+10b. [backlog-m2.md](./backlog-m2.md) — нарезка M2 на стори (закрыт).
+10c. [backlog-m3.md](./backlog-m3.md) — нарезка M3 на стори (1–5 SP).
 11. [sources/ideas-essence.md](./sources/ideas-essence.md) — сжатая суть идей горизонта.
 12. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI.
 13. [features-realtime.md](./features-realtime.md) — presence, стук, звонки (задел).
