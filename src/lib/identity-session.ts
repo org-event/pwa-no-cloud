@@ -14,9 +14,12 @@ import {
   loadVaultFromStorage,
   openSecretKey,
   publicKeyFromSecret,
+  registerBiometricUnlock,
   restoreKeyPairFromBackup,
   saveVaultToStorage,
   sealSecretKey,
+  unlockSecretWithBiometrics,
+  clearBiometricUnlock,
   type KeyPair,
   type VaultStorage,
 } from '@/domain/identity/index.ts';
@@ -114,6 +117,7 @@ export const restoreIdentityFromMnemonic = async (
   const sealed = await sealSecretKey(derived.value.secretKey, passphrase);
   if (!sealed.ok) return sealed;
   saveVaultToStorage(storage, sealed.value);
+  clearBiometricUnlock(storage);
   return { ok: true, value: toUnlocked(derived.value) };
 };
 
@@ -127,6 +131,7 @@ export const restoreIdentityFromBackupText = async (
   const sealed = await sealSecretKey(restored.value.secretKey, passphrase);
   if (!sealed.ok) return sealed;
   saveVaultToStorage(storage, sealed.value);
+  clearBiometricUnlock(storage);
   return { ok: true, value: toUnlocked(restored.value) };
 };
 
@@ -147,4 +152,32 @@ export const exportBackupText = async (
     text: encodeIdentityBackup(backup.value),
     fileName: backupFileName(backup.value.fingerprint),
   };
+};
+
+export const unlockIdentityWithBiometrics = async (
+  storage: VaultStorage,
+): Promise<IdentitySessionResult> => {
+  const opened = await unlockSecretWithBiometrics(storage);
+  if (!opened.ok) return opened;
+  const publicKey = await publicKeyFromSecret(opened.value);
+  return {
+    ok: true,
+    value: toUnlocked({ secretKey: opened.value, publicKey }),
+  };
+};
+
+export const enableBiometricUnlock = async (
+  storage: VaultStorage,
+  identity: UnlockedIdentity,
+): Promise<IdentitySessionResult & { mode?: string }> => {
+  const registered = await registerBiometricUnlock(
+    storage,
+    identity.keyPair.secretKey,
+    {
+      userId: identity.fingerprint,
+      displayName: identity.displayFingerprint,
+    },
+  );
+  if (!registered.ok) return registered;
+  return { ok: true, value: identity, mode: registered.value.mode };
 };

@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import { browserStorage } from '@/config/index.ts';
-import type { VaultStorage } from '@/domain/identity/index.ts';
+import { componentsCopy } from '@/content/index.ts';
+import {
+  canUsePlatformAuthenticator,
+  hasBiometricUnlock,
+  type VaultStorage,
+} from '@/domain/identity/index.ts';
 import {
   createIdentityWithMnemonic,
+  enableBiometricUnlock,
   exportBackupText,
   hasSealedVault,
   restoreIdentityFromBackupText,
   restoreIdentityFromMnemonic,
   unlockIdentity,
+  unlockIdentityWithBiometrics,
   type UnlockedIdentity,
 } from '@/lib/identity-session.ts';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import Card from './Card.vue';
 
 const emit = defineEmits<{
@@ -19,6 +26,7 @@ const emit = defineEmits<{
 
 type Mode = 'unlock' | 'create' | 'restore-mnemonic' | 'restore-backup';
 
+const copy = componentsCopy.identity;
 const base = browserStorage();
 const storage: VaultStorage = {
   getItem: (key) => base.getItem(key),
@@ -35,8 +43,11 @@ const mnemonic = ref('');
 const backupText = ref('');
 const shownMnemonic = ref('');
 const error = ref('');
+const notice = ref('');
 const busy = ref(false);
 const unlocked = ref<UnlockedIdentity | null>(null);
+const bioAvailable = ref(false);
+const bioEnrolled = ref(hasBiometricUnlock(storage));
 
 const title = computed(() => {
   if (mode.value === 'unlock') return 'Разблокировать личность';
@@ -45,8 +56,32 @@ const title = computed(() => {
   return 'Восстановить из файла бэкапа';
 });
 
+const showBioUnlock = computed(
+  () =>
+    mode.value === 'unlock' &&
+    bioAvailable.value &&
+    bioEnrolled.value &&
+    !unlocked.value,
+);
+
+const showBioEnroll = computed(
+  () => Boolean(unlocked.value) && bioAvailable.value && !bioEnrolled.value,
+);
+
+onMounted(() => {
+  void canUsePlatformAuthenticator().then((ok) => {
+    bioAvailable.value = ok;
+  });
+});
+
+const finishUnlocked = (value: UnlockedIdentity) => {
+  unlocked.value = value;
+  emit('unlocked', value);
+};
+
 const run = async () => {
   error.value = '';
+  notice.value = '';
   busy.value = true;
   try {
     if (mode.value === 'create') {
@@ -59,8 +94,7 @@ const run = async () => {
         return;
       }
       shownMnemonic.value = result.mnemonic ?? '';
-      unlocked.value = result.value;
-      emit('unlocked', result.value);
+      finishUnlocked(result.value);
       return;
     }
     if (mode.value === 'unlock') {
@@ -69,8 +103,7 @@ const run = async () => {
         error.value = result.message;
         return;
       }
-      unlocked.value = result.value;
-      emit('unlocked', result.value);
+      finishUnlocked(result.value);
       return;
     }
     if (mode.value === 'restore-mnemonic') {
@@ -83,8 +116,8 @@ const run = async () => {
         error.value = result.message;
         return;
       }
-      unlocked.value = result.value;
-      emit('unlocked', result.value);
+      bioEnrolled.value = false;
+      finishUnlocked(result.value);
       return;
     }
     const result = await restoreIdentityFromBackupText(
@@ -96,8 +129,43 @@ const run = async () => {
       error.value = result.message;
       return;
     }
-    unlocked.value = result.value;
-    emit('unlocked', result.value);
+    bioEnrolled.value = false;
+    finishUnlocked(result.value);
+  } finally {
+    busy.value = false;
+  }
+};
+
+const runBiometric = async () => {
+  error.value = '';
+  notice.value = '';
+  busy.value = true;
+  try {
+    const result = await unlockIdentityWithBiometrics(storage);
+    if (!result.ok) {
+      error.value = copy.bioFallback;
+      notice.value = result.message;
+      return;
+    }
+    finishUnlocked(result.value);
+  } finally {
+    busy.value = false;
+  }
+};
+
+const enrollBiometric = async () => {
+  if (!unlocked.value) return;
+  error.value = '';
+  notice.value = '';
+  busy.value = true;
+  try {
+    const result = await enableBiometricUnlock(storage, unlocked.value);
+    if (!result.ok) {
+      error.value = result.message;
+      return;
+    }
+    bioEnrolled.value = true;
+    notice.value = copy.bioEnabled;
   } finally {
     busy.value = false;
   }
@@ -115,10 +183,10 @@ const copyBackup = async () => {
 </script>
 
 <template>
-  <Card :title="title" hint="Грубый онбординг M1: ключ локально, без облака.">
+  <Card :title="title" :hint="copy.hint">
     <div class="stack-form">
       <label class="field">
-        <span>Мастер-фраза</span>
+        <span>{{ copy.passphrase }}</span>
         <input
           v-model="passphrase"
           type="password"
@@ -128,31 +196,49 @@ const copyBackup = async () => {
       </label>
 
       <label v-if="mode === 'restore-mnemonic'" class="field">
-        <span>Seed BIP39 (12 слов)</span>
+        <span>{{ copy.seedLabel }}</span>
         <textarea v-model="mnemonic" rows="3" :disabled="busy" />
       </label>
 
       <label v-if="mode === 'restore-backup'" class="field">
-        <span>Содержимое nb1. бэкапа</span>
+        <span>{{ copy.backupLabel }}</span>
         <textarea v-model="backupText" rows="4" :disabled="busy" />
       </label>
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="notice" class="tagline">{{ notice }}</p>
 
       <p v-if="shownMnemonic" class="tagline">
-        Сохраните seed-фразу (один раз):
+        {{ copy.saveSeed }}
         <strong>{{ shownMnemonic }}</strong>
       </p>
 
       <p v-if="unlocked" class="tagline">
-        Fingerprint:
+        {{ copy.fingerprint }}
         <code>{{ unlocked.displayFingerprint }}</code>
       </p>
     </div>
 
     <template #actions>
+      <button
+        v-if="showBioUnlock"
+        type="button"
+        class="primary"
+        :disabled="busy"
+        @click="runBiometric"
+      >
+        {{ copy.unlockBio }}
+      </button>
       <button type="button" class="primary" :disabled="busy" @click="run">
-        {{ mode === 'unlock' ? 'Войти' : 'Продолжить' }}
+        {{ mode === 'unlock' ? copy.enter : copy.continue }}
+      </button>
+      <button
+        v-if="showBioEnroll"
+        type="button"
+        :disabled="busy"
+        @click="enrollBiometric"
+      >
+        {{ copy.enableBio }}
       </button>
       <button
         v-if="unlocked"
@@ -160,7 +246,7 @@ const copyBackup = async () => {
         :disabled="busy || !passphrase"
         @click="copyBackup"
       >
-        Копировать бэкап
+        {{ copy.copyBackup }}
       </button>
       <button
         v-if="mode !== 'create'"
@@ -168,7 +254,7 @@ const copyBackup = async () => {
         :disabled="busy"
         @click="mode = 'create'"
       >
-        Создать новую
+        {{ copy.createNew }}
       </button>
       <button
         v-if="mode !== 'unlock' && hasSealedVault(storage)"
@@ -176,7 +262,7 @@ const copyBackup = async () => {
         :disabled="busy"
         @click="mode = 'unlock'"
       >
-        Разблокировать
+        {{ copy.unlock }}
       </button>
       <button
         v-if="mode !== 'restore-mnemonic'"
@@ -184,7 +270,7 @@ const copyBackup = async () => {
         :disabled="busy"
         @click="mode = 'restore-mnemonic'"
       >
-        Из seed
+        {{ copy.fromSeed }}
       </button>
       <button
         v-if="mode !== 'restore-backup'"
@@ -192,7 +278,7 @@ const copyBackup = async () => {
         :disabled="busy"
         @click="mode = 'restore-backup'"
       >
-        Из бэкапа
+        {{ copy.fromBackup }}
       </button>
     </template>
   </Card>

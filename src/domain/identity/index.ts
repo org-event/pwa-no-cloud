@@ -50,6 +50,20 @@ export {
 export type { VaultRecord, VaultStorage } from './vault.ts';
 
 export {
+  WEBAUTHN_STORAGE_KEY,
+  canUsePlatformAuthenticator,
+  clearBiometricUnlock,
+  hasBiometricUnlock,
+  loadBiometricRecord,
+  registerBiometricUnlock,
+  unlockSecretWithBiometrics,
+} from './webauthn-unlock.ts';
+export type {
+  BiometricUnlockMode,
+  BiometricUnlockRecord,
+} from './webauthn-unlock.ts';
+
+export {
   createMnemonic,
   isValidMnemonic,
   keyPairFromMnemonic,
