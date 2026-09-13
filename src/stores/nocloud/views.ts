@@ -169,6 +169,7 @@ export function contactsState(ctx: NocloudContext): ContactsState {
     pending: state.pending,
     notice: state.contactsNotice,
     cardText: state.cardText,
+    identityQrUrl: state.identityQrUrl,
     waiting: peerIsLive(ctx) && state.roomId === meetRoomId(state.me.id),
     connected: state.peer?.state === 'connected',
     livePeerId: state.livePeerId,

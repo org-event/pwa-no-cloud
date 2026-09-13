@@ -116,3 +116,10 @@ export {
   signProfile,
   verifySignedProfile,
 } from './contacts/index.ts';
+export type { IdentityInvite } from './contacts/index.ts';
+export {
+  IDENTITY_INVITE_VERSION,
+  createIdentityInvite,
+  encodeIdentityInvite,
+  parseIdentityInvite,
+} from './contacts/index.ts';

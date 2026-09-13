@@ -6,6 +6,11 @@ import {
   notes,
 } from '@/content/index.ts';
 import {
+  createIdentityInvite,
+  parseIdentityInvite,
+} from '@/domain/identity-invite.ts';
+import type { KeyPair } from '@/domain/identity/index.ts';
+import {
   defaultNick,
   encodeContactCard,
   findContact,
@@ -19,11 +24,33 @@ import {
 import { fileToAvatarDataUrl } from '@/lib/avatar.ts';
 import { createGroup, saveAddressBook } from '@/lib/contacts-store.ts';
 import { bindIdentityProfile, saveProfile } from '@/lib/profile-store.ts';
+import { inviteToQr } from '@/lib/qr.ts';
 import type { NocloudContext } from './context.ts';
 import { peerIsLive, socketBlocked, usesRoomLink } from './views.ts';
 
 export function createContactsSlice(ctx: NocloudContext) {
   const { state, storage, skippedPeers, touch, note } = ctx;
+  let signingKeys: KeyPair | null = null;
+
+  const refreshIdentityCard = async () => {
+    if (signingKeys && state.me.id) {
+      const invite = await createIdentityInvite(
+        { nick: state.me.nick || defaultNick(state.me.id) },
+        signingKeys,
+      );
+      if (invite.ok) {
+        state.cardText = invite.value;
+        state.identityQrUrl = await inviteToQr(invite.value);
+        touch();
+        return;
+      }
+    }
+    state.cardText = encodeContactCard(state.me);
+    state.identityQrUrl = state.cardText
+      ? await inviteToQr(state.cardText)
+      : null;
+    touch();
+  };
 
   const persistBook = (): Promise<void> => {
     const opfs = state.store;
@@ -143,11 +170,11 @@ export function createContactsSlice(ctx: NocloudContext) {
     touch();
   }
 
-  function onBindIdentity(fingerprint: string) {
+  function onBindIdentity(fingerprint: string, keyPair?: KeyPair) {
     state.me = bindIdentityProfile(storage, fingerprint);
-    state.cardText = encodeContactCard(state.me);
+    if (keyPair) signingKeys = keyPair;
     state.peer?.setProfile(state.me);
-    touch();
+    void refreshIdentityCard();
   }
 
   function onSaveProfile(nick: string) {
@@ -161,10 +188,9 @@ export function createContactsSlice(ctx: NocloudContext) {
       nick: nextNick,
       avatar: state.me.avatar,
     });
-    state.cardText = encodeContactCard(state.me);
     state.peer?.setProfile(state.me);
     state.contactsNotice = contactsCopy.nickSaved;
-    touch();
+    void refreshIdentityCard();
   }
 
   function onPickAvatar(file: File) {
@@ -177,10 +203,9 @@ export function createContactsSlice(ctx: NocloudContext) {
           return;
         }
         state.me = saveProfile(storage, { nick: state.me.nick, avatar });
-        state.cardText = encodeContactCard(state.me);
         state.peer?.setProfile(state.me);
         state.contactsNotice = contactsCopy.avatarSaved;
-        touch();
+        void refreshIdentityCard();
       } catch {
         state.contactsNotice = contactsCopy.avatarUnreadable;
         touch();
@@ -190,7 +215,7 @@ export function createContactsSlice(ctx: NocloudContext) {
 
   function onCopyCard() {
     void (async () => {
-      state.cardText = encodeContactCard(state.me);
+      await refreshIdentityCard();
       const ok = await ctx.refs.copyText?.(state.cardText);
       state.contactsNotice = ok
         ? contactsCopy.cardCopied
@@ -205,7 +230,26 @@ export function createContactsSlice(ctx: NocloudContext) {
     })();
   }
 
-  function onAddContact(text: string) {
+  async function onAddContact(text: string): Promise<boolean> {
+    const invite = await parseIdentityInvite(text);
+    if (invite.ok) {
+      if (invite.value.id === state.me.id) {
+        state.contactsNotice = contactsCopy.ownCard;
+        touch();
+        return false;
+      }
+      state.book = upsertContact(state.book, {
+        id: invite.value.id,
+        nick: invite.value.nick,
+        avatar: '',
+        publicKey: invite.value.publicKey,
+      });
+      void persistBook();
+      state.contactsNotice = contactsCopy.inBook(invite.value.nick);
+      touch();
+      ctx.refs.syncPresenceContacts?.();
+      return true;
+    }
     const card = parseContactCard(text);
     if (!card) {
       state.contactsNotice = contactsCopy.pasteCard;

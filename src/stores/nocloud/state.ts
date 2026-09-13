@@ -55,6 +55,7 @@ export type NocloudState = {
   presenceAvailable: boolean;
   presenceOnlineIds: string[];
   cardText: string;
+  identityQrUrl: string | null;
   updateChecking: boolean;
   updateNotice: string;
 };
@@ -101,6 +102,7 @@ export function createNocloudState(storage: StorageLike) {
     presenceAvailable: false,
     presenceOnlineIds: [] as string[],
     cardText: encodeContactCard(me),
+    identityQrUrl: null as string | null,
     updateChecking: false,
     updateNotice: '',
   }) as NocloudState;

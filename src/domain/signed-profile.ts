@@ -31,7 +31,7 @@ export type SignedProfile = {
 
 export type SignedProfileDraft = {
   nick: string;
-  avatar: string;
+  avatar?: string;
   updatedAt?: number;
 };
 

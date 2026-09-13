@@ -41,8 +41,8 @@ const onPickAvatar = (event: Event) => {
   if (file) store.onPickAvatar(file);
 };
 
-const onAddContact = () => {
-  if (store.onAddContact(addCard.value)) addCard.value = '';
+const onAddContact = async () => {
+  if (await store.onAddContact(addCard.value)) addCard.value = '';
 };
 
 const onSaveGroup = () => {
@@ -149,6 +149,14 @@ const contactDetail = (id: string) => {
         :tooltip="copy.copy"
         :disabled="!contacts.cardText"
         @action="store.onCopyCard()"
+      />
+      <img
+        v-if="contacts.identityQrUrl"
+        :src="contacts.identityQrUrl"
+        :alt="copy.qrAlt"
+        class="identity-qr"
+        width="192"
+        height="192"
       />
       <input
         ref="avatarInput"
@@ -271,3 +279,11 @@ const contactDetail = (id: string) => {
     </p>
   </div>
 </template>
+
+<style scoped>
+.identity-qr {
+  display: block;
+  margin-top: 0.75rem;
+  image-rendering: pixelated;
+}
+</style>

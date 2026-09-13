@@ -160,6 +160,7 @@ export const componentsCopy = {
     pickPhoto: 'Своё фото',
     edit: 'Редактировать',
     copy: 'Копировать карточку',
+    qrAlt: 'QR карточки «это я»',
     goAvailable: 'Я в сети',
     goUnavailable: 'Офлайн',
     availableHint:

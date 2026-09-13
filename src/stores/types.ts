@@ -36,6 +36,7 @@ export type ContactsState = {
   pending: ProfileCard | null;
   notice: string;
   cardText: string;
+  identityQrUrl: string | null;
   waiting: boolean;
   connected: boolean;
   livePeerId: string | null;

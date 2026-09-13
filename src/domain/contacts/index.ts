@@ -25,3 +25,10 @@ export {
   signProfile,
   verifySignedProfile,
 } from '../signed-profile.ts';
+export type { IdentityInvite } from '../identity-invite.ts';
+export {
+  IDENTITY_INVITE_VERSION,
+  createIdentityInvite,
+  encodeIdentityInvite,
+  parseIdentityInvite,
+} from '../identity-invite.ts';
