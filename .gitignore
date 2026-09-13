@@ -23,3 +23,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local agent / code intelligence (machine-specific)
+.cursor/
+.serena/
+.codegraph/
