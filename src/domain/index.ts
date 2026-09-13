@@ -204,14 +204,28 @@ export {
   parseIntroduceCard,
   verifyIntroduceCard,
 } from './contacts/index.ts';
-export type { ChatMessage, ChatMessageDraft } from './chat/index.ts';
+export type {
+  ChatDirection,
+  ChatMessage,
+  ChatMessageDraft,
+  ChatStoredMessage,
+  ChatStoreState,
+  ChatThreadSummary,
+} from './chat/index.ts';
 export {
   CHAT_MESSAGE_MAX_CHARS,
   CHAT_MESSAGE_PREFIX,
   CHAT_MESSAGE_VERSION,
+  CHAT_STORE_MAX_PER_THREAD,
+  appendChatMessage,
   canonicalChatMessage,
   createChatMessage,
+  emptyChatStore,
+  listThreadMessages,
+  listThreadSummaries,
   parseAndVerifyChatMessage,
   parseChatMessage,
+  storedFromWire,
+  threadPeerId,
   verifyChatMessage,
 } from './chat/index.ts';

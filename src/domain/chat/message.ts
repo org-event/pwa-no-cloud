@@ -49,7 +49,7 @@ const extractPayload = (text: string): string | null => {
 };
 
 const sanitizeText = (raw: string): string | null => {
-  const text = raw.replace(/\u0000/g, '').trim();
+  const text = raw.split('\0').join('').trim();
   if (!text || text.length > CHAT_MESSAGE_MAX_CHARS) return null;
   return text;
 };
