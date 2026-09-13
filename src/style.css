@@ -161,8 +161,32 @@ body {
   background: var(--color-muted);
 }
 
+.shell-row-contact {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.shell-row-avatar {
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
+.shell-row-text {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
 .shell-row-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-weight: 600;
+}
+
+.shell-list-empty {
+  padding: 0.5rem 0.75rem 0.75rem;
 }
 
 .shell-row-detail {
@@ -216,6 +240,29 @@ body {
 .page-solo {
   max-width: 40rem;
   margin: 0 auto;
+}
+
+.shell-contact-focus {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  text-align: center;
+}
+
+.shell-contact-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--color-muted-foreground);
+}
+
+.shell-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
 }
 
 @media (max-width: 900px) {

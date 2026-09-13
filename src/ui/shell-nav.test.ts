@@ -1,17 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { allShellNavItems, isShellStub, shellNavTitle } from './shell-nav.ts';
+import {
+  isShellContact,
+  isShellStub,
+  parseShellContactId,
+  shellContactId,
+  shellNavTitle,
+} from './shell-nav.ts';
 
 describe('shell-nav', () => {
-  it('includes stubs and app sections', () => {
-    const items = allShellNavItems();
-    expect(items.some((item) => item.id === 'stub-chats')).toBe(true);
-    expect(items.some((item) => item.id === 'contacts')).toBe(true);
-    expect(isShellStub('stub-empty')).toBe(true);
-    expect(isShellStub('calls')).toBe(false);
+  it('builds and parses contact nav ids', () => {
+    const id = shellContactId('fp-alice');
+    expect(id).toBe('contact:fp-alice');
+    expect(parseShellContactId(id)).toBe('fp-alice');
+    expect(isShellContact(id)).toBe(true);
+    expect(isShellStub(id)).toBe(false);
   });
 
-  it('resolves titles for stubs and sections', () => {
+  it('resolves titles for stubs, sections, and contacts', () => {
     expect(shellNavTitle('stub-chats')).toBeTruthy();
     expect(shellNavTitle('contacts')).toBeTruthy();
+    expect(shellNavTitle(shellContactId('fp'), 'Аня')).toBe('Аня');
   });
 });

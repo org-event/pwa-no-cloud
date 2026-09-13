@@ -14,6 +14,7 @@ import PlaceholderSection from './components/PlaceholderSection.vue';
 import ServersSection from './components/ServersSection.vue';
 import SessionTools from './components/SessionTools.vue';
 import ShellChatList from './components/ShellChatList.vue';
+import ShellContactFocus from './components/ShellContactFocus.vue';
 import TransferPanel from './components/TransferPanel.vue';
 import { useNocloudStore } from './stores/nocloud.ts';
 import type { UnlockedIdentity } from '@/lib/identity-session.ts';
@@ -22,11 +23,16 @@ import {
   parseSectionHash,
   type AppSection,
 } from './ui/sections.ts';
-import { isShellStub, shellNavTitle, type ShellNavId } from './ui/shell-nav.ts';
+import {
+  isShellContact,
+  isShellStub,
+  parseShellContactId,
+  shellNavTitle,
+  type ShellNavId,
+} from './ui/shell-nav.ts';
 
 const store = useNocloudStore();
-const { status, canInstall, state, contacts, hasSignalingSocket } =
-  storeToRefs(store);
+const { status, state, contacts } = storeToRefs(store);
 
 const identity = ref<UnlockedIdentity | null>(null);
 const onIdentityUnlocked = (value: UnlockedIdentity) => {
@@ -74,7 +80,16 @@ const currentSection = ref<AppSection>(
 
 const activeNav = ref<ShellNavId>(currentSection.value);
 
-const pageTitle = computed(() => shellNavTitle(activeNav.value));
+const pageTitle = computed(() => {
+  const peerId = parseShellContactId(activeNav.value);
+  if (peerId) {
+    const contact = contacts.value.book.contacts.find(
+      (item) => item.id === peerId,
+    );
+    return shellNavTitle(activeNav.value, contact ? contact.nick : undefined);
+  }
+  return shellNavTitle(activeNav.value);
+});
 
 const showShellList = computed(
   () => Boolean(identity.value) && (!shellStacked.value || listMode.value),
@@ -140,6 +155,13 @@ const setMenuOpen = (open: boolean) => {
 
 const openPane = (id: ShellNavId) => {
   activeNav.value = id;
+  const peerId = parseShellContactId(id);
+  if (peerId) {
+    store.onSelectContact(peerId);
+    listMode.value = false;
+    setMenuOpen(false);
+    return;
+  }
   if (!isShellStub(id)) {
     currentSection.value = id;
     if (globalThis.location && globalThis.location.hash !== `#${id}`) {
@@ -148,6 +170,16 @@ const openPane = (id: ShellNavId) => {
   }
   listMode.value = false;
   setMenuOpen(false);
+};
+
+const openContactCalls = () => {
+  const peerId = parseShellContactId(activeNav.value);
+  openPane('calls');
+  if (peerId) store.onSelectContact(peerId);
+};
+
+const openContactBook = () => {
+  openPane('contacts');
 };
 
 const backToList = () => {
@@ -177,6 +209,7 @@ const skipToContent = (event: Event) => {
 
 watch(identity, (value) => {
   if (value && shellStacked.value) listMode.value = true;
+  if (value) void store.seedDemoContacts();
 });
 
 onMounted(() => {
@@ -417,6 +450,18 @@ onUnmounted(() => {
                 v-else
                 :title="shellCopy.stubEmptyTitle"
                 :text="shellCopy.stubEmptyText"
+              />
+            </section>
+
+            <section
+              v-else-if="isShellContact(activeNav)"
+              class="page-section"
+              data-section="contact"
+            >
+              <ShellContactFocus
+                :peer-id="parseShellContactId(activeNav) || ''"
+                @open-calls="openContactCalls"
+                @open-book="openContactBook"
               />
             </section>
 
