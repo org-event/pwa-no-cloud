@@ -9,8 +9,11 @@ import {
   createIdentityInvite,
   parseIdentityInvite,
 } from '@/domain/identity-invite.ts';
-import { importIntroduceCard } from '@/domain/introduce.ts';
-import type { KeyPair } from '@/domain/identity/index.ts';
+import {
+  createIntroduceCard,
+  importIntroduceCard,
+} from '@/domain/introduce.ts';
+import { decodePublicKey, type KeyPair } from '@/domain/identity/index.ts';
 import {
   defaultNick,
   encodeContactCard,
@@ -20,6 +23,7 @@ import {
   removeContact,
   sanitizeNick,
   setContactAlias,
+  contactDisplayName,
   upsertContact,
   type ProfileCard,
 } from '@/domain/profile.ts';
@@ -254,6 +258,50 @@ export function createContactsSlice(ctx: NocloudContext) {
     })();
   }
 
+  async function onIntroduceContact(id: string): Promise<boolean> {
+    const contact = findContact(state.book, id);
+    if (!contact) {
+      state.contactsNotice = contactsCopy.introduceNotFound;
+      touch();
+      return false;
+    }
+    if (!contact.publicKey) {
+      state.contactsNotice = contactsCopy.introduceNeedKey;
+      touch();
+      return false;
+    }
+    const keyPair = currentKeyPair();
+    if (!keyPair) {
+      state.contactsNotice = contactsCopy.introduceNeedIdentity;
+      touch();
+      return false;
+    }
+    const subjectPk = decodePublicKey(contact.publicKey);
+    if (!subjectPk.ok) {
+      state.contactsNotice = contactsCopy.introduceFailed;
+      touch();
+      return false;
+    }
+    const encoded = await createIntroduceCard(
+      {
+        subjectPk: subjectPk.value,
+        subjectNick: contact.nick || defaultNick(contact.id),
+      },
+      keyPair,
+    );
+    if (!encoded.ok) {
+      state.contactsNotice = contactsCopy.introduceFailed;
+      touch();
+      return false;
+    }
+    const ok = await ctx.refs.copyText?.(encoded.value);
+    state.contactsNotice = ok
+      ? contactsCopy.introduceCopied(contactDisplayName(contact))
+      : contactsCopy.cardCopyFailed;
+    touch();
+    return ok ?? false;
+  }
+
   async function onAddContact(text: string): Promise<boolean> {
     const introduced = await importIntroduceCard(text);
     if (introduced.ok) {
@@ -401,6 +449,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     onPickAvatar,
     onCopyCard,
     onAddContact,
+    onIntroduceContact,
     onRenameAlias,
     onRemoveContact,
     onSaveGroup,

@@ -22,6 +22,7 @@ export const shellCopy = {
   openCalls: 'Звонок',
   openContacts: 'Карточка',
   knock: 'Постучаться',
+  introduce: 'Представить',
   transferTitle: 'Файлы',
   transferHint:
     'Тот же transfer, что в «Передача» — прямо из сессии с контактом.',

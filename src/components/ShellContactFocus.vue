@@ -58,6 +58,12 @@ const onKnock = () => {
   void store.onKnockContact(props.peerId);
 };
 
+const canIntroduce = computed(() => Boolean(contact.value?.publicKey));
+
+const onIntroduce = () => {
+  void store.onIntroduceContact(props.peerId);
+};
+
 const ensureSelected = () => {
   store.onSelectContact(props.peerId);
 };
@@ -105,6 +111,14 @@ const onSend = () => {
             @click="onKnock"
           >
             {{ shellCopy.knock }}
+          </button>
+          <button
+            type="button"
+            class="button button-secondary"
+            :disabled="!canIntroduce"
+            @click="onIntroduce"
+          >
+            {{ shellCopy.introduce }}
           </button>
           <button
             type="button"

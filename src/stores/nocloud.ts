@@ -243,6 +243,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
     onPickAvatar: contacts.onPickAvatar,
     onCopyCard: contacts.onCopyCard,
     onAddContact: contacts.onAddContact,
+    onIntroduceContact: contacts.onIntroduceContact,
     onStartPresence: presence.startPresence,
     onStopPresence: presence.stopPresence,
     onKnockContact: presence.onKnockContact,

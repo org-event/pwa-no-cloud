@@ -12,6 +12,14 @@ export const contactsCopy = {
   cardCopyFailed: 'Не удалось скопировать.',
   pasteCard: 'Вставьте карточку P1. или представление I1.',
   introduced: (nick: string) => `Добавлен по представлению: ${nick}`,
+  introduceCopied: (nick: string) =>
+    `Представление I1. скопировано: ${nick}. Вставьте у третьего в «Контакты».`,
+  introduceNeedKey:
+    'У контакта нет ключа — сначала добавьте его по карточке P1.',
+  introduceNeedIdentity:
+    'Нужна своя личность (ключ), чтобы подписать представление.',
+  introduceNotFound: 'Контакт не найден.',
+  introduceFailed: 'Не удалось создать представление.',
   ownCard: 'Это ваша карточка.',
   aliasSaved: 'Локальное имя сохранено.',
   removed: 'Удалено.',

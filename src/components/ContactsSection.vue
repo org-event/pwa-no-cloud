@@ -190,7 +190,7 @@ const saveAlias = () => {
         v-model="addCard"
         :label="copy.cardField"
         name="card"
-        placeholder="P1.{…}"
+        placeholder="P1. / I1."
         :input-aria-label="copy.cardFieldAria"
         icon="plus"
         :tooltip="copy.add"
@@ -226,6 +226,14 @@ const saveAlias = () => {
               @click="store.onKnockContact(contact.id)"
             >
               {{ copy.knock }}
+            </button>
+            <button
+              type="button"
+              class="button button-secondary"
+              :disabled="!contact.publicKey"
+              @click="store.onIntroduceContact(contact.id)"
+            >
+              {{ copy.introduce }}
             </button>
             <button
               type="button"
