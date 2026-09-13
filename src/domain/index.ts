@@ -101,6 +101,7 @@ export {
   M1_MAX_CALL_LEGS,
   applyCallSessionEvent,
   createIdleCallSession,
+  isCallBusy,
   primaryCallLeg,
 } from './call/index.ts';
 export type { PresenceEntry, PresenceStatus } from './presence/index.ts';

@@ -1,17 +1,18 @@
 /**
  * Call domain — voice/video session over WebRTC legs.
- * S4.1: multi-leg types + automaton (N=1 runtime). Media wiring in S4.2+.
+ * S4.1 multi-leg model; S4.2 media on PC; S4.3 offer/ringing/accept/reject/busy/hangup FSM.
  */
 
 export type CallTopology = 'mesh' | 'sfu';
 
-/** Per-leg lifecycle before the richer Call FSM in S4.3. */
 export type CallLegState =
   | 'outbound'
   | 'ringing'
   | 'active'
   | 'ended'
-  | 'failed';
+  | 'failed'
+  | 'rejected'
+  | 'busy';
 
 /** Aggregate session state derived from legs. */
 export type CallSessionState = 'idle' | 'open' | 'ended' | 'failed';
@@ -50,9 +51,21 @@ export type Call = CallSession;
 /** Runtime cap for M1 — more legs are a type-level / future concern. */
 export const M1_MAX_CALL_LEGS = 1;
 
+const TERMINAL_LEG: ReadonlySet<CallLegState> = new Set([
+  'ended',
+  'failed',
+  'rejected',
+  'busy',
+]);
+
 export type CallSessionEvent =
   | { type: 'dial'; peerId: string; legId?: CallLegId }
   | { type: 'incoming'; peerId: string; legId?: CallLegId }
+  /** Caller learns remote is ringing (SIP-like 180). */
+  | { type: 'remote-ringing'; legId: CallLegId }
+  | { type: 'accept'; legId: CallLegId }
+  | { type: 'reject'; legId: CallLegId; reason?: string }
+  | { type: 'busy'; legId: CallLegId }
   | { type: 'leg-active'; legId: CallLegId }
   | { type: 'leg-fail'; legId: CallLegId; message: string }
   | { type: 'hangup'; legId?: CallLegId }
@@ -91,6 +104,8 @@ const replaceLeg = (session: CallSession, next: CallLeg): CallSession => ({
   legs: session.legs.map((leg) => (leg.id === next.id ? next : leg)),
 });
 
+const isTerminalLeg = (state: CallLegState): boolean => TERMINAL_LEG.has(state);
+
 const deriveState = (
   legs: CallLeg[],
   fallbackError = '',
@@ -102,9 +117,21 @@ const deriveState = (
   if (legs.every((leg) => leg.state === 'ended')) {
     return { state: 'ended', error: '' };
   }
-  if (legs.every((leg) => leg.state === 'failed' || leg.state === 'ended')) {
-    const failed = legs.find((leg) => leg.state === 'failed');
-    return { state: 'failed', error: failed?.error || fallbackError };
+  if (legs.every((leg) => isTerminalLeg(leg.state))) {
+    const failed = legs.find(
+      (leg) =>
+        leg.state === 'failed' ||
+        leg.state === 'rejected' ||
+        leg.state === 'busy',
+    );
+    const error =
+      failed?.error ||
+      (failed?.state === 'busy'
+        ? 'busy'
+        : failed?.state === 'rejected'
+          ? 'rejected'
+          : fallbackError);
+    return { state: 'failed', error };
   }
   return { state: 'open', error: '' };
 };
@@ -112,6 +139,17 @@ const deriveState = (
 const canOpenLeg = (session: CallSession): boolean =>
   session.state === 'idle' ||
   (session.state === 'open' && session.legs.length < session.maxLegs);
+
+const reopenBase = (session: CallSession): CallSession => {
+  if (session.state !== 'ended' && session.state !== 'failed') return session;
+  return {
+    ...createIdleCallSession({
+      topology: session.topology,
+      maxLegs: session.maxLegs,
+    }),
+    id: session.id,
+  };
+};
 
 const openLeg = (
   session: CallSession,
@@ -136,6 +174,21 @@ const openLeg = (
   };
 };
 
+const setLegState = (
+  session: CallSession,
+  legId: CallLegId,
+  state: CallLegState,
+  error = '',
+  allowed: ReadonlySet<CallLegState>,
+): CallSession => {
+  const leg = findLeg(session, legId);
+  if (!leg) return session;
+  if (!allowed.has(leg.state)) return session;
+  const next = { ...leg, state, error };
+  const legs = replaceLeg(session, next).legs;
+  return { ...session, legs, ...deriveState(legs, error) };
+};
+
 export const applyCallSessionEvent = (
   session: CallSession,
   event: CallSessionEvent,
@@ -151,60 +204,92 @@ export const applyCallSessionEvent = (
   }
 
   if (event.type === 'dial') {
-    if (session.state !== 'idle' && session.state !== 'ended') return session;
-    const base =
-      session.state === 'ended'
-        ? {
-            ...createIdleCallSession({
-              topology: session.topology,
-              maxLegs: session.maxLegs,
-            }),
-            id: session.id,
-          }
-        : session;
-    return openLeg(base, event.peerId, 'out', event.legId);
+    if (
+      session.state !== 'idle' &&
+      session.state !== 'ended' &&
+      session.state !== 'failed'
+    ) {
+      return session;
+    }
+    return openLeg(reopenBase(session), event.peerId, 'out', event.legId);
   }
 
   if (event.type === 'incoming') {
-    if (session.state !== 'idle' && session.state !== 'ended') return session;
-    const base =
-      session.state === 'ended'
-        ? {
-            ...createIdleCallSession({
-              topology: session.topology,
-              maxLegs: session.maxLegs,
-            }),
-            id: session.id,
-          }
-        : session;
-    return openLeg(base, event.peerId, 'in', event.legId);
+    if (
+      session.state !== 'idle' &&
+      session.state !== 'ended' &&
+      session.state !== 'failed'
+    ) {
+      return session;
+    }
+    return openLeg(reopenBase(session), event.peerId, 'in', event.legId);
   }
 
   if (event.type === 'add-leg') {
-    // M1: maxLegs === 1 → no-op when already has a leg.
     return openLeg(session, event.peerId, 'out', event.legId);
   }
 
+  if (event.type === 'remote-ringing') {
+    return setLegState(
+      session,
+      event.legId,
+      'ringing',
+      '',
+      new Set(['outbound']),
+    );
+  }
+
+  if (event.type === 'accept') {
+    // Callee accepts while ringing; media "active" may follow via leg-active.
+    return setLegState(
+      session,
+      event.legId,
+      'active',
+      '',
+      new Set(['ringing', 'outbound']),
+    );
+  }
+
+  if (event.type === 'reject') {
+    return setLegState(
+      session,
+      event.legId,
+      'rejected',
+      event.reason || 'rejected',
+      new Set(['ringing', 'outbound']),
+    );
+  }
+
+  if (event.type === 'busy') {
+    return setLegState(
+      session,
+      event.legId,
+      'busy',
+      'busy',
+      new Set(['ringing', 'outbound']),
+    );
+  }
+
   if (event.type === 'leg-active') {
-    const leg = findLeg(session, event.legId);
-    if (!leg) return session;
-    if (leg.state !== 'outbound' && leg.state !== 'ringing') return session;
-    const next = { ...leg, state: 'active' as const, error: '' };
-    const legs = replaceLeg(session, next).legs;
-    return { ...session, legs, ...deriveState(legs) };
+    return setLegState(
+      session,
+      event.legId,
+      'active',
+      '',
+      new Set(['outbound', 'ringing', 'active']),
+    );
   }
 
   if (event.type === 'leg-fail') {
     const leg = findLeg(session, event.legId);
-    if (!leg) return session;
-    if (leg.state === 'ended' || leg.state === 'failed') return session;
-    const next = {
-      ...leg,
-      state: 'failed' as const,
-      error: event.message,
-    };
-    const legs = replaceLeg(session, next).legs;
-    return { ...session, legs, ...deriveState(legs, event.message) };
+    if (!leg || isTerminalLeg(leg.state)) return session;
+    return setLegState(
+      session,
+      event.legId,
+      'failed',
+      event.message,
+      new Set(['outbound', 'ringing', 'active']),
+    );
   }
 
   if (event.type === 'hangup') {
@@ -212,7 +297,7 @@ export const applyCallSessionEvent = (
     const targetId = event.legId;
     const legs = session.legs.map((leg) => {
       if (targetId && leg.id !== targetId) return leg;
-      if (leg.state === 'ended' || leg.state === 'failed') return leg;
+      if (isTerminalLeg(leg.state)) return leg;
       return { ...leg, state: 'ended' as const, error: '' };
     });
     return { ...session, legs, ...deriveState(legs) };
@@ -224,3 +309,7 @@ export const applyCallSessionEvent = (
 /** Convenience: first (and only, in M1) leg. */
 export const primaryCallLeg = (session: CallSession): CallLeg | null =>
   session.legs[0] ?? null;
+
+export const isCallBusy = (session: CallSession): boolean =>
+  session.state === 'open' &&
+  session.legs.some((leg) => !isTerminalLeg(leg.state));
