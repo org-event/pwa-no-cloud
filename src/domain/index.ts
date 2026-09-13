@@ -97,6 +97,7 @@ export type {
 export type { AddressBook, Contact, ProfileCard } from './contacts/index.ts';
 export {
   CONTACT_CARD_PREFIX,
+  LEGACY_CONTACT_CARD_PREFIX,
   encodeContactCard,
   meetRoomId,
   parseContactCard,

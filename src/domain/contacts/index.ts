@@ -6,6 +6,7 @@
 export type { AddressBook, Contact, ProfileCard } from '../profile.ts';
 export {
   CONTACT_CARD_PREFIX,
+  LEGACY_CONTACT_CARD_PREFIX,
   encodeContactCard,
   meetRoomId,
   parseContactCard,

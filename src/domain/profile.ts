@@ -1,5 +1,10 @@
 import { domainCopy } from '@/content/index.ts';
 
+/**
+ * Peer profile card. `id` is the identity fingerprint (16 hex), not a random short code.
+ * Old C1. / alphanumeric client ids are hard-cut (see backlog S0.2).
+ */
+
 export type ProfileCard = {
   id: string;
   nick: string;
@@ -9,10 +14,17 @@ export type ProfileCard = {
 export const MAX_NICK_LENGTH = 32;
 export const MAX_AVATAR_CHARS = 48_000;
 
-const NICK_RE = /^[\p{L}\p{N} ._-]{1,32}$/u;
+/** Invite / paste card: fingerprint-based (replaces exploratory `C1.`). */
+export const CONTACT_CARD_PREFIX = 'P1.';
+/** Rejected exploratory prefix — parseContactCard returns null for these. */
+export const LEGACY_CONTACT_CARD_PREFIX = 'C1.';
 
+const NICK_RE = /^[\p{L}\p{N} ._-]{1,32}$/u;
+const FINGERPRINT_RE = /^[0-9a-f]{16}$/i;
+
+/** Canonical peer id = identity fingerprint (S1.2), not random clientId. */
 export const isProfileId = (value: string): boolean => {
-  return /^[a-z0-9]{8,24}$/i.test(value);
+  return FINGERPRINT_RE.test(value);
 };
 
 export const sanitizeNick = (raw: string): string => {
@@ -38,15 +50,18 @@ export const isSafeAvatar = (value: string): boolean => {
   );
 };
 
-export const CONTACT_CARD_PREFIX = 'C1.';
-
 export const encodeContactCard = (card: ProfileCard): string => {
+  if (!isProfileId(card.id)) return '';
   return (
-    CONTACT_CARD_PREFIX + JSON.stringify({ v: 1, id: card.id, nick: card.nick })
+    CONTACT_CARD_PREFIX +
+    JSON.stringify({ v: 2, id: card.id.toLowerCase(), nick: card.nick })
   );
 };
 
-export const meetRoomId = (ownerId: string): string => `c-${ownerId}`;
+export const meetRoomId = (ownerId: string): string => {
+  const id = ownerId.toLowerCase();
+  return `c-${id}`;
+};
 
 const stripCardNoise = (text: string): string => {
   return text.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
@@ -55,13 +70,16 @@ const stripCardNoise = (text: string): string => {
 const cardFromRecord = (id: unknown, nick: unknown): ProfileCard | null => {
   if (typeof id !== 'string' || !isProfileId(id)) return null;
   const label = typeof nick === 'string' ? sanitizeNick(nick) : '';
-  return { id, nick: label || defaultNick(id), avatar: '' };
+  const normalized = id.toLowerCase();
+  return { id: normalized, nick: label || defaultNick(normalized), avatar: '' };
 };
 
 export const parseContactCard = (text: string): ProfileCard | null => {
   const raw = stripCardNoise(text);
   if (!raw) return null;
-  const packed = raw.match(/C1\.\s*(\{[\s\S]*\})/i);
+  // Hard cut: exploratory C1. cards are not accepted.
+  if (raw.includes(LEGACY_CONTACT_CARD_PREFIX)) return null;
+  const packed = raw.match(/P1\.\s*(\{[\s\S]*\})/i);
   if (packed?.[1]) {
     try {
       const parsed = JSON.parse(packed[1]) as {
@@ -83,7 +101,8 @@ export const parseContactCard = (text: string): ProfileCard | null => {
     }
   }
   if (isProfileId(raw)) {
-    return { id: raw, nick: defaultNick(raw), avatar: '' };
+    const id = raw.toLowerCase();
+    return { id, nick: defaultNick(id), avatar: '' };
   }
   return null;
 };
@@ -96,13 +115,14 @@ export const parseProfileCard = (raw: unknown): ProfileCard | null => {
     avatar?: unknown;
   };
   if (typeof record.id !== 'string' || !isProfileId(record.id)) return null;
+  const id = record.id.toLowerCase();
   const nick = typeof record.nick === 'string' ? sanitizeNick(record.nick) : '';
   if (!nick) return null;
   const avatar = typeof record.avatar === 'string' ? record.avatar : '';
   if (!isSafeAvatar(avatar)) {
-    return { id: record.id, nick, avatar: '' };
+    return { id, nick, avatar: '' };
   }
-  return { id: record.id, nick, avatar };
+  return { id, nick, avatar };
 };
 
 export type Contact = ProfileCard & {
@@ -128,10 +148,12 @@ export const upsertContact = (
   card: ProfileCard,
   now = Date.now(),
 ): AddressBook => {
-  const next = book.contacts.filter((item) => item.id !== card.id);
-  const previous = book.contacts.find((item) => item.id === card.id);
+  const id = card.id.toLowerCase();
+  const next = book.contacts.filter((item) => item.id !== id);
+  const previous = book.contacts.find((item) => item.id === id);
   next.push({
     ...card,
+    id,
     addedAt: previous?.addedAt ?? now,
     updatedAt: now,
   });
@@ -140,18 +162,22 @@ export const upsertContact = (
 };
 
 export const removeContact = (book: AddressBook, id: string): AddressBook => {
+  const normalized = id.toLowerCase();
   return {
-    contacts: book.contacts.filter((item) => item.id !== id),
+    contacts: book.contacts.filter((item) => item.id !== normalized),
     groups: book.groups.map((group) => ({
       ...group,
-      memberIds: group.memberIds.filter((member) => member !== id),
+      memberIds: group.memberIds.filter(
+        (member) => member.toLowerCase() !== normalized,
+      ),
     })),
   };
 };
 
 export const findContact = (book: AddressBook, id: string): Contact | null => {
+  const normalized = id.toLowerCase();
   for (const item of book.contacts) {
-    if (item.id === id) return item;
+    if (item.id === normalized) return item;
   }
   return null;
 };
@@ -164,9 +190,10 @@ export const expandRecipients = (
   const seen = new Set<string>();
   const cards: ProfileCard[] = [];
   const add = (id: string) => {
-    if (seen.has(id)) return;
-    seen.add(id);
-    const found = findContact(book, id);
+    const normalized = id.toLowerCase();
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    const found = findContact(book, normalized);
     if (found) cards.push(found);
   };
   for (const id of contactIds) add(id);

@@ -28,6 +28,7 @@ const { status, canInstall, state, contacts, hasSignalingSocket } =
 const identity = ref<UnlockedIdentity | null>(null);
 const onIdentityUnlocked = (value: UnlockedIdentity) => {
   identity.value = value;
+  store.onBindIdentity(value.fingerprint);
 };
 
 const menuOpen = ref(false);

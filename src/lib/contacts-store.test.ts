@@ -10,7 +10,7 @@ describe('contacts store', () => {
     const saved = await saveAddressBook(opened.value, {
       contacts: [
         {
-          id: 'abc123xyz9',
+          id: 'abcd1234ef567890',
           nick: 'Вася',
           avatar: '',
           addedAt: 1,
@@ -24,7 +24,7 @@ describe('contacts store', () => {
           updatedAt: 1,
         },
       ],
-      groups: [{ id: 'g1', name: 'дом', memberIds: ['abc123xyz9'] }],
+      groups: [{ id: 'g1', name: 'дом', memberIds: ['abcd1234ef567890'] }],
     });
     expect(saved.ok).toBe(true);
     const loaded = await loadAddressBook(opened.value);

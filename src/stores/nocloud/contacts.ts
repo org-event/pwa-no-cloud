@@ -18,7 +18,7 @@ import {
 } from '@/domain/profile.ts';
 import { fileToAvatarDataUrl } from '@/lib/avatar.ts';
 import { createGroup, saveAddressBook } from '@/lib/contacts-store.ts';
-import { saveProfile } from '@/lib/profile-store.ts';
+import { bindIdentityProfile, saveProfile } from '@/lib/profile-store.ts';
 import type { NocloudContext } from './context.ts';
 import { peerIsLive, socketBlocked, usesRoomLink } from './views.ts';
 
@@ -140,6 +140,13 @@ export function createContactsSlice(ctx: NocloudContext) {
     state.selectedGroupIds = state.selectedGroupIds.includes(id)
       ? state.selectedGroupIds.filter((item) => item !== id)
       : [...state.selectedGroupIds, id];
+    touch();
+  }
+
+  function onBindIdentity(fingerprint: string) {
+    state.me = bindIdentityProfile(storage, fingerprint);
+    state.cardText = encodeContactCard(state.me);
+    state.peer?.setProfile(state.me);
     touch();
   }
 
@@ -270,11 +277,11 @@ export function createContactsSlice(ctx: NocloudContext) {
   async function seedDemoContacts() {
     if (!state.store) return;
     const demos: ProfileCard[] = [
-      { id: 'demoanna01xx', nick: 'Анна', avatar: '' },
-      { id: 'demoboris02y', nick: 'Борис', avatar: '' },
-      { id: 'demovika03zz', nick: 'Вика', avatar: '' },
-      { id: 'demodima04ww', nick: 'Дима', avatar: '' },
-      { id: 'demolena05vv', nick: 'Лена', avatar: '' },
+      { id: 'a11a11a11a11a11a', nick: 'Анна', avatar: '' },
+      { id: 'b22b22b22b22b22b', nick: 'Борис', avatar: '' },
+      { id: 'c33c33c33c33c33c', nick: 'Вика', avatar: '' },
+      { id: 'd44d44d44d44d44d', nick: 'Дима', avatar: '' },
+      { id: 'e55e55e55e55e55e', nick: 'Лена', avatar: '' },
     ];
     let changed = false;
     for (const demo of demos) {
@@ -298,6 +305,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     onToggleContact,
     onSelectContact,
     onToggleGroup,
+    onBindIdentity,
     onSaveProfile,
     onPickAvatar,
     onCopyCard,

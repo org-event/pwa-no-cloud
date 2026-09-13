@@ -165,7 +165,7 @@ const contactDetail = (id: string) => {
         v-model="addCard"
         :label="copy.cardField"
         name="card"
-        placeholder="C1.{…}"
+        placeholder="P1.{…}"
         :input-aria-label="copy.cardFieldAria"
         icon="plus"
         :tooltip="copy.add"
