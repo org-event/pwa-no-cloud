@@ -38,12 +38,12 @@ describe('peer-media attach/detach', () => {
     const audio = fakeTrack('audio', 'a1');
     const stream = fakeStream([audio]);
     const mediaSender = { track: audio };
-    const senders: Array<{ track: MediaStreamTrack | null }> = [mediaSender];
+    const senders = [mediaSender];
     const pc = {
       getSenders: () => senders as RTCRtpSender[],
       addTrack: vi.fn(),
-      removeTrack: vi.fn((sender: { track: MediaStreamTrack | null }) => {
-        const index = senders.indexOf(sender);
+      removeTrack: vi.fn((sender: RTCRtpSender) => {
+        const index = senders.findIndex((item) => item === sender);
         if (index >= 0) senders.splice(index, 1);
       }),
     };
@@ -63,8 +63,8 @@ describe('peer-media attach/detach', () => {
     const pc = {
       getSenders: () => senders as RTCRtpSender[],
       addTrack: vi.fn(),
-      removeTrack: vi.fn((sender: { track: MediaStreamTrack | null }) => {
-        const index = senders.indexOf(sender);
+      removeTrack: vi.fn((sender: RTCRtpSender) => {
+        const index = senders.findIndex((item) => item === sender);
         if (index >= 0) senders.splice(index, 1);
       }),
     };

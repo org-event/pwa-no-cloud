@@ -34,7 +34,7 @@ export const detachLocalMediaTracks = (
   stream: MediaStream | null = null,
 ): number => {
   let removed = 0;
-  for (const sender of [...pc.getSenders()]) {
+  for (const sender of pc.getSenders()) {
     const track = sender.track;
     if (!track) continue;
     if (track.kind !== 'audio' && track.kind !== 'video') continue;
