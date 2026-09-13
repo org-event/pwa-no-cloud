@@ -1,24 +1,39 @@
 /**
- * Identity domain — Ed25519 keygen / sign / verify (S1.1).
+ * Identity domain — Ed25519 keygen / sign / verify (S1.1) + encoding (S1.2).
  * Algorithm is behind this module so it can be swapped later.
  */
 
 import * as ed from '@noble/ed25519';
+import type {
+  CryptoResult,
+  KeyPair,
+  PublicKeyBytes,
+  SecretKeyBytes,
+  SignatureBytes,
+} from './types.ts';
 
-export type PublicKeyBytes = Uint8Array;
-export type SecretKeyBytes = Uint8Array;
-export type SignatureBytes = Uint8Array;
+export type {
+  CryptoErr,
+  CryptoOk,
+  CryptoResult,
+  IdentityId,
+  KeyPair,
+  PublicKeyBytes,
+  SecretKeyBytes,
+  SignatureBytes,
+} from './types.ts';
 
-export type KeyPair = {
-  publicKey: PublicKeyBytes;
-  secretKey: SecretKeyBytes;
-};
-
-export type IdentityId = string;
-
-export type CryptoOk<T> = { ok: true; value: T };
-export type CryptoErr = { ok: false; code: string; message: string };
-export type CryptoResult<T> = CryptoOk<T> | CryptoErr;
+export {
+  PUBLIC_KEY_PREFIX,
+  bytesToHex,
+  decodePublicKey,
+  encodePublicKey,
+  fingerprintOf,
+  formatFingerprint,
+  hexToBytes,
+  meetRoomIdFromFingerprint,
+  parsePublicKey,
+} from './encoding.ts';
 
 const enc = new TextEncoder();
 

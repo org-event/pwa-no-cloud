@@ -43,7 +43,16 @@ export type {
   SignatureBytes,
 } from './identity/index.ts';
 export {
+  PUBLIC_KEY_PREFIX,
+  bytesToHex,
+  decodePublicKey,
+  encodePublicKey,
+  fingerprintOf,
+  formatFingerprint,
   generateKeyPair,
+  hexToBytes,
+  meetRoomIdFromFingerprint,
+  parsePublicKey,
   publicKeyFromSecret,
   signBytes,
   signPayload,

@@ -149,7 +149,7 @@
 | S0.2 | todo | 3 |
 | S0.3 | done | 1 |
 | S1.1 | done | 3 |
-| S1.2 | todo | 2 |
+| S1.2 | done | 2 |
 | S1.3 | todo | 5 |
 | S1.4 | todo | 3 |
 | S1.5 | todo | 3 |
