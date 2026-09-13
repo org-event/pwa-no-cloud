@@ -35,6 +35,20 @@ export {
   parsePublicKey,
 } from './encoding.ts';
 
+export {
+  VAULT_PREFIX,
+  VAULT_STORAGE_KEY,
+  VAULT_VERSION,
+  clearVaultStorage,
+  decodeVaultRecord,
+  encodeVaultRecord,
+  loadVaultFromStorage,
+  openSecretKey,
+  saveVaultToStorage,
+  sealSecretKey,
+} from './vault.ts';
+export type { VaultRecord, VaultStorage } from './vault.ts';
+
 const enc = new TextEncoder();
 
 export const generateKeyPair = async (): Promise<KeyPair> => {
