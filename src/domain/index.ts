@@ -166,3 +166,17 @@ export {
   encodeIdentityInvite,
   parseIdentityInvite,
 } from './contacts/index.ts';
+export type {
+  IntroduceCard,
+  IntroduceCardDraft,
+  IntroduceSubject,
+} from './contacts/index.ts';
+export {
+  INTRODUCE_CARD_PREFIX,
+  INTRODUCE_CARD_VERSION,
+  canonicalIntroduceCard,
+  createIntroduceCard,
+  parseAndVerifyIntroduceCard,
+  parseIntroduceCard,
+  verifyIntroduceCard,
+} from './contacts/index.ts';

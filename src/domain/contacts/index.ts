@@ -32,3 +32,17 @@ export {
   encodeIdentityInvite,
   parseIdentityInvite,
 } from '../identity-invite.ts';
+export type {
+  IntroduceCard,
+  IntroduceCardDraft,
+  IntroduceSubject,
+} from '../introduce.ts';
+export {
+  INTRODUCE_CARD_PREFIX,
+  INTRODUCE_CARD_VERSION,
+  canonicalIntroduceCard,
+  createIntroduceCard,
+  parseAndVerifyIntroduceCard,
+  parseIntroduceCard,
+  verifyIntroduceCard,
+} from '../introduce.ts';
