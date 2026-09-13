@@ -18,6 +18,7 @@ import {
   parseContactCard,
   removeContact,
   sanitizeNick,
+  setContactAlias,
   upsertContact,
   type ProfileCard,
 } from '@/domain/profile.ts';
@@ -269,6 +270,13 @@ export function createContactsSlice(ctx: NocloudContext) {
     return true;
   }
 
+  function onRenameAlias(id: string, alias: string) {
+    state.book = setContactAlias(state.book, id, alias);
+    void persistBook();
+    state.contactsNotice = contactsCopy.aliasSaved;
+    touch();
+  }
+
   function onRemoveContact(id: string) {
     state.book = removeContact(state.book, id);
     state.selectedContactIds = state.selectedContactIds.filter(
@@ -354,6 +362,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     onPickAvatar,
     onCopyCard,
     onAddContact,
+    onRenameAlias,
     onRemoveContact,
     onSaveGroup,
     onRemoveGroup,

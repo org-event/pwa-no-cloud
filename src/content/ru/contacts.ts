@@ -12,6 +12,7 @@ export const contactsCopy = {
   cardCopyFailed: 'Не удалось скопировать.',
   pasteCard: 'Вставьте карточку P1. которую прислали.',
   ownCard: 'Это ваша карточка.',
+  aliasSaved: 'Локальное имя сохранено.',
   removed: 'Удалено.',
   groupNeedMembers: 'Нужны название и хотя бы один человек.',
   groupSaved: (label: string) => `Группа «${label}». Канал всё равно 1:1.`,

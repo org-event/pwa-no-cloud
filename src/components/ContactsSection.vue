@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { componentsCopy } from '@/content/index.ts';
+import { contactDisplayName } from '@/domain/profile.ts';
 import { onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useNocloudStore } from '@/stores/nocloud.ts';
@@ -18,6 +19,8 @@ const groupName = ref('');
 const groupMemberIds = ref<string[]>([]);
 const avatarInput = ref<HTMLInputElement | null>(null);
 const editing = ref(false);
+const aliasEditId = ref<string | null>(null);
+const aliasDraft = ref('');
 
 const copy = componentsCopy.contacts;
 
@@ -59,10 +62,24 @@ const toggleGroupMember = (id: string, checked: boolean) => {
 
 const isOnline = (id: string) => store.isPresenceOnline(id);
 
-const contactDetail = (id: string) => {
+const contactDetail = (id: string, networkNick: string, hasAlias: boolean) => {
   if (store.isChannelOpen(id)) return copy.inCall;
   if (store.isPresenceOnline(id)) return copy.online;
+  if (hasAlias) return copy.networkNick(networkNick);
   return copy.offline;
+};
+
+const startAliasEdit = (id: string, current: string) => {
+  aliasEditId.value = id;
+  aliasDraft.value = current;
+};
+
+const saveAlias = () => {
+  const id = aliasEditId.value;
+  if (!id) return;
+  store.onRenameAlias(id, aliasDraft.value);
+  aliasEditId.value = null;
+  aliasDraft.value = '';
 };
 </script>
 
@@ -190,8 +207,10 @@ const contactDetail = (id: string) => {
         <ContactRow
           v-for="contact in contacts.book.contacts"
           :key="contact.id"
-          :name="contact.nick"
-          :detail="contactDetail(contact.id)"
+          :name="contactDisplayName(contact)"
+          :detail="
+            contactDetail(contact.id, contact.nick, Boolean(contact.localAlias))
+          "
           :online="isOnline(contact.id)"
           :online-label="copy.online"
           :offline-label="copy.offline"
@@ -211,12 +230,33 @@ const contactDetail = (id: string) => {
             <button
               type="button"
               class="button button-secondary"
+              @click="
+                startAliasEdit(contact.id, contact.localAlias || contact.nick)
+              "
+            >
+              {{ copy.rename }}
+            </button>
+            <button
+              type="button"
+              class="button button-secondary"
               @click="store.onRemoveContact(contact.id)"
             >
               {{ copy.remove }}
             </button>
           </template>
         </ContactRow>
+        <InputAction
+          v-if="aliasEditId"
+          v-model="aliasDraft"
+          :label="copy.aliasLabel"
+          name="alias"
+          :maxlength="32"
+          :input-aria-label="copy.aliasAria"
+          icon="check"
+          :tooltip="copy.saveAlias"
+          @action="saveAlias"
+          @enter="saveAlias"
+        />
       </div>
     </Card>
 

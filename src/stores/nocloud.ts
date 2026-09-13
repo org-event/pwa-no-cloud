@@ -250,6 +250,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
     callError: calls.callError,
     onStartCall: calls.onStartCall,
     onHangUp: calls.onHangUp,
+    onRenameAlias: contacts.onRenameAlias,
     onRemoveContact: contacts.onRemoveContact,
     onSaveGroup: contacts.onSaveGroup,
     onRemoveGroup: contacts.onRemoveGroup,
