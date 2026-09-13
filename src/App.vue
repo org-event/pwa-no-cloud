@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { APP_NAME, APP_TAGLINE, APP_VERSION } from './config/index.ts';
 import { componentsCopy, shellCopy, statusCopy } from '@/content/index.ts';
@@ -10,8 +10,10 @@ import IdentityOnboarding from './components/IdentityOnboarding.vue';
 import InboxPanel from './components/InboxPanel.vue';
 import LogsSection from './components/LogsSection.vue';
 import CallsSection from './components/CallsSection.vue';
+import PlaceholderSection from './components/PlaceholderSection.vue';
 import ServersSection from './components/ServersSection.vue';
 import SessionTools from './components/SessionTools.vue';
+import ShellChatList from './components/ShellChatList.vue';
 import TransferPanel from './components/TransferPanel.vue';
 import { useNocloudStore } from './stores/nocloud.ts';
 import type { UnlockedIdentity } from '@/lib/identity-session.ts';
@@ -20,6 +22,7 @@ import {
   parseSectionHash,
   type AppSection,
 } from './ui/sections.ts';
+import { isShellStub, shellNavTitle, type ShellNavId } from './ui/shell-nav.ts';
 
 const store = useNocloudStore();
 const { status, canInstall, state, contacts, hasSignalingSocket } =
@@ -39,14 +42,27 @@ const drawer = ref<HTMLElement | null>(null);
 const page = ref<HTMLElement | null>(null);
 
 const TOOLS_MQ = '(max-width: 920px)';
+const SHELL_MQ = '(max-width: 900px)';
 const toolsInDrawer = ref(
   typeof globalThis.matchMedia === 'function' &&
     globalThis.matchMedia(TOOLS_MQ).matches,
 );
+const shellStacked = ref(
+  typeof globalThis.matchMedia === 'function' &&
+    globalThis.matchMedia(SHELL_MQ).matches,
+);
+/** On stacked layout: list first; selecting a row opens the pane. */
+const listMode = ref(true);
 let toolsMq: MediaQueryList | null = null;
+let shellMq: MediaQueryList | null = null;
 
 const syncToolsPlacement = () => {
   toolsInDrawer.value = Boolean(toolsMq?.matches);
+};
+
+const syncShellStack = () => {
+  shellStacked.value = Boolean(shellMq?.matches);
+  if (!shellStacked.value) listMode.value = false;
 };
 
 const currentSection = ref<AppSection>(
@@ -56,9 +72,16 @@ const currentSection = ref<AppSection>(
   ),
 );
 
-const pageTitle = computed(
-  () =>
-    APP_SECTIONS.find((item) => item.id === currentSection.value)?.title ?? '',
+const activeNav = ref<ShellNavId>(currentSection.value);
+
+const pageTitle = computed(() => shellNavTitle(activeNav.value));
+
+const showShellList = computed(
+  () => Boolean(identity.value) && (!shellStacked.value || listMode.value),
+);
+
+const showShellPane = computed(
+  () => Boolean(identity.value) && (!shellStacked.value || !listMode.value),
 );
 
 const statusPath = computed(() => status.value.path);
@@ -102,7 +125,6 @@ const setMenuOpen = (open: boolean) => {
     return;
   }
   if (!menuOpen.value) return;
-  // Move focus out before inert hides the drawer from AT.
   focusOutsideDrawer();
   menuOpen.value = false;
   void nextTick(() => {
@@ -116,12 +138,29 @@ const setMenuOpen = (open: boolean) => {
   });
 };
 
+const openPane = (id: ShellNavId) => {
+  activeNav.value = id;
+  if (!isShellStub(id)) {
+    currentSection.value = id;
+    if (globalThis.location && globalThis.location.hash !== `#${id}`) {
+      globalThis.location.hash = id;
+    }
+  }
+  listMode.value = false;
+  setMenuOpen(false);
+};
+
+const backToList = () => {
+  listMode.value = true;
+};
+
 const onHash = () => {
   currentSection.value = parseSectionHash(
     globalThis.location?.hash ?? '',
     globalThis.location?.search ?? '',
   );
-  if (menuOpen.value) setMenuOpen(false);
+  activeNav.value = currentSection.value;
+  if (shellStacked.value) listMode.value = false;
 };
 
 const onKeydown = (event: KeyboardEvent) => {
@@ -136,21 +175,30 @@ const skipToContent = (event: Event) => {
   page.value?.focus();
 };
 
+watch(identity, (value) => {
+  if (value && shellStacked.value) listMode.value = true;
+});
+
 onMounted(() => {
   globalThis.addEventListener('hashchange', onHash);
   document.addEventListener('keydown', onKeydown);
-  if (typeof globalThis.matchMedia === 'function') {
-    toolsMq = globalThis.matchMedia(TOOLS_MQ);
-    syncToolsPlacement();
-    toolsMq.addEventListener('change', syncToolsPlacement);
-  }
+  toolsMq = globalThis.matchMedia(TOOLS_MQ);
+  shellMq = globalThis.matchMedia(SHELL_MQ);
+  toolsMq.addEventListener('change', syncToolsPlacement);
+  shellMq.addEventListener('change', syncShellStack);
+  syncToolsPlacement();
+  syncShellStack();
+  onHash();
+  if (shellStacked.value) listMode.value = true;
 });
 
 onUnmounted(() => {
   globalThis.removeEventListener('hashchange', onHash);
   document.removeEventListener('keydown', onKeydown);
   toolsMq?.removeEventListener('change', syncToolsPlacement);
+  shellMq?.removeEventListener('change', syncShellStack);
   toolsMq = null;
+  shellMq = null;
 });
 </script>
 
@@ -211,7 +259,7 @@ onUnmounted(() => {
           class="drawer-link"
           :href="`#${section.id}`"
           :aria-current="currentSection === section.id ? 'page' : undefined"
-          @click="setMenuOpen(false)"
+          @click="openPane(section.id)"
         >
           {{ section.title }}
         </a>
@@ -313,78 +361,127 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <main id="content" ref="page" class="page" tabindex="-1">
-        <h1 class="page-title">{{ pageTitle }}</h1>
+      <section v-if="!identity" class="page page-solo" data-section="identity">
+        <IdentityOnboarding @unlocked="onIdentityUnlocked" />
+      </section>
 
-        <section v-if="!identity" class="page-section" data-section="identity">
-          <IdentityOnboarding @unlocked="onIdentityUnlocked" />
-        </section>
-
-        <template v-else>
-          <p class="tagline identity-chip">
+      <div v-else class="shell-body">
+        <aside v-show="showShellList" class="shell-rail">
+          <p class="identity-chip shell-identity">
             ID
             <code>{{ identity.displayFingerprint }}</code>
           </p>
+          <ShellChatList :active-id="activeNav" @select="openPane" />
+        </aside>
 
-          <section
-            v-show="currentSection === 'lan'"
-            class="page-section"
-            data-section="lan"
-          >
-            <div class="transfer">
-              <TransferPanel />
-            </div>
-            <div class="inbox">
-              <InboxPanel />
-            </div>
-          </section>
+        <div v-show="showShellPane" class="shell-pane">
+          <header class="shell-pane-head">
+            <button
+              v-if="shellStacked"
+              type="button"
+              class="icon-button"
+              :aria-label="shellCopy.backToList"
+              @click="backToList"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+                class="icon"
+              >
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M15 6l-6 6 6 6"
+                />
+              </svg>
+            </button>
+            <h1 class="page-title shell-pane-title">{{ pageTitle }}</h1>
+          </header>
 
-          <section
-            v-show="currentSection === 'servers'"
-            class="page-section servers"
-            data-section="servers"
-          >
-            <div id="my-server" class="servers">
-              <HostPanel />
-            </div>
-            <div class="servers">
-              <ServersSection />
-            </div>
-          </section>
+          <main id="content" ref="page" class="page shell-page" tabindex="-1">
+            <section
+              v-if="isShellStub(activeNav)"
+              class="page-section"
+              data-section="stub"
+            >
+              <PlaceholderSection
+                v-if="activeNav === 'stub-chats'"
+                :title="shellCopy.stubChatsTitle"
+                :text="shellCopy.stubChatsHint"
+              />
+              <PlaceholderSection
+                v-else
+                :title="shellCopy.stubEmptyTitle"
+                :text="shellCopy.stubEmptyText"
+              />
+            </section>
 
-          <section
-            v-show="currentSection === 'contacts'"
-            class="page-section"
-            data-section="contacts"
-          >
-            <ContactsSection />
-          </section>
+            <template v-else>
+              <section
+                v-show="currentSection === 'lan'"
+                class="page-section"
+                data-section="lan"
+              >
+                <div class="transfer">
+                  <TransferPanel />
+                </div>
+                <div class="inbox">
+                  <InboxPanel />
+                </div>
+              </section>
 
-          <section
-            v-show="currentSection === 'calls'"
-            class="page-section"
-            data-section="calls"
-          >
-            <CallsSection />
-          </section>
+              <section
+                v-show="currentSection === 'servers'"
+                class="page-section servers"
+                data-section="servers"
+              >
+                <div id="my-server" class="servers">
+                  <HostPanel />
+                </div>
+                <div class="servers">
+                  <ServersSection />
+                </div>
+              </section>
 
-          <section
-            v-show="currentSection === 'logs'"
-            class="page-section"
-            data-section="logs"
-          >
-            <LogsSection />
-          </section>
+              <section
+                v-show="currentSection === 'contacts'"
+                class="page-section"
+                data-section="contacts"
+              >
+                <ContactsSection />
+              </section>
 
-          <section
-            v-show="currentSection === 'help'"
-            class="page-section help"
-            data-section="help"
-          >
-            <HelpSection />
-          </section>
-        </template>
-      </main>
+              <section
+                v-show="currentSection === 'calls'"
+                class="page-section"
+                data-section="calls"
+              >
+                <CallsSection />
+              </section>
+
+              <section
+                v-show="currentSection === 'logs'"
+                class="page-section"
+                data-section="logs"
+              >
+                <LogsSection />
+              </section>
+
+              <section
+                v-show="currentSection === 'help'"
+                class="page-section help"
+                data-section="help"
+              >
+                <HelpSection />
+              </section>
+            </template>
+          </main>
+        </div>
+      </div>
     </div>
   </div>
 </template>
