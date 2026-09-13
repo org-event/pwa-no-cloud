@@ -7,7 +7,7 @@
 
 **Порядок:** сверху вниз по эпикам.
 
-M1 закрыт (`docs/backlog-m1.md`). M2 = must следующего среза из [requirements.md](./requirements.md).
+M1 закрыт (`docs/backlog-m1.md`). **M2 закрыт** (трекинг ниже): introduce, пучок реле, video/screen, redirect.
 
 ---
 
@@ -102,4 +102,6 @@ M1 закрыт (`docs/backlog-m1.md`). M2 = must следующего срез�
 | T3.3 | done | 2 |
 | T4.1 | done | 3 |
 | T4.2 | done | 2 |
-| T5.1 | todo | 3 |
+| T5.1 | done | 3 |
+
+M2 закрыт: introduce, пучок реле, video/screen, redirect UX, usage.
