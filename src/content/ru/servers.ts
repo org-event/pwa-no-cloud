@@ -22,4 +22,6 @@ export const serversCopy = {
   relayRemoved: 'Реле удалено из пучка.',
   relayFailover: (url: string) =>
     `Активное реле упало — переключились на ${url}.`,
+  redirectApplied:
+    'R1. принят: новые реле в пучке и выбраны. Снова «Я в сети» и покажите карточку, если контакт потерялся.',
 } as const;

@@ -15,6 +15,7 @@ import {
   removeRelayUrl,
   setActiveRelay,
 } from '@/domain/discovery/index.ts';
+import { parseAndVerifyRelayRedirectNote } from '@/domain/relay/redirect.ts';
 import { titleFromDraft } from '@/domain/saved-server.ts';
 import { createSavedServer, type SavedServer } from '@/domain/saved-server.ts';
 import { canScanQr, decodeQrFromFile } from '@/lib/scan-qr.ts';
@@ -183,15 +184,36 @@ export function createServersSlice(ctx: NocloudContext) {
   }
 
   function onApplySharePack(text: string) {
-    const packed = decodeSharePack(text);
-    if (!packed.ok) {
-      state.hostNotice = packed.message;
+    void (async () => {
+      const redirect = await parseAndVerifyRelayRedirectNote(text);
+      if (redirect.ok) {
+        const next = mergeRemoteRelays(
+          state.relayBundle,
+          redirect.value.relays,
+          redirect.value.issuedAt,
+        );
+        const withActive =
+          next.activeUrl === redirect.value.relays[0]
+            ? next
+            : setActiveRelay(next, redirect.value.relays[0]!);
+        state.relayBundle = withActive;
+        persistRelayBundle();
+        applyActiveRelayToSettings();
+        state.hostNotice = serversCopy.redirectApplied;
+        note(notes.sharePackSaved);
+        touch();
+        return;
+      }
+      const packed = decodeSharePack(text);
+      if (!packed.ok) {
+        state.hostNotice = packed.message;
+        touch();
+        return;
+      }
+      applyShareDraft(packed.value, serversCopy.packSaved);
+      note(notes.sharePackSaved);
       touch();
-      return;
-    }
-    applyShareDraft(packed.value, serversCopy.packSaved);
-    note(notes.sharePackSaved);
-    touch();
+    })();
   }
 
   function onScanSharePack(file: File) {
@@ -205,6 +227,11 @@ export function createServersSlice(ctx: NocloudContext) {
       if (!raw) {
         state.hostNotice = serversCopy.qrNotRecognized;
         touch();
+        return;
+      }
+      const redirect = await parseAndVerifyRelayRedirectNote(raw);
+      if (redirect.ok) {
+        onApplySharePack(raw);
         return;
       }
       const packed = decodeSharePack(raw);

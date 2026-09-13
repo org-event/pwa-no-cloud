@@ -175,6 +175,9 @@ const saveAlias = () => {
         width="192"
         height="192"
       />
+      <p v-if="!contacts.presenceAvailable" class="tagline">
+        {{ copy.lostHint }}
+      </p>
       <input
         ref="avatarInput"
         type="file"
