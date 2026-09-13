@@ -53,13 +53,11 @@ describe('peer-media attach/detach', () => {
     expect(senders).toEqual([]);
   });
 
-  it('leaves unrelated senders alone when detaching a specific stream', () => {
-    const keep = fakeTrack('audio', 'keep');
-    const drop = fakeTrack('audio', 'drop');
-    const stream = fakeStream([drop]);
-    const keepSender = { track: keep };
-    const dropSender = { track: drop };
-    const senders = [keepSender, dropSender];
+  it('detaches all A/V senders when stream is null (hangup) and ignores empty senders', () => {
+    const display = fakeTrack('video', 'screen');
+    const mediaSender = { track: display };
+    const emptySender = { track: null };
+    const senders = [mediaSender, emptySender];
     const pc = {
       getSenders: () => senders as RTCRtpSender[],
       addTrack: vi.fn(),
@@ -69,7 +67,8 @@ describe('peer-media attach/detach', () => {
       }),
     };
 
-    expect(detachLocalMediaTracks(pc, stream)).toBe(1);
-    expect(senders).toEqual([keepSender]);
+    expect(detachLocalMediaTracks(pc, null)).toBe(1);
+    expect(pc.removeTrack).toHaveBeenCalledWith(mediaSender);
+    expect(senders).toEqual([emptySender]);
   });
 });

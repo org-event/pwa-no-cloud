@@ -11,7 +11,11 @@ import {
   type CallIntent,
   type CallKind,
 } from '@/lib/call-intent.ts';
-import { openCallMedia, stopStream } from '@/lib/call-media.ts';
+import {
+  openCallMedia,
+  onScreenShareEnded,
+  stopStream,
+} from '@/lib/call-media.ts';
 import { markRaw, shallowRef } from 'vue';
 import type { NocloudContext } from './context.ts';
 
@@ -25,6 +29,7 @@ export function createCallsSlice(ctx: NocloudContext) {
   const callPeerId = shallowRef<string | null>(null);
   const callError = shallowRef('');
   const callSession = shallowRef<CallSession>(createIdleCallSession());
+  let unbindScreenEnded: (() => void) | null = null;
 
   const publish = () => touch();
 
@@ -32,14 +37,30 @@ export function createCallsSlice(ctx: NocloudContext) {
     callSession.value = next;
   };
 
+  const clearScreenEnded = () => {
+    unbindScreenEnded?.();
+    unbindScreenEnded = null;
+  };
+
   const clearMediaUi = () => {
-    stopStream(localMedia.value);
+    clearScreenEnded();
+    const stream = localMedia.value;
     localMedia.value = null;
     remoteMedia.value = null;
     callKind.value = null;
     callPeerId.value = null;
     callError.value = '';
+    // Detach from PC first so data/ping stay; then stop display/mic tracks.
     state.peer?.clearLocalStream();
+    stopStream(stream);
+  };
+
+  const bindScreenIfNeeded = (kind: MediaCallKind, stream: MediaStream) => {
+    clearScreenEnded();
+    if (kind !== 'screen') return;
+    unbindScreenEnded = onScreenShareEnded(stream, () => {
+      onHangUp();
+    });
   };
 
   const onRemoteTrack = (stream: MediaStream) => {
@@ -66,10 +87,12 @@ export function createCallsSlice(ctx: NocloudContext) {
     }
     try {
       const stream = await openCallMedia(kind);
+      clearScreenEnded();
       stopStream(localMedia.value);
       localMedia.value = markRaw(stream);
       callKind.value = kind;
       callPeerId.value = peerId;
+      bindScreenIfNeeded(kind, stream);
       setSession(
         applyCallSessionEvent(callSession.value, {
           type: 'dial',
@@ -130,10 +153,12 @@ export function createCallsSlice(ctx: NocloudContext) {
     callError.value = '';
     try {
       const stream = await openCallMedia(kind);
+      clearScreenEnded();
       stopStream(localMedia.value);
       localMedia.value = markRaw(stream);
       callKind.value = kind;
       callPeerId.value = leg.peerId;
+      bindScreenIfNeeded(kind, stream);
       setSession(
         applyCallSessionEvent(callSession.value, {
           type: 'accept',
@@ -192,11 +217,13 @@ export function createCallsSlice(ctx: NocloudContext) {
     );
     callError.value = message;
     state.contactsNotice = message;
-    stopStream(localMedia.value);
+    clearScreenEnded();
+    const stream = localMedia.value;
     localMedia.value = null;
     remoteMedia.value = null;
     callKind.value = null;
     state.peer?.clearLocalStream();
+    stopStream(stream);
     publish();
   }
 

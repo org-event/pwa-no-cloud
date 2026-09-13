@@ -26,6 +26,38 @@ export const stopStream = (stream: MediaStream | null | undefined) => {
   for (const track of stream.getTracks()) track.stop();
 };
 
+/** True when a track looks like a display-capture surface (screen share). */
+export const isDisplayTrack = (track: MediaStreamTrack): boolean => {
+  if (track.kind !== 'video') return false;
+  try {
+    const settings = track.getSettings?.() as { displaySurface?: string };
+    return Boolean(settings?.displaySurface);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * When the user stops sharing via the browser UI, video tracks fire `ended`.
+ * Returns an unsubscribe that removes the listeners.
+ */
+export const onScreenShareEnded = (
+  stream: MediaStream,
+  onEnded: () => void,
+): (() => void) => {
+  const cleanups: Array<() => void> = [];
+  for (const track of stream.getVideoTracks()) {
+    const handler = () => {
+      onEnded();
+    };
+    track.addEventListener('ended', handler);
+    cleanups.push(() => track.removeEventListener('ended', handler));
+  }
+  return () => {
+    for (const cleanup of cleanups) cleanup();
+  };
+};
+
 export const openUserMedia = async (
   kind: Exclude<CallKind, 'data' | 'screen'>,
 ): Promise<MediaStream> => {
