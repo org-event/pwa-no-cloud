@@ -169,6 +169,7 @@ export {
 export type {
   IntroduceCard,
   IntroduceCardDraft,
+  IntroduceImport,
   IntroduceSubject,
 } from './contacts/index.ts';
 export {
@@ -176,6 +177,7 @@ export {
   INTRODUCE_CARD_VERSION,
   canonicalIntroduceCard,
   createIntroduceCard,
+  importIntroduceCard,
   parseAndVerifyIntroduceCard,
   parseIntroduceCard,
   verifyIntroduceCard,

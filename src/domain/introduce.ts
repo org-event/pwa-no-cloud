@@ -9,13 +9,18 @@ import {
   encodePublicKey,
   bytesToHex,
   hexToBytes,
+  fingerprintOf,
   signText,
   verifyText,
   type CryptoResult,
   type KeyPair,
   type PublicKeyBytes,
 } from './identity/index.ts';
-import { sanitizeNick } from './profile.ts';
+import {
+  isSafeAvatar,
+  sanitizeNick,
+  type UpsertContactInput,
+} from './profile.ts';
 import {
   parseSignedProfile,
   verifySignedProfile,
@@ -258,4 +263,36 @@ export const parseAndVerifyIntroduceCard = async (
   const verified = await verifyIntroduceCard(parsed.value);
   if (!verified.ok) return verified;
   return parsed;
+};
+
+export type IntroduceImport = {
+  contact: UpsertContactInput;
+  relayHints: string[];
+  fromPk: string;
+};
+
+/** Verify I1. text and map to address-book upsert fields (alias untouched). */
+export const importIntroduceCard = async (
+  text: string,
+): Promise<CryptoResult<IntroduceImport>> => {
+  const card = await parseAndVerifyIntroduceCard(text);
+  if (!card.ok) return card;
+  const pk = decodePublicKey(card.value.subject.pk);
+  if (!pk.ok) return pk;
+  const id = fingerprintOf(pk.value);
+  const profileAvatar = card.value.subject.profile?.avatar ?? '';
+  const avatar = isSafeAvatar(profileAvatar) ? profileAvatar : '';
+  return {
+    ok: true,
+    value: {
+      contact: {
+        id,
+        nick: card.value.subject.nick,
+        avatar,
+        publicKey: card.value.subject.pk,
+      },
+      relayHints: card.value.relayHints,
+      fromPk: card.value.fromPk,
+    },
+  };
 };

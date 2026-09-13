@@ -9,6 +9,7 @@ import {
   createIdentityInvite,
   parseIdentityInvite,
 } from '@/domain/identity-invite.ts';
+import { importIntroduceCard } from '@/domain/introduce.ts';
 import type { KeyPair } from '@/domain/identity/index.ts';
 import {
   defaultNick,
@@ -254,6 +255,22 @@ export function createContactsSlice(ctx: NocloudContext) {
   }
 
   async function onAddContact(text: string): Promise<boolean> {
+    const introduced = await importIntroduceCard(text);
+    if (introduced.ok) {
+      if (introduced.value.contact.id === state.me.id) {
+        state.contactsNotice = contactsCopy.ownCard;
+        touch();
+        return false;
+      }
+      state.book = upsertContact(state.book, introduced.value.contact);
+      void persistBook();
+      state.contactsNotice = contactsCopy.introduced(
+        introduced.value.contact.nick,
+      );
+      touch();
+      ctx.refs.syncPresenceContacts?.();
+      return true;
+    }
     const invite = await parseIdentityInvite(text);
     if (invite.ok) {
       if (invite.value.id === state.me.id) {
