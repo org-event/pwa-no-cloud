@@ -172,6 +172,34 @@ export function createCallsSlice(ctx: NocloudContext) {
     publish();
   }
 
+  function onPeerError(message: string) {
+    const leg = primaryCallLeg(callSession.value);
+    if (!leg) return;
+    if (
+      leg.state === 'ended' ||
+      leg.state === 'failed' ||
+      leg.state === 'rejected' ||
+      leg.state === 'busy'
+    ) {
+      return;
+    }
+    setSession(
+      applyCallSessionEvent(callSession.value, {
+        type: 'leg-fail',
+        legId: leg.id,
+        message,
+      }),
+    );
+    callError.value = message;
+    state.contactsNotice = message;
+    stopStream(localMedia.value);
+    localMedia.value = null;
+    remoteMedia.value = null;
+    callKind.value = null;
+    state.peer?.clearLocalStream();
+    publish();
+  }
+
   function onHangUp() {
     setSession(applyCallSessionEvent(callSession.value, { type: 'hangup' }));
     clearMediaUi();
@@ -196,6 +224,7 @@ export function createCallsSlice(ctx: NocloudContext) {
     onAcceptCall,
     onRejectCall,
     onHangUp,
+    onPeerError,
     startCallIntent,
   };
 }

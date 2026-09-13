@@ -169,7 +169,7 @@
 | S4.2 | done | 5 |
 | S4.3 | done | 5 |
 | S4.4 | done | 5 |
-| S4.5 | todo | 2 |
+| S4.5 | done | 2 |
 | S5.1 | todo | 5 |
 | S5.2 | todo | 3 |
 | S5.3 | todo | 3 |

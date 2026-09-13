@@ -43,4 +43,25 @@ describe('explainIceFailure', () => {
     });
     expect(message).toContain('даже через TURN');
   });
+
+  it('points at own TURN when gathering was incomplete', () => {
+    const message = explainIceFailure({
+      local: ['host', 'srflx'],
+      remote: ['srflx'],
+      hasTurn: true,
+      hasStun: true,
+      gathering: 'gathering',
+    });
+    expect(message).toContain('TURN ещё собирал relay');
+  });
+
+  it('asks for own TURN when NAT blocks without TURN configured', () => {
+    const message = explainIceFailure({
+      local: ['host'],
+      remote: ['host'],
+      hasTurn: false,
+      hasStun: true,
+    });
+    expect(message).toContain('Свой TURN не задан');
+  });
 });

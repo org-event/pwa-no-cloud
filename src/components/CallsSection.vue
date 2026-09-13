@@ -31,11 +31,13 @@ const incomingRinging = computed(
 );
 const inCallUi = computed(
   () =>
+    Boolean(callError.value) ||
     Boolean(callKind.value) ||
     incomingRinging.value ||
     legState.value === 'outbound' ||
     (leg.value?.direction === 'out' && legState.value === 'ringing') ||
-    legState.value === 'active',
+    legState.value === 'active' ||
+    legState.value === 'failed',
 );
 
 const sortedContacts = computed(() => {
@@ -167,7 +169,7 @@ onBeforeUnmount(() => {
             class="button button-accent"
             @click="store.onHangUp()"
           >
-            {{ copy.hangUp }}
+            {{ callError ? copy.dismiss : copy.hangUp }}
           </button>
         </div>
       </div>

@@ -61,6 +61,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
   const calls = createCallsSlice(ctx);
   ctx.refs.onRemoteTrack = calls.onRemoteTrack;
   ctx.refs.onIncomingCall = calls.onIncomingCall;
+  ctx.refs.onCallPeerError = calls.onPeerError;
   const session = createSessionSlice(ctx, servers.shareDraftForInvite);
   const shell = createShellSlice(ctx);
 

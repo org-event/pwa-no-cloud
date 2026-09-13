@@ -86,6 +86,7 @@ export function createPeerSlice(
       if (typeof value === 'string') {
         state.transferError = humanizeSignalingError(value);
         note(notes.error(state.transferError));
+        ctx.refs.onCallPeerError?.(state.transferError);
       }
       touch();
     });

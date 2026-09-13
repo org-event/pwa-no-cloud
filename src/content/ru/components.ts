@@ -18,6 +18,7 @@ export const componentsCopy = {
     video: 'Видео',
     screen: 'Экран',
     hangUp: 'Завершить',
+    dismiss: 'Понятно',
     accept: 'Принять',
     reject: 'Отклонить',
     localLabel: 'Вы',

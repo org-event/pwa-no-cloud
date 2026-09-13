@@ -7,7 +7,7 @@
 | 1 | **Presence** — кто из книги в сети | ✅ авто при открытии PWA + лобби `c-{id}` | push/`peers` без опроса |
 | 2 | **Стук (knock)** — постучаться к онлайн-контакту | ✅ в Контактах и в Передаче | рингтон, отказ, очередь |
 | 3 | **Wake Lock** — экран не гаснет, пока вы «доступны» | ✅ Screen Wake Lock API | fallback NoSleep |
-| 4 | **Голос** | ✅ getUserMedia + FSM + UI принять/сброс (S4.2–S4.4) | ICE fail → TURN (S4.5) |
+| 4 | **Голос** | ✅ getUserMedia + FSM + UI + ICE→TURN (S4.2–S4.5) | SFU later |
 | 5 | **Видео** | ✅ camera constraints + tracks на PC | UI/FSM polish |
 | 6 | **Демонстрация экрана** | ✅ `getDisplayMedia` + mic merge | UI/FSM polish |
 
