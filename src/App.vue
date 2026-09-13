@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { APP_NAME, APP_TAGLINE, APP_VERSION } from './config/index.ts';
-import { componentsCopy, shellCopy, statusCopy } from '@/content/index.ts';
+import { APP_VERSION } from './config/index.ts';
+import { componentsCopy, shellCopy } from '@/content/index.ts';
 import ContactsSection from './components/ContactsSection.vue';
 import HelpSection from './components/HelpSection.vue';
 import HostPanel from './components/HostPanel.vue';
@@ -10,12 +10,16 @@ import IdentityOnboarding from './components/IdentityOnboarding.vue';
 import InboxPanel from './components/InboxPanel.vue';
 import LogsSection from './components/LogsSection.vue';
 import CallsSection from './components/CallsSection.vue';
-import PlaceholderSection from './components/PlaceholderSection.vue';
+import PersonalSettings from './components/PersonalSettings.vue';
 import ServersSection from './components/ServersSection.vue';
-import SessionTools from './components/SessionTools.vue';
+import ShellCallList from './components/ShellCallList.vue';
 import ShellChatList from './components/ShellChatList.vue';
-import ShellContactFocus from './components/ShellContactFocus.vue';
+import ShellChatThread from './components/ShellChatThread.vue';
+import ShellContactList from './components/ShellContactList.vue';
+import ShellSettingsList from './components/ShellSettingsList.vue';
 import TransferPanel from './components/TransferPanel.vue';
+import AppShell from './layouts/AppShell.vue';
+import ShellRail from './layouts/ShellRail.vue';
 import { useNocloudStore } from './stores/nocloud.ts';
 import type { UnlockedIdentity } from '@/lib/identity-session.ts';
 import {
@@ -24,18 +28,19 @@ import {
   saveTheme,
   type ThemeMode,
 } from './lib/theme.ts';
+import { parseSectionHash, type AppSection } from './ui/sections.ts';
 import {
-  APP_SECTIONS,
-  parseSectionHash,
-  type AppSection,
-} from './ui/sections.ts';
-import {
-  isShellContact,
-  isShellStub,
+  isSelfPeer,
   parseShellContactId,
   shellNavTitle,
   type ShellNavId,
 } from './ui/shell-nav.ts';
+import {
+  DEFAULT_SHELL_TAB,
+  SETTINGS_MENU,
+  tabForSection,
+  type ShellTabId,
+} from './ui/shell-tabs.ts';
 
 const store = useNocloudStore();
 const { status, state, contacts } = storeToRefs(store);
@@ -57,166 +62,239 @@ const onIdentityUnlocked = (value: UnlockedIdentity) => {
   store.onBindIdentity(value.fingerprint, value.keyPair);
 };
 
-const menuOpen = ref(false);
-const lastFocus = ref<HTMLElement | null>(null);
-const menuButton = ref<HTMLButtonElement | null>(null);
-const closeButton = ref<HTMLButtonElement | null>(null);
-const drawer = ref<HTMLElement | null>(null);
 const page = ref<HTMLElement | null>(null);
 
-const TOOLS_MQ = '(max-width: 920px)';
 const SHELL_MQ = '(max-width: 900px)';
-const toolsInDrawer = ref(
-  typeof globalThis.matchMedia === 'function' &&
-    globalThis.matchMedia(TOOLS_MQ).matches,
-);
 const shellStacked = ref(
   typeof globalThis.matchMedia === 'function' &&
     globalThis.matchMedia(SHELL_MQ).matches,
 );
-/** On stacked layout: list first; selecting a row opens the pane. */
 const listMode = ref(true);
-let toolsMq: MediaQueryList | null = null;
 let shellMq: MediaQueryList | null = null;
-
-const syncToolsPlacement = () => {
-  toolsInDrawer.value = Boolean(toolsMq?.matches);
-};
 
 const syncShellStack = () => {
   shellStacked.value = Boolean(shellMq?.matches);
   if (!shellStacked.value) listMode.value = false;
 };
 
-const currentSection = ref<AppSection>(
-  parseSectionHash(
-    globalThis.location?.hash ?? '',
-    globalThis.location?.search ?? '',
-  ),
-);
+const activeTab = ref<ShellTabId>(DEFAULT_SHELL_TAB);
+const settingsSection = ref<AppSection | 'personal' | null>(null);
+const activeContact = ref<ShellNavId | null>(null);
+const activeCallPeer = ref<string | null>(null);
+const activeProfileContact = ref<string | null>(null);
 
-const activeNav = ref<ShellNavId>(currentSection.value);
-
-const pageTitle = computed(() => {
-  const peerId = parseShellContactId(activeNav.value);
-  if (peerId) {
-    const contact = contacts.value.book.contacts.find(
-      (item) => item.id === peerId,
+/** Pane head only for a concrete peer / settings page — not tab names. */
+const paneTitle = computed(() => {
+  if (activeTab.value === 'chats' && activeContact.value) {
+    const peerId = parseShellContactId(activeContact.value);
+    if (isSelfPeer(peerId)) return shellCopy.selfChatTitle;
+    const contact = peerId
+      ? contacts.value.book.contacts.find((item) => item.id === peerId)
+      : null;
+    return shellNavTitle(
+      activeContact.value,
+      contact ? contact.nick : undefined,
     );
-    return shellNavTitle(activeNav.value, contact ? contact.nick : undefined);
   }
-  return shellNavTitle(activeNav.value);
+  if (activeTab.value === 'calls' && activeCallPeer.value) {
+    const contact = contacts.value.book.contacts.find(
+      (item) => item.id === activeCallPeer.value,
+    );
+    return contact?.nick || activeCallPeer.value.slice(0, 12);
+  }
+  if (activeTab.value === 'profile' && activeProfileContact.value) {
+    const contact = contacts.value.book.contacts.find(
+      (item) => item.id === activeProfileContact.value,
+    );
+    return contact?.nick || activeProfileContact.value.slice(0, 12);
+  }
+  if (activeTab.value === 'settings' && settingsSection.value) {
+    return shellNavTitle(settingsSection.value);
+  }
+  return '';
 });
 
-const showShellList = computed(
-  () => Boolean(identity.value) && (!shellStacked.value || listMode.value),
+const showPaneHead = computed(() => {
+  if (activeTab.value === 'chats' && activeContact.value) return false;
+  return Boolean(paneTitle.value);
+});
+
+const showRail = computed(() => Boolean(identity.value));
+
+const railTabsOnly = computed(
+  () =>
+    shellStacked.value &&
+    !listMode.value &&
+    ((activeTab.value === 'chats' && Boolean(activeContact.value)) ||
+      (activeTab.value === 'calls' && Boolean(activeCallPeer.value)) ||
+      (activeTab.value === 'settings' && Boolean(settingsSection.value))),
 );
 
-const showShellPane = computed(
-  () => Boolean(identity.value) && (!shellStacked.value || !listMode.value),
-);
+const showPane = computed(() => {
+  if (!identity.value) return false;
+  if (activeTab.value === 'profile') return true;
+  if (activeTab.value === 'settings') {
+    return Boolean(settingsSection.value) || !shellStacked.value;
+  }
+  if (activeTab.value === 'calls') {
+    return Boolean(activeCallPeer.value) || !shellStacked.value;
+  }
+  if (activeTab.value === 'chats') {
+    if (activeContact.value) return !shellStacked.value || !listMode.value;
+    return !shellStacked.value;
+  }
+  return false;
+});
 
-const statusPath = computed(() => status.value.path);
+const statusView = computed(() => ({
+  networkOnline: status.value.networkOnline,
+  socketLive: status.value.socketLive,
+  socketBusy: status.value.socketBusy,
+  socketVisible: status.value.socketVisible,
+  webrtcLive: status.value.webrtcLive,
+  linkLabel: status.value.linkLabel,
+  latencyLabel: status.value.latencyLabel,
+  title: status.value.title,
+  path: status.value.path,
+}));
 
 const updateTitle = computed(
   () => state.value.updateNotice || shellCopy.checkUpdate,
 );
-
 const versionTitle = computed(() =>
   state.value.updateNotice
     ? `${APP_VERSION} · ${state.value.updateNotice}`
     : APP_VERSION,
 );
 
-const focusOutsideDrawer = () => {
-  const active = document.activeElement;
-  const inside =
-    active instanceof HTMLElement && Boolean(drawer.value?.contains(active));
-  if (!inside) return;
-  const back =
-    lastFocus.value &&
-    document.contains(lastFocus.value) &&
-    !drawer.value?.contains(lastFocus.value)
-      ? lastFocus.value
-      : menuButton.value;
-  back?.focus();
-  if (document.activeElement === active && active instanceof HTMLElement) {
-    active.blur();
+const setHash = (id: string) => {
+  if (globalThis.location && globalThis.location.hash !== `#${id}`) {
+    globalThis.location.hash = id;
   }
 };
 
-const setMenuOpen = (open: boolean) => {
-  if (open) {
-    lastFocus.value =
-      document.activeElement instanceof HTMLElement &&
-      !drawer.value?.contains(document.activeElement)
-        ? document.activeElement
-        : menuButton.value;
-    menuOpen.value = true;
-    void nextTick(() => closeButton.value?.focus());
-    return;
-  }
-  if (!menuOpen.value) return;
-  focusOutsideDrawer();
-  menuOpen.value = false;
-  void nextTick(() => {
-    const back =
-      lastFocus.value &&
-      document.contains(lastFocus.value) &&
-      !drawer.value?.contains(lastFocus.value)
-        ? lastFocus.value
-        : menuButton.value;
-    back?.focus();
-  });
-};
-
-const openPane = (id: ShellNavId) => {
-  activeNav.value = id;
-  const peerId = parseShellContactId(id);
-  if (peerId) {
-    store.onSelectContact(peerId);
-    listMode.value = false;
-    setMenuOpen(false);
-    return;
-  }
-  if (!isShellStub(id)) {
-    currentSection.value = id;
-    if (globalThis.location && globalThis.location.hash !== `#${id}`) {
-      globalThis.location.hash = id;
-    }
-  }
+const openSettingsItem = (section: AppSection | 'personal') => {
+  activeTab.value = 'settings';
+  settingsSection.value = section;
+  if (section !== 'personal') setHash(section);
   listMode.value = false;
-  setMenuOpen(false);
+};
+
+const openTransfer = () => openSettingsItem('lan');
+
+const openTab = (tab: ShellTabId) => {
+  activeTab.value = tab;
+  if (tab === 'chats') {
+    settingsSection.value = null;
+    activeCallPeer.value = null;
+    activeProfileContact.value = null;
+    if (shellStacked.value) listMode.value = true;
+    setHash('chats');
+    return;
+  }
+  activeContact.value = null;
+  if (tab === 'calls') {
+    settingsSection.value = null;
+    activeProfileContact.value = null;
+    listMode.value = shellStacked.value;
+    setHash('calls');
+    return;
+  }
+  if (tab === 'profile') {
+    settingsSection.value = null;
+    activeCallPeer.value = null;
+    activeProfileContact.value = null;
+    listMode.value = false;
+    setHash('contacts');
+    return;
+  }
+  // settings
+  activeCallPeer.value = null;
+  activeProfileContact.value = null;
+  if (!settingsSection.value) {
+    settingsSection.value = SETTINGS_MENU[0]?.section ?? 'personal';
+  }
+  listMode.value = shellStacked.value;
+  setHash('settings');
+};
+
+const openContact = (id: ShellNavId) => {
+  const peerId = parseShellContactId(id);
+  if (!peerId) return;
+  activeTab.value = 'chats';
+  settingsSection.value = null;
+  activeContact.value = id;
+  if (!isSelfPeer(peerId)) store.onSelectContact(peerId);
+  listMode.value = false;
+};
+
+const openCallPeer = (peerId: string) => {
+  activeTab.value = 'calls';
+  settingsSection.value = null;
+  activeCallPeer.value = peerId;
+  store.onSelectContact(peerId);
+  listMode.value = false;
+};
+
+const openProfileContact = (peerId: string) => {
+  activeTab.value = 'profile';
+  settingsSection.value = null;
+  activeProfileContact.value = peerId;
+  store.onSelectContact(peerId);
+  listMode.value = false;
 };
 
 const openContactCalls = () => {
-  const peerId = parseShellContactId(activeNav.value);
-  openPane('calls');
-  if (peerId) store.onSelectContact(peerId);
+  const peerId = parseShellContactId(activeContact.value ?? '');
+  openTab('calls');
+  if (peerId && !isSelfPeer(peerId)) {
+    activeCallPeer.value = peerId;
+    store.onSelectContact(peerId);
+  }
 };
 
-const openContactBook = () => {
-  openPane('contacts');
-};
+const openContactBook = () => openTab('profile');
 
 const backToList = () => {
   listMode.value = true;
+  if (activeTab.value === 'chats') activeContact.value = null;
+  if (activeTab.value === 'calls') activeCallPeer.value = null;
+  if (activeTab.value === 'settings') settingsSection.value = null;
+  if (activeTab.value === 'profile') activeProfileContact.value = null;
 };
 
-const onHash = () => {
-  currentSection.value = parseSectionHash(
+const applyHash = () => {
+  const hash = (globalThis.location?.hash ?? '')
+    .replace(/^#/, '')
+    .toLowerCase();
+  if (!hash || hash === 'chats') {
+    activeTab.value = 'chats';
+    settingsSection.value = null;
+    if (shellStacked.value) listMode.value = true;
+    return;
+  }
+  if (hash === 'settings') {
+    openTab('settings');
+    return;
+  }
+  const section = parseSectionHash(
     globalThis.location?.hash ?? '',
     globalThis.location?.search ?? '',
   );
-  activeNav.value = currentSection.value;
-  if (shellStacked.value) listMode.value = false;
-};
-
-const onKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && menuOpen.value) {
-    event.preventDefault();
-    setMenuOpen(false);
+  const tab = tabForSection(section);
+  if (tab === 'settings') {
+    activeTab.value = 'settings';
+    settingsSection.value = section === 'lan' ? 'lan' : section;
+    listMode.value = false;
+    return;
   }
+  if (tab) {
+    openTab(tab);
+    return;
+  }
+  settingsSection.value = section;
+  activeTab.value = 'settings';
+  listMode.value = false;
 };
 
 const skipToContent = (event: Event) => {
@@ -230,192 +308,92 @@ watch(identity, (value) => {
 });
 
 onMounted(() => {
-  globalThis.addEventListener('hashchange', onHash);
-  document.addEventListener('keydown', onKeydown);
-  toolsMq = globalThis.matchMedia(TOOLS_MQ);
+  globalThis.addEventListener('hashchange', applyHash);
   shellMq = globalThis.matchMedia(SHELL_MQ);
-  toolsMq.addEventListener('change', syncToolsPlacement);
   shellMq.addEventListener('change', syncShellStack);
-  syncToolsPlacement();
   syncShellStack();
-  onHash();
-  if (shellStacked.value) listMode.value = true;
+  applyHash();
 });
 
 onUnmounted(() => {
-  globalThis.removeEventListener('hashchange', onHash);
-  document.removeEventListener('keydown', onKeydown);
-  toolsMq?.removeEventListener('change', syncToolsPlacement);
+  globalThis.removeEventListener('hashchange', applyHash);
   shellMq?.removeEventListener('change', syncShellStack);
-  toolsMq = null;
   shellMq = null;
 });
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'is-menu-open': menuOpen }">
-    <a class="skip-link" href="#content" @click="skipToContent">
-      {{ componentsCopy.app.skipToContent }}
-    </a>
+  <AppShell
+    :version-title="versionTitle"
+    :update-title="updateTitle"
+    :status="statusView"
+    :theme-mode="themeMode"
+    :theme-label="themeLabel"
+    @toggle-theme="onToggleTheme"
+    @skip-to-content="skipToContent"
+  >
+    <section v-if="!identity" class="page page-solo" data-section="identity">
+      <IdentityOnboarding @unlocked="onIdentityUnlocked" />
+    </section>
 
-    <button
-      type="button"
-      class="drawer-scrim"
-      :hidden="!menuOpen"
-      tabindex="-1"
-      :aria-label="componentsCopy.app.closeMenu"
-      @click="setMenuOpen(false)"
-    />
-
-    <aside
-      id="app-nav"
-      ref="drawer"
-      class="drawer"
-      :aria-label="componentsCopy.app.sections"
-      :inert="!menuOpen"
-    >
-      <div class="drawer-head">
-        <div>
-          <p class="drawer-title">{{ APP_NAME }}</p>
-          <p class="tagline">{{ APP_TAGLINE }}</p>
-        </div>
-        <button
-          ref="closeButton"
-          type="button"
-          class="icon-button"
-          :aria-label="componentsCopy.app.closeMenu"
-          @click="setMenuOpen(false)"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            focusable="false"
-            class="icon"
-          >
-            <path
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              d="M6 6l12 12M18 6L6 18"
-            />
-          </svg>
-        </button>
-      </div>
-      <nav class="drawer-nav" :aria-label="componentsCopy.app.appSections">
-        <a
-          v-for="section in APP_SECTIONS"
-          :key="section.id"
-          class="drawer-link"
-          :href="`#${section.id}`"
-          :aria-current="currentSection === section.id ? 'page' : undefined"
-          @click="openPane(section.id)"
-        >
-          {{ section.title }}
-        </a>
-      </nav>
-      <div class="drawer-tools">
-        <SessionTools
-          v-if="toolsInDrawer"
-          in-drawer
-          :version-title="versionTitle"
-          :update-title="updateTitle"
+    <div v-else class="shell-body">
+      <ShellRail
+        :show="showRail"
+        :tabs-only="railTabsOnly"
+        :active-tab="activeTab"
+        @select="openTab"
+      >
+        <ShellChatList
+          v-if="activeTab === 'chats'"
+          :active-id="activeContact"
+          @select="openContact"
         />
-      </div>
-    </aside>
+        <ShellCallList
+          v-else-if="activeTab === 'calls'"
+          :active-peer-id="activeCallPeer"
+          @select="openCallPeer"
+        />
+        <ShellSettingsList
+          v-else-if="activeTab === 'settings'"
+          :active-section="settingsSection"
+          @select="openSettingsItem"
+        />
+        <ShellContactList
+          v-else-if="activeTab === 'profile'"
+          :active-id="activeProfileContact"
+          @select="openProfileContact"
+        />
+      </ShellRail>
 
-    <div class="app-frame" :inert="menuOpen">
-      <header class="topbar">
-        <button
-          ref="menuButton"
-          type="button"
-          class="icon-button"
-          :aria-label="componentsCopy.app.menu"
-          aria-controls="app-nav"
-          :aria-expanded="menuOpen"
-          @click="setMenuOpen(!menuOpen)"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            focusable="false"
-            class="icon"
-          >
-            <path
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              d="M4 7h16M4 12h16M4 17h16"
-            />
-          </svg>
-        </button>
-
-        <p
-          class="status-line"
-          data-role="session"
-          role="status"
-          aria-live="polite"
-          :data-online="String(status.networkOnline)"
-          :data-socket="String(status.socketLive)"
-          :data-webrtc="String(status.webrtcLive)"
-          :data-path="statusPath"
-          :title="status.title"
-        >
-          <span
-            v-if="status.socketVisible"
-            class="status-chip"
-            :data-online="String(status.socketLive)"
-            :data-busy="String(status.socketBusy)"
-          >
-            <span
-              class="presence status-dot"
-              :data-online="String(status.socketLive)"
-              :data-busy="String(status.socketBusy)"
-              :aria-label="
-                status.socketBusy
-                  ? statusCopy.socketBusyLabel
-                  : status.socketLive
-                    ? statusCopy.socketOnlineLabel
-                    : statusCopy.socketOfflineLabel
-              "
-            />
-            <span>{{ statusCopy.socketOn }}</span>
-          </span>
-          <span class="status-chip" :data-online="String(status.webrtcLive)">
-            <span
-              class="presence status-dot"
-              :data-online="String(status.webrtcLive)"
-              :aria-label="
-                status.webrtcLive
-                  ? statusCopy.webrtcOnlineLabel
-                  : statusCopy.webrtcOfflineLabel
-              "
-            />
-            <span>{{ statusCopy.webrtcOn }}</span>
-          </span>
-          <span v-if="status.linkLabel" class="status-line-text">{{
-            status.linkLabel
-          }}</span>
-          <span v-if="status.latencyLabel" class="status-line-ms">{{
-            status.latencyLabel
-          }}</span>
-        </p>
-
-        <div class="topbar-end">
+      <div
+        v-show="showPane"
+        class="shell-pane"
+        :class="{ 'is-chat': activeTab === 'chats' && activeContact }"
+      >
+        <header v-if="showPaneHead" class="shell-pane-head">
           <button
+            v-if="
+              shellStacked &&
+              ((activeTab === 'calls' && activeCallPeer) ||
+                (activeTab === 'settings' && settingsSection) ||
+                (activeTab === 'profile' && activeProfileContact))
+            "
             type="button"
             class="icon-button"
-            :title="themeLabel"
-            :aria-label="themeLabel"
-            @click="onToggleTheme"
+            :aria-label="
+              activeTab === 'calls'
+                ? shellCopy.backToCalls
+                : activeTab === 'profile'
+                  ? shellCopy.tabProfile
+                  : shellCopy.tabSettings
+            "
+            @click="backToList"
           >
             <svg
-              v-if="themeMode === 'dark'"
               viewBox="0 0 24 24"
-              class="icon"
               aria-hidden="true"
               focusable="false"
+              class="icon"
             >
               <path
                 fill="none"
@@ -423,200 +401,112 @@ onUnmounted(() => {
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5Z"
-              />
-            </svg>
-            <svg
-              v-else-if="themeMode === 'system'"
-              viewBox="0 0 24 24"
-              class="icon"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <rect
-                x="3"
-                y="4"
-                width="18"
-                height="14"
-                rx="2"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              />
-              <path
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                d="M8 20h8"
-              />
-            </svg>
-            <svg
-              v-else
-              viewBox="0 0 24 24"
-              class="icon"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <circle
-                cx="12"
-                cy="12"
-                r="4"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              />
-              <path
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+                d="M15 6l-6 6 6 6"
               />
             </svg>
           </button>
-          <SessionTools
-            v-if="!toolsInDrawer"
-            :version-title="versionTitle"
-            :update-title="updateTitle"
-          />
-        </div>
-      </header>
+          <h1 class="page-title shell-pane-title">{{ paneTitle }}</h1>
+        </header>
 
-      <section v-if="!identity" class="page page-solo" data-section="identity">
-        <IdentityOnboarding @unlocked="onIdentityUnlocked" />
-      </section>
+        <main
+          id="content"
+          ref="page"
+          class="page shell-page"
+          :class="{ 'is-chat': activeTab === 'chats' && activeContact }"
+          tabindex="-1"
+        >
+          <section
+            v-if="activeTab === 'chats' && activeContact && identity"
+            class="page-section page-section-chat"
+            data-section="chat"
+          >
+            <ShellChatThread
+              :peer-id="parseShellContactId(activeContact) || ''"
+              :identity="identity"
+              :show-back="shellStacked"
+              @back="backToList"
+              @open-calls="openContactCalls"
+              @open-book="openContactBook"
+              @open-transfer="openTransfer"
+            />
+          </section>
 
-      <div v-else class="shell-body">
-        <aside v-show="showShellList" class="shell-rail">
-          <p class="identity-chip shell-identity">
-            ID
-            <code>{{ identity.displayFingerprint }}</code>
-          </p>
-          <ShellChatList :active-id="activeNav" @select="openPane" />
-        </aside>
+          <section
+            v-else-if="activeTab === 'chats'"
+            class="page-section"
+            data-section="chat-empty"
+          >
+            <p class="tagline">{{ shellCopy.chatEmptyHint }}</p>
+          </section>
 
-        <div v-show="showShellPane" class="shell-pane">
-          <header class="shell-pane-head">
-            <button
-              v-if="shellStacked"
-              type="button"
-              class="icon-button"
-              :aria-label="shellCopy.backToList"
-              @click="backToList"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                focusable="false"
-                class="icon"
-              >
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M15 6l-6 6 6 6"
-                />
-              </svg>
-            </button>
-            <h1 class="page-title shell-pane-title">{{ pageTitle }}</h1>
-          </header>
+          <section
+            v-else-if="activeTab === 'profile'"
+            class="page-section"
+            data-section="contacts"
+          >
+            <ContactsSection list-in-rail :focus-id="activeProfileContact" />
+          </section>
 
-          <main id="content" ref="page" class="page shell-page" tabindex="-1">
+          <section
+            v-else-if="activeTab === 'calls'"
+            class="page-section"
+            data-section="calls"
+          >
+            <CallsSection :peer-id="activeCallPeer" />
+          </section>
+
+          <template v-else-if="activeTab === 'settings' && settingsSection">
             <section
-              v-if="isShellStub(activeNav)"
+              v-if="settingsSection === 'lan'"
               class="page-section"
-              data-section="stub"
+              data-section="lan"
             >
-              <PlaceholderSection
-                v-if="activeNav === 'stub-chats'"
-                :title="shellCopy.stubChatsTitle"
-                :text="shellCopy.stubChatsHint"
-              />
-              <PlaceholderSection
-                v-else
-                :title="shellCopy.stubEmptyTitle"
-                :text="shellCopy.stubEmptyText"
+              <div class="transfer"><TransferPanel /></div>
+              <div class="inbox"><InboxPanel /></div>
+            </section>
+            <section
+              v-else-if="settingsSection === 'servers'"
+              class="page-section servers"
+              data-section="servers"
+            >
+              <div id="my-server" class="servers"><HostPanel /></div>
+              <div class="servers"><ServersSection /></div>
+            </section>
+            <section
+              v-else-if="settingsSection === 'logs'"
+              class="page-section"
+              data-section="logs"
+            >
+              <LogsSection />
+            </section>
+            <section
+              v-else-if="settingsSection === 'help'"
+              class="page-section help"
+              data-section="help"
+            >
+              <HelpSection />
+            </section>
+            <section
+              v-else-if="settingsSection === 'personal' && identity"
+              class="page-section"
+              data-section="personal"
+            >
+              <PersonalSettings
+                :identity="identity"
+                @open-transfer="openTransfer"
               />
             </section>
+          </template>
 
-            <section
-              v-else-if="isShellContact(activeNav)"
-              class="page-section"
-              data-section="contact"
-            >
-              <ShellContactFocus
-                :peer-id="parseShellContactId(activeNav) || ''"
-                @open-calls="openContactCalls"
-                @open-book="openContactBook"
-                @open-transfer="openPane('lan')"
-              />
-            </section>
-
-            <template v-else>
-              <section
-                v-show="currentSection === 'lan'"
-                class="page-section"
-                data-section="lan"
-              >
-                <div class="transfer">
-                  <TransferPanel />
-                </div>
-                <div class="inbox">
-                  <InboxPanel />
-                </div>
-              </section>
-
-              <section
-                v-show="currentSection === 'servers'"
-                class="page-section servers"
-                data-section="servers"
-              >
-                <div id="my-server" class="servers">
-                  <HostPanel />
-                </div>
-                <div class="servers">
-                  <ServersSection />
-                </div>
-              </section>
-
-              <section
-                v-show="currentSection === 'contacts'"
-                class="page-section"
-                data-section="contacts"
-              >
-                <ContactsSection />
-              </section>
-
-              <section
-                v-show="currentSection === 'calls'"
-                class="page-section"
-                data-section="calls"
-              >
-                <CallsSection />
-              </section>
-
-              <section
-                v-show="currentSection === 'logs'"
-                class="page-section"
-                data-section="logs"
-              >
-                <LogsSection />
-              </section>
-
-              <section
-                v-show="currentSection === 'help'"
-                class="page-section help"
-                data-section="help"
-              >
-                <HelpSection />
-              </section>
-            </template>
-          </main>
-        </div>
+          <section
+            v-else-if="activeTab === 'settings'"
+            class="page-section"
+            data-section="settings-empty"
+          >
+            <p class="tagline">{{ shellCopy.drawerPersonal }}</p>
+          </section>
+        </main>
       </div>
     </div>
-  </div>
+  </AppShell>
 </template>

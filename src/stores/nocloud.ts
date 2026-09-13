@@ -257,6 +257,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
     callPeerId: calls.callPeerId,
     callError: calls.callError,
     callSession: calls.callSession,
+    callLog: calls.callLog,
     micOn: calls.micOn,
     camOn: calls.camOn,
     onStartCall: calls.onStartCall,

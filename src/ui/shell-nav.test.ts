@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   isShellContact,
-  isShellStub,
   parseShellContactId,
   shellContactId,
   shellNavTitle,
+  shellSelfId,
 } from './shell-nav.ts';
 
 describe('shell-nav', () => {
@@ -13,12 +13,12 @@ describe('shell-nav', () => {
     expect(id).toBe('contact:fp-alice');
     expect(parseShellContactId(id)).toBe('fp-alice');
     expect(isShellContact(id)).toBe(true);
-    expect(isShellStub(id)).toBe(false);
   });
 
-  it('resolves titles for stubs, sections, and contacts', () => {
-    expect(shellNavTitle('stub-chats')).toBeTruthy();
+  it('resolves titles for sections, self chat, and contacts', () => {
     expect(shellNavTitle('contacts')).toBeTruthy();
+    expect(shellNavTitle('personal')).toBeTruthy();
+    expect(shellNavTitle(shellSelfId())).toBeTruthy();
     expect(shellNavTitle(shellContactId('fp'), 'Аня')).toBe('Аня');
   });
 });

@@ -19,6 +19,7 @@ import {
 } from '@/lib/identity-session.ts';
 import { computed, onMounted, ref } from 'vue';
 import Card from './Card.vue';
+import FieldInput from './FieldInput.vue';
 
 const emit = defineEmits<{
   unlocked: [identity: UnlockedIdentity];
@@ -184,57 +185,60 @@ const copyBackup = async () => {
 
 <template>
   <Card :title="title" :hint="copy.hint">
-    <div class="stack-form">
-      <label class="field">
-        <span>{{ copy.passphrase }}</span>
-        <input
-          v-model="passphrase"
-          type="password"
-          autocomplete="current-password"
-          :disabled="busy"
-        />
-      </label>
+    <FieldInput
+      v-model="passphrase"
+      :label="copy.passphrase"
+      type="password"
+      autocomplete="current-password"
+      :disabled="busy"
+    />
 
-      <label v-if="mode === 'restore-mnemonic'" class="field">
-        <span>{{ copy.seedLabel }}</span>
-        <textarea v-model="mnemonic" rows="3" :disabled="busy" />
-      </label>
+    <FieldInput
+      v-if="mode === 'restore-mnemonic'"
+      v-model="mnemonic"
+      :label="copy.seedLabel"
+      :rows="3"
+      :disabled="busy"
+    />
 
-      <label v-if="mode === 'restore-backup'" class="field">
-        <span>{{ copy.backupLabel }}</span>
-        <textarea v-model="backupText" rows="4" :disabled="busy" />
-      </label>
+    <FieldInput
+      v-if="mode === 'restore-backup'"
+      v-model="backupText"
+      :label="copy.backupLabel"
+      :rows="4"
+      :disabled="busy"
+    />
 
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p v-if="notice" class="tagline">{{ notice }}</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="notice" class="tagline">{{ notice }}</p>
 
-      <p v-if="shownMnemonic" class="tagline">
-        {{ copy.saveSeed }}
-        <strong>{{ shownMnemonic }}</strong>
-      </p>
+    <p v-if="shownMnemonic" class="tagline">
+      {{ copy.saveSeed }}
+      <strong>{{ shownMnemonic }}</strong>
+    </p>
 
-      <p v-if="unlocked" class="tagline">
-        {{ copy.fingerprint }}
-        <code>{{ unlocked.displayFingerprint }}</code>
-      </p>
-    </div>
+    <p v-if="unlocked" class="tagline">
+      {{ copy.fingerprint }}
+      <code>{{ unlocked.displayFingerprint }}</code>
+    </p>
 
     <template #actions>
       <button
         v-if="showBioUnlock"
         type="button"
-        class="primary"
+        class="button"
         :disabled="busy"
         @click="runBiometric"
       >
         {{ copy.unlockBio }}
       </button>
-      <button type="button" class="primary" :disabled="busy" @click="run">
+      <button type="button" class="button" :disabled="busy" @click="run">
         {{ mode === 'unlock' ? copy.enter : copy.continue }}
       </button>
       <button
         v-if="showBioEnroll"
         type="button"
+        class="button button-secondary"
         :disabled="busy"
         @click="enrollBiometric"
       >
@@ -243,6 +247,7 @@ const copyBackup = async () => {
       <button
         v-if="unlocked"
         type="button"
+        class="button button-secondary"
         :disabled="busy || !passphrase"
         @click="copyBackup"
       >
@@ -251,6 +256,7 @@ const copyBackup = async () => {
       <button
         v-if="mode !== 'create'"
         type="button"
+        class="button button-secondary"
         :disabled="busy"
         @click="mode = 'create'"
       >
@@ -259,6 +265,7 @@ const copyBackup = async () => {
       <button
         v-if="mode !== 'unlock' && hasSealedVault(storage)"
         type="button"
+        class="button button-secondary"
         :disabled="busy"
         @click="mode = 'unlock'"
       >
@@ -267,6 +274,7 @@ const copyBackup = async () => {
       <button
         v-if="mode !== 'restore-mnemonic'"
         type="button"
+        class="button button-secondary"
         :disabled="busy"
         @click="mode = 'restore-mnemonic'"
       >
@@ -275,6 +283,7 @@ const copyBackup = async () => {
       <button
         v-if="mode !== 'restore-backup'"
         type="button"
+        class="button button-secondary"
         :disabled="busy"
         @click="mode = 'restore-backup'"
       >
@@ -285,20 +294,8 @@ const copyBackup = async () => {
 </template>
 
 <style scoped>
-.stack-form {
-  display: grid;
-  gap: 0.75rem;
-}
-.field {
-  display: grid;
-  gap: 0.35rem;
-}
-.field input,
-.field textarea {
-  width: 100%;
-}
 .error {
-  color: var(--danger, #c44);
+  color: var(--color-destructive);
   margin: 0;
 }
 </style>

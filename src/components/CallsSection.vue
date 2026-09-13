@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { componentsCopy } from '@/content/index.ts';
+import { componentsCopy, shellCopy } from '@/content/index.ts';
 import { primaryCallLeg } from '@/domain/call/index.ts';
+import { contactDisplayName } from '@/domain/profile.ts';
 import type { MediaCallKind } from '@/stores/nocloud/calls.ts';
 import { useNocloudStore } from '@/stores/nocloud.ts';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import AvatarImg from './AvatarImg.vue';
 import Card from './Card.vue';
-import ContactRow from './ContactRow.vue';
+
+const props = defineProps<{
+  peerId?: string | null;
+}>();
 
 const store = useNocloudStore();
 const {
@@ -26,6 +30,8 @@ const copy = componentsCopy.calls;
 const localVideo = ref<HTMLVideoElement | null>(null);
 const remoteVideo = ref<HTMLVideoElement | null>(null);
 
+const focusPeerId = computed(() => props.peerId || callPeerId.value || null);
+
 const leg = computed(() => primaryCallLeg(callSession.value));
 const legState = computed(() => leg.value?.state ?? null);
 const incomingRinging = computed(
@@ -42,16 +48,15 @@ const inCallUi = computed(
     legState.value === 'failed',
 );
 
-const sortedContacts = computed(() => {
-  const list = [...contacts.value.book.contacts];
-  list.sort((a, b) => a.nick.localeCompare(b.nick, 'ru'));
-  return list;
-});
-
 const activeContact = computed(() => {
-  const id = callPeerId.value;
+  const id = focusPeerId.value;
   if (!id) return null;
   return contacts.value.book.contacts.find((item) => item.id === id) ?? null;
+});
+
+const peerName = computed(() => {
+  if (activeContact.value) return contactDisplayName(activeContact.value);
+  return focusPeerId.value?.slice(0, 12) || copy.remoteLabel;
 });
 
 const statusText = computed(() => {
@@ -65,16 +70,13 @@ const statusText = computed(() => {
     return copy.calling;
   }
   if (callKind.value) return copy.calling;
-  return copy.hint;
+  if (focusPeerId.value) return copy.hint;
+  return shellCopy.callsEmpty;
 });
 
-const contactDetail = (id: string) => {
-  if (callPeerId.value === id && inCallUi.value) return copy.inCall;
-  if (store.isPresenceOnline(id)) return copy.online;
-  return copy.offline;
-};
-
-const start = (id: string, kind: MediaCallKind) => {
+const start = (kind: MediaCallKind) => {
+  const id = focusPeerId.value;
+  if (!id) return;
   void store.onStartCall(id, kind);
 };
 
@@ -109,19 +111,17 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="card-stack">
-    <Card title="Звонок" :hint="statusText">
+    <p v-if="!focusPeerId" class="tagline">{{ shellCopy.callsEmpty }}</p>
+    <Card v-else :title="peerName" :hint="statusText">
       <div v-if="inCallUi" class="call-stage">
         <div class="call-hero">
           <AvatarImg
-            v-if="activeContact || callPeerId"
             class="call-hero-avatar"
-            :id="activeContact?.id || callPeerId || ''"
+            :id="focusPeerId"
             :avatar="activeContact?.avatar || ''"
             :size="72"
           />
-          <p class="call-hero-name">
-            {{ activeContact?.nick || copy.remoteLabel }}
-          </p>
+          <p class="call-hero-name">{{ peerName }}</p>
           <p class="call-hero-status">{{ statusText }}</p>
         </div>
 
@@ -134,9 +134,7 @@ onBeforeUnmount(() => {
               playsinline
               :aria-label="copy.remoteLabel"
             />
-            <p class="call-tile-label">
-              {{ activeContact?.nick || copy.remoteLabel }}
-            </p>
+            <p class="call-tile-label">{{ peerName }}</p>
           </div>
           <div class="call-tile call-tile-local">
             <video
@@ -202,54 +200,36 @@ onBeforeUnmount(() => {
           </template>
         </div>
       </div>
-      <p v-else class="tagline">{{ copy.hint }}</p>
-    </Card>
 
-    <Card title="Кому">
-      <p v-if="sortedContacts.length === 0" class="tagline">
-        {{ copy.bookEmpty }}
-      </p>
-      <div v-else class="call-book">
-        <ContactRow
-          v-for="contact in sortedContacts"
-          :key="contact.id"
-          :name="contact.nick"
-          :detail="contactDetail(contact.id)"
-          :online="store.isPresenceOnline(contact.id)"
-          :online-label="copy.online"
-          :offline-label="copy.offline"
-        >
-          <template #leading>
-            <AvatarImg :id="contact.id" :avatar="contact.avatar" />
-          </template>
-          <template #actions>
-            <button
-              type="button"
-              class="button button-secondary"
-              :disabled="busy"
-              @click="start(contact.id, 'audio')"
-            >
-              {{ copy.audio }}
-            </button>
-            <button
-              type="button"
-              class="button button-secondary"
-              :disabled="busy"
-              @click="start(contact.id, 'video')"
-            >
-              {{ copy.video }}
-            </button>
-            <button
-              type="button"
-              class="button button-secondary"
-              :disabled="busy"
-              @click="start(contact.id, 'screen')"
-            >
-              {{ copy.screen }}
-            </button>
-          </template>
-        </ContactRow>
-      </div>
+      <template v-else>
+        <p class="tagline">{{ copy.hint }}</p>
+        <div class="call-actions">
+          <button
+            type="button"
+            class="button"
+            :disabled="busy"
+            @click="start('audio')"
+          >
+            {{ copy.audio }}
+          </button>
+          <button
+            type="button"
+            class="button button-secondary"
+            :disabled="busy"
+            @click="start('video')"
+          >
+            {{ copy.video }}
+          </button>
+          <button
+            type="button"
+            class="button button-secondary"
+            :disabled="busy"
+            @click="start('screen')"
+          >
+            {{ copy.screen }}
+          </button>
+        </div>
+      </template>
     </Card>
   </div>
 </template>

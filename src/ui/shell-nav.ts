@@ -1,45 +1,30 @@
 import { APP_SECTIONS, type AppSection } from '@/content/index.ts';
 import { shellCopy } from '@/content/ru/shell.ts';
 
-/** Synthetic list rows for empty Telegram-like stubs (S5.1). */
-export type ShellStubId = 'stub-chats' | 'stub-empty';
+/** Local notebook / chat-with-self (never sent over the wire). */
+export const SELF_PEER_ID = 'self';
 
 export type ShellContactId = `contact:${string}`;
 
-export type ShellNavId = AppSection | ShellStubId | ShellContactId;
+export type ShellNavId = AppSection | 'personal' | ShellContactId;
+
+export const shellSelfId = (): ShellContactId => `contact:${SELF_PEER_ID}`;
+
+export const isSelfPeer = (peerId: string | null | undefined): boolean =>
+  peerId === SELF_PEER_ID;
+
+export const isSelfChat = (id: ShellNavId): boolean =>
+  parseShellContactId(id) === SELF_PEER_ID;
 
 export type ShellNavItem = {
   id: ShellNavId;
   title: string;
   detail: string;
-  kind: 'section' | 'stub' | 'contact';
+  kind: 'section' | 'contact';
   peerId?: string;
   online?: boolean;
   avatar?: string;
 };
-
-export const SHELL_STUBS: ShellNavItem[] = [
-  {
-    id: 'stub-chats',
-    title: shellCopy.stubChatsTitle,
-    detail: shellCopy.stubChatsHint,
-    kind: 'stub',
-  },
-  {
-    id: 'stub-empty',
-    title: shellCopy.stubEmptyTitle,
-    detail: shellCopy.stubEmptyText,
-    kind: 'stub',
-  },
-];
-
-export const shellSectionItems = (): ShellNavItem[] =>
-  APP_SECTIONS.map((section) => ({
-    id: section.id,
-    title: section.title,
-    detail: shellCopy.sectionHint,
-    kind: 'section' as const,
-  }));
 
 export const shellContactId = (peerId: string): ShellContactId =>
   `contact:${peerId}`;
@@ -50,22 +35,16 @@ export const parseShellContactId = (id: ShellNavId): string | null => {
   return peerId || null;
 };
 
-export const isShellStub = (id: ShellNavId): id is ShellStubId =>
-  id === 'stub-chats' || id === 'stub-empty';
-
 export const isShellContact = (id: ShellNavId): id is ShellContactId =>
   parseShellContactId(id) !== null;
 
 export const shellNavTitle = (id: ShellNavId, contactNick?: string): string => {
   const peerId = parseShellContactId(id);
+  if (peerId === SELF_PEER_ID) return shellCopy.selfChatTitle;
   if (peerId) return contactNick || peerId.slice(0, 12);
-  if (isShellStub(id)) {
-    for (const item of SHELL_STUBS) {
-      if (item.id === id) return item.title;
-    }
-  }
+  if (id === 'personal') return shellCopy.personalTitle;
   for (const section of APP_SECTIONS) {
     if (section.id === id) return section.title;
   }
-  return shellCopy.listTitle;
+  return shellCopy.contactsTitle;
 };

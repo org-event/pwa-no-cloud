@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { componentsCopy } from '@/content/index.ts';
 import { contactDisplayName } from '@/domain/profile.ts';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useNocloudStore } from '@/stores/nocloud.ts';
 import AvatarImg from './AvatarImg.vue';
@@ -9,6 +9,12 @@ import Card from './Card.vue';
 import ContactRow from './ContactRow.vue';
 import InputAction from './InputAction.vue';
 import PendingPeer from './PendingPeer.vue';
+
+const props = defineProps<{
+  /** Contact list + add live in the shell rail. */
+  listInRail?: boolean;
+  focusId?: string | null;
+}>();
 
 const store = useNocloudStore();
 const { contacts, hasSignalingSocket } = storeToRefs(store);
@@ -24,9 +30,23 @@ const aliasDraft = ref('');
 
 const copy = componentsCopy.contacts;
 
+const focusContact = computed(() => {
+  const id = props.focusId;
+  if (!id) return null;
+  return contacts.value.book.contacts.find((item) => item.id === id) ?? null;
+});
+
 onMounted(() => {
   void store.seedDemoContacts();
 });
+
+watch(
+  () => props.focusId,
+  () => {
+    aliasEditId.value = null;
+    aliasDraft.value = '';
+  },
+);
 
 const onSaveNick = () => {
   store.onSaveProfile(nick.value);
@@ -96,6 +116,85 @@ const saveAlias = () => {
       <a href="#servers">{{ copy.needS1Link }}</a>
       {{ copy.needS1After }}
     </p>
+
+    <Card
+      v-if="listInRail && focusContact"
+      :title="contactDisplayName(focusContact)"
+      :hint="
+        contactDetail(
+          focusContact.id,
+          focusContact.nick,
+          Boolean(focusContact.localAlias),
+        )
+      "
+    >
+      <ContactRow
+        :name="contactDisplayName(focusContact)"
+        :detail="
+          contactDetail(
+            focusContact.id,
+            focusContact.nick,
+            Boolean(focusContact.localAlias),
+          )
+        "
+        :online="isOnline(focusContact.id)"
+        :online-label="copy.online"
+        :offline-label="copy.offline"
+      >
+        <template #leading>
+          <AvatarImg :id="focusContact.id" :avatar="focusContact.avatar" />
+        </template>
+        <template #actions>
+          <button
+            type="button"
+            class="button button-accent"
+            :disabled="!hasSignalingSocket"
+            @click="store.onKnockContact(focusContact.id)"
+          >
+            {{ copy.knock }}
+          </button>
+          <button
+            type="button"
+            class="button button-secondary"
+            :disabled="!focusContact.publicKey"
+            @click="store.onIntroduceContact(focusContact.id)"
+          >
+            {{ copy.introduce }}
+          </button>
+          <button
+            type="button"
+            class="button button-secondary"
+            @click="
+              startAliasEdit(
+                focusContact.id,
+                focusContact.localAlias || focusContact.nick,
+              )
+            "
+          >
+            {{ copy.rename }}
+          </button>
+          <button
+            type="button"
+            class="button button-secondary"
+            @click="store.onRemoveContact(focusContact.id)"
+          >
+            {{ copy.remove }}
+          </button>
+        </template>
+      </ContactRow>
+      <InputAction
+        v-if="aliasEditId === focusContact.id"
+        v-model="aliasDraft"
+        :label="copy.aliasLabel"
+        name="alias"
+        :maxlength="32"
+        :input-aria-label="copy.aliasAria"
+        icon="check"
+        :tooltip="copy.saveAlias"
+        @action="saveAlias"
+        @enter="saveAlias"
+      />
+    </Card>
 
     <Card :title="copy.meLegend" :hint="copy.availableHint">
       <ContactRow
@@ -188,7 +287,7 @@ const saveAlias = () => {
       />
     </Card>
 
-    <Card :title="copy.addLegend" :hint="copy.addHint">
+    <Card v-if="!listInRail" :title="copy.addLegend" :hint="copy.addHint">
       <InputAction
         v-model="addCard"
         :label="copy.cardField"
@@ -202,7 +301,7 @@ const saveAlias = () => {
       />
     </Card>
 
-    <Card :title="copy.listLegend">
+    <Card v-if="!listInRail" :title="copy.listLegend">
       <div class="contact-list">
         <p v-if="contacts.book.contacts.length === 0" class="tagline">
           {{ copy.listEmpty }}

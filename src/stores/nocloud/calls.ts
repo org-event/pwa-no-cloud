@@ -12,30 +12,51 @@ import {
   type CallKind,
 } from '@/lib/call-intent.ts';
 import {
+  appendCallLog,
+  loadCallLog,
+  saveCallLog,
+  type CallLogEntry,
+  type CallLogOutcome,
+} from '@/lib/call-log.ts';
+import {
   openCallMedia,
   onScreenShareEnded,
   setTracksEnabled,
   stopStream,
   tracksEnabled,
 } from '@/lib/call-media.ts';
-import { markRaw, shallowRef } from 'vue';
+import { markRaw, ref, shallowRef } from 'vue';
 import type { NocloudContext } from './context.ts';
 
 export type MediaCallKind = Exclude<CallKind, 'data'>;
 
 export function createCallsSlice(ctx: NocloudContext) {
-  const { state, touch } = ctx;
+  const { state, touch, storage } = ctx;
   const localMedia = shallowRef<MediaStream | null>(null);
   const remoteMedia = shallowRef<MediaStream | null>(null);
   const callKind = shallowRef<MediaCallKind | null>(null);
   const callPeerId = shallowRef<string | null>(null);
   const callError = shallowRef('');
   const callSession = shallowRef<CallSession>(createIdleCallSession());
+  const callLog = ref<CallLogEntry[]>(loadCallLog(storage));
   const micOn = shallowRef(true);
   const camOn = shallowRef(true);
   let unbindScreenEnded: (() => void) | null = null;
 
   const publish = () => touch();
+
+  const recordCall = (
+    peerId: string,
+    direction: 'in' | 'out',
+    outcome: CallLogOutcome,
+  ) => {
+    callLog.value = appendCallLog(callLog.value, {
+      peerId,
+      direction,
+      outcome,
+    });
+    saveCallLog(storage, callLog.value);
+  };
 
   const setSession = (next: CallSession) => {
     callSession.value = next;
@@ -61,7 +82,6 @@ export function createCallsSlice(ctx: NocloudContext) {
     callError.value = '';
     micOn.value = true;
     camOn.value = true;
-    // Detach from PC first so data/ping stay; then stop display/mic tracks.
     state.peer?.clearLocalStream();
     stopStream(stream);
   };
@@ -111,6 +131,7 @@ export function createCallsSlice(ctx: NocloudContext) {
           peerId,
         }),
       );
+      recordCall(peerId, 'out', 'started');
       state.peer?.setLocalStream(stream);
       state.contactsNotice = `${componentsCopy.calls.calling} (${CALL_KIND_LABEL[kind]})`;
       publish();
@@ -136,6 +157,7 @@ export function createCallsSlice(ctx: NocloudContext) {
           }),
         );
       }
+      recordCall(peerId, 'out', 'failed');
       callError.value = componentsCopy.calls.needPermission;
       state.contactsNotice = componentsCopy.calls.needPermission;
       publish();
@@ -155,6 +177,7 @@ export function createCallsSlice(ctx: NocloudContext) {
     callPeerId.value = peerId;
     callKind.value = null;
     callError.value = '';
+    recordCall(peerId, 'in', 'started');
     publish();
     return true;
   }
@@ -178,6 +201,7 @@ export function createCallsSlice(ctx: NocloudContext) {
           legId: leg.id,
         }),
       );
+      recordCall(leg.peerId, 'in', 'answered');
       state.peer?.setLocalStream(stream);
       state.contactsNotice = `${componentsCopy.calls.active} (${CALL_KIND_LABEL[kind]})`;
       publish();
@@ -191,6 +215,7 @@ export function createCallsSlice(ctx: NocloudContext) {
           message: componentsCopy.calls.needPermission,
         }),
       );
+      recordCall(leg.peerId, 'in', 'failed');
       callError.value = componentsCopy.calls.needPermission;
       state.contactsNotice = componentsCopy.calls.needPermission;
       publish();
@@ -206,6 +231,7 @@ export function createCallsSlice(ctx: NocloudContext) {
         legId: leg.id,
       }),
     );
+    recordCall(leg.peerId, leg.direction, 'rejected');
     clearMediaUi();
     publish();
   }
@@ -228,6 +254,7 @@ export function createCallsSlice(ctx: NocloudContext) {
         message,
       }),
     );
+    recordCall(leg.peerId, leg.direction, 'failed');
     callError.value = message;
     state.contactsNotice = message;
     clearScreenEnded();
@@ -243,6 +270,12 @@ export function createCallsSlice(ctx: NocloudContext) {
   }
 
   function onHangUp() {
+    const leg = primaryCallLeg(callSession.value);
+    if (leg && !['ended', 'failed', 'rejected', 'busy'].includes(leg.state)) {
+      const outcome: CallLogOutcome =
+        leg.direction === 'in' && leg.state === 'ringing' ? 'missed' : 'ended';
+      recordCall(leg.peerId, leg.direction, outcome);
+    }
     setSession(applyCallSessionEvent(callSession.value, { type: 'hangup' }));
     clearMediaUi();
     publish();
@@ -277,6 +310,7 @@ export function createCallsSlice(ctx: NocloudContext) {
     callPeerId,
     callError,
     callSession,
+    callLog,
     micOn,
     camOn,
     onRemoteTrack,

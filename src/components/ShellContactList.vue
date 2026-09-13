@@ -2,38 +2,29 @@
 import { componentsCopy, shellCopy } from '@/content/index.ts';
 import { contactDisplayName } from '@/domain/profile.ts';
 import { useNocloudStore } from '@/stores/nocloud.ts';
-import {
-  shellContactId,
-  shellSelfId,
-  type ShellNavId,
-  type ShellNavItem,
-} from '@/ui/shell-nav.ts';
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import AvatarImg from './AvatarImg.vue';
+import InputAction from './InputAction.vue';
 
 defineProps<{
-  activeId: ShellNavId | null;
+  activeId: string | null;
 }>();
 
 const emit = defineEmits<{
-  select: [id: ShellNavId];
+  select: [peerId: string];
 }>();
 
 const store = useNocloudStore();
 const { contacts } = storeToRefs(store);
 const copy = componentsCopy.contacts;
+const addCard = ref('');
 
-const selfItem = computed((): ShellNavItem => ({
-  id: shellSelfId(),
-  title: shellCopy.selfChatTitle,
-  detail: shellCopy.selfChatDetail,
-  kind: 'contact',
-  peerId: 'self',
-  online: true,
-}));
+onMounted(() => {
+  void store.seedDemoContacts();
+});
 
-const contactItems = computed((): ShellNavItem[] => {
+const rows = computed(() => {
   const list = [...contacts.value.book.contacts];
   list.sort((a, b) =>
     contactDisplayName(a).localeCompare(contactDisplayName(b), 'ru'),
@@ -42,60 +33,52 @@ const contactItems = computed((): ShellNavItem[] => {
     const online = store.isPresenceOnline(contact.id);
     const inChannel = store.isChannelOpen(contact.id);
     return {
-      id: shellContactId(contact.id),
+      id: contact.id,
       title: contactDisplayName(contact),
       detail: inChannel ? copy.inCall : online ? copy.online : copy.offline,
-      kind: 'contact' as const,
-      peerId: contact.id,
       online,
       avatar: contact.avatar,
     };
   });
 });
 
-const onSelect = (id: ShellNavId) => {
-  emit('select', id);
+const onAdd = async () => {
+  if (await store.onAddContact(addCard.value)) addCard.value = '';
 };
 </script>
 
 <template>
-  <div class="shell-list" :aria-label="shellCopy.listAria">
-    <p class="shell-list-title">{{ shellCopy.contactsTitle }}</p>
+  <div class="shell-list" :aria-label="copy.listLegend">
+    <div class="shell-list-pinned">
+      <p class="shell-list-title">{{ shellCopy.tabProfile }}</p>
+      <InputAction
+        v-model="addCard"
+        class="shell-list-add"
+        :label="copy.cardField"
+        name="profile-card"
+        placeholder="P1. / I1."
+        :input-aria-label="copy.cardFieldAria"
+        icon="plus"
+        :tooltip="copy.add"
+        @action="onAdd"
+        @enter="onAdd"
+      />
+    </div>
     <ul class="shell-list-rows">
-      <li>
-        <button
-          type="button"
-          class="shell-row shell-row-contact"
-          data-kind="self"
-          :aria-current="activeId === selfItem.id ? 'page' : undefined"
-          @click="onSelect(selfItem.id)"
-        >
-          <AvatarImg
-            class="shell-row-avatar"
-            :id="selfItem.peerId || 'self'"
-            avatar=""
-            :size="40"
-          />
-          <span class="shell-row-text">
-            <span class="shell-row-title">{{ selfItem.title }}</span>
-            <span class="shell-row-detail">{{ selfItem.detail }}</span>
-          </span>
-        </button>
+      <li v-if="rows.length === 0" class="shell-list-empty">
+        <p class="tagline">{{ copy.listEmpty }}</p>
       </li>
-      <li v-if="contactItems.length === 0" class="shell-list-empty">
-        <p class="tagline">{{ shellCopy.contactsEmpty }}</p>
-      </li>
-      <li v-for="item in contactItems" :key="item.id">
+      <li v-for="item in rows" :key="item.id">
         <button
           type="button"
           class="shell-row shell-row-contact"
           data-kind="contact"
           :aria-current="activeId === item.id ? 'page' : undefined"
-          @click="onSelect(item.id)"
+          @click="emit('select', item.id)"
         >
           <AvatarImg
             class="shell-row-avatar"
-            :id="item.peerId || ''"
+            :id="item.id"
             :avatar="item.avatar || ''"
             :size="40"
           />
@@ -103,7 +86,7 @@ const onSelect = (id: ShellNavId) => {
             <span class="shell-row-title">
               <span
                 class="presence"
-                :data-online="String(Boolean(item.online))"
+                :data-online="String(item.online)"
                 :aria-label="item.online ? copy.online : copy.offline"
               />
               {{ item.title }}
