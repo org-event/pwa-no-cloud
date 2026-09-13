@@ -15,9 +15,7 @@ import type { CryptoResult, KeyPair } from './types.ts';
 
 export type MnemonicStrength = 128 | 256;
 
-export const createMnemonic = (
-  strength: MnemonicStrength = 128,
-): string => {
+export const createMnemonic = (strength: MnemonicStrength = 128): string => {
   return scureGenerateMnemonic(wordlist, strength);
 };
 
@@ -35,7 +33,11 @@ export const keyPairFromMnemonic = async (
 ): Promise<CryptoResult<KeyPair>> => {
   const normalized = normalizeMnemonic(mnemonic);
   if (!validateMnemonic(normalized, wordlist)) {
-    return { ok: false, code: 'bad-mnemonic', message: 'invalid BIP39 mnemonic' };
+    return {
+      ok: false,
+      code: 'bad-mnemonic',
+      message: 'invalid BIP39 mnemonic',
+    };
   }
   try {
     const seed = await mnemonicToSeed(normalized, passphrase);

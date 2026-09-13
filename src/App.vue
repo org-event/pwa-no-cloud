@@ -6,6 +6,7 @@ import { componentsCopy, shellCopy, statusCopy } from '@/content/index.ts';
 import ContactsSection from './components/ContactsSection.vue';
 import HelpSection from './components/HelpSection.vue';
 import HostPanel from './components/HostPanel.vue';
+import IdentityOnboarding from './components/IdentityOnboarding.vue';
 import InboxPanel from './components/InboxPanel.vue';
 import LogsSection from './components/LogsSection.vue';
 import CallsSection from './components/CallsSection.vue';
@@ -13,6 +14,7 @@ import ServersSection from './components/ServersSection.vue';
 import SessionTools from './components/SessionTools.vue';
 import TransferPanel from './components/TransferPanel.vue';
 import { useNocloudStore } from './stores/nocloud.ts';
+import type { UnlockedIdentity } from '@/lib/identity-session.ts';
 import {
   APP_SECTIONS,
   parseSectionHash,
@@ -22,6 +24,11 @@ import {
 const store = useNocloudStore();
 const { status, canInstall, state, contacts, hasSignalingSocket } =
   storeToRefs(store);
+
+const identity = ref<UnlockedIdentity | null>(null);
+const onIdentityUnlocked = (value: UnlockedIdentity) => {
+  identity.value = value;
+};
 
 const menuOpen = ref(false);
 const lastFocus = ref<HTMLElement | null>(null);
@@ -308,63 +315,74 @@ onUnmounted(() => {
       <main id="content" ref="page" class="page" tabindex="-1">
         <h1 class="page-title">{{ pageTitle }}</h1>
 
-        <section
-          v-show="currentSection === 'lan'"
-          class="page-section"
-          data-section="lan"
-        >
-          <div class="transfer">
-            <TransferPanel />
-          </div>
-          <div class="inbox">
-            <InboxPanel />
-          </div>
+        <section v-if="!identity" class="page-section" data-section="identity">
+          <IdentityOnboarding @unlocked="onIdentityUnlocked" />
         </section>
 
-        <section
-          v-show="currentSection === 'servers'"
-          class="page-section servers"
-          data-section="servers"
-        >
-          <div id="my-server" class="servers">
-            <HostPanel />
-          </div>
-          <div class="servers">
-            <ServersSection />
-          </div>
-        </section>
+        <template v-else>
+          <p class="tagline identity-chip">
+            ID
+            <code>{{ identity.displayFingerprint }}</code>
+          </p>
 
-        <section
-          v-show="currentSection === 'contacts'"
-          class="page-section"
-          data-section="contacts"
-        >
-          <ContactsSection />
-        </section>
+          <section
+            v-show="currentSection === 'lan'"
+            class="page-section"
+            data-section="lan"
+          >
+            <div class="transfer">
+              <TransferPanel />
+            </div>
+            <div class="inbox">
+              <InboxPanel />
+            </div>
+          </section>
 
-        <section
-          v-show="currentSection === 'calls'"
-          class="page-section"
-          data-section="calls"
-        >
-          <CallsSection />
-        </section>
+          <section
+            v-show="currentSection === 'servers'"
+            class="page-section servers"
+            data-section="servers"
+          >
+            <div id="my-server" class="servers">
+              <HostPanel />
+            </div>
+            <div class="servers">
+              <ServersSection />
+            </div>
+          </section>
 
-        <section
-          v-show="currentSection === 'logs'"
-          class="page-section"
-          data-section="logs"
-        >
-          <LogsSection />
-        </section>
+          <section
+            v-show="currentSection === 'contacts'"
+            class="page-section"
+            data-section="contacts"
+          >
+            <ContactsSection />
+          </section>
 
-        <section
-          v-show="currentSection === 'help'"
-          class="page-section help"
-          data-section="help"
-        >
-          <HelpSection />
-        </section>
+          <section
+            v-show="currentSection === 'calls'"
+            class="page-section"
+            data-section="calls"
+          >
+            <CallsSection />
+          </section>
+
+          <section
+            v-show="currentSection === 'logs'"
+            class="page-section"
+            data-section="logs"
+          >
+            <LogsSection />
+          </section>
+
+          <section
+            v-show="currentSection === 'help'"
+            class="page-section help"
+            data-section="help"
+          >
+            <HelpSection />
+          </section>
+        </template>
       </main>
     </div>
   </div>

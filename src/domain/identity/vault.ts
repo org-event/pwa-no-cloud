@@ -25,12 +25,16 @@ const enc = new TextEncoder();
 const toBase64Url = (bytes: Uint8Array): string => {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 };
 
 const fromBase64Url = (text: string): CryptoResult<Uint8Array> => {
   const padded = text.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
+  const pad =
+    padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
   try {
     const binary = atob(padded + pad);
     const bytes = new Uint8Array(binary.length);
@@ -47,6 +51,10 @@ const randomBytes = (size: number): Uint8Array => {
   return bytes;
 };
 
+/** TS DOM typings reject Uint8Array<ArrayBufferLike>; Web Crypto accepts the bytes. */
+const asBufferSource = (bytes: Uint8Array): BufferSource =>
+  bytes as unknown as BufferSource;
+
 const deriveAesKey = async (
   passphrase: string,
   salt: Uint8Array,
@@ -61,7 +69,7 @@ const deriveAesKey = async (
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: asBufferSource(salt),
       iterations: PBKDF2_ITERATIONS,
       hash: 'SHA-256',
     },
@@ -77,19 +85,27 @@ export const sealSecretKey = async (
   passphrase: string,
 ): Promise<CryptoResult<VaultRecord>> => {
   if (secretKey.byteLength !== SECRET_BYTES) {
-    return { ok: false, code: 'bad-secret', message: 'secret key must be 32 bytes' };
+    return {
+      ok: false,
+      code: 'bad-secret',
+      message: 'secret key must be 32 bytes',
+    };
   }
   if (!passphrase) {
-    return { ok: false, code: 'empty-passphrase', message: 'passphrase required' };
+    return {
+      ok: false,
+      code: 'empty-passphrase',
+      message: 'passphrase required',
+    };
   }
   try {
     const salt = randomBytes(SALT_BYTES);
     const iv = randomBytes(IV_BYTES);
     const key = await deriveAesKey(passphrase, salt);
     const encrypted = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
+      { name: 'AES-GCM', iv: asBufferSource(iv) },
       key,
-      secretKey,
+      asBufferSource(secretKey),
     );
     return {
       ok: true,
@@ -114,10 +130,18 @@ export const openSecretKey = async (
   passphrase: string,
 ): Promise<CryptoResult<SecretKeyBytes>> => {
   if (!passphrase) {
-    return { ok: false, code: 'empty-passphrase', message: 'passphrase required' };
+    return {
+      ok: false,
+      code: 'empty-passphrase',
+      message: 'passphrase required',
+    };
   }
   if (record.v !== VAULT_VERSION) {
-    return { ok: false, code: 'bad-version', message: 'unsupported vault version' };
+    return {
+      ok: false,
+      code: 'bad-version',
+      message: 'unsupported vault version',
+    };
   }
   const salt = fromBase64Url(record.salt);
   const iv = fromBase64Url(record.iv);
@@ -128,17 +152,25 @@ export const openSecretKey = async (
   try {
     const key = await deriveAesKey(passphrase, salt.value);
     const plain = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv.value },
+      { name: 'AES-GCM', iv: asBufferSource(iv.value) },
       key,
-      ciphertext.value,
+      asBufferSource(ciphertext.value),
     );
     const secretKey = new Uint8Array(plain);
     if (secretKey.byteLength !== SECRET_BYTES) {
-      return { ok: false, code: 'bad-secret', message: 'decrypted key length invalid' };
+      return {
+        ok: false,
+        code: 'bad-secret',
+        message: 'decrypted key length invalid',
+      };
     }
     return { ok: true, value: secretKey };
   } catch {
-    return { ok: false, code: 'open-failed', message: 'wrong passphrase or corrupt vault' };
+    return {
+      ok: false,
+      code: 'open-failed',
+      message: 'wrong passphrase or corrupt vault',
+    };
   }
 };
 
@@ -154,7 +186,9 @@ export const decodeVaultRecord = (text: string): CryptoResult<VaultRecord> => {
   const body = fromBase64Url(raw.slice(VAULT_PREFIX.length));
   if (!body.ok) return body;
   try {
-    const parsed = JSON.parse(new TextDecoder().decode(body.value)) as VaultRecord;
+    const parsed = JSON.parse(
+      new TextDecoder().decode(body.value),
+    ) as VaultRecord;
     if (
       parsed?.v !== VAULT_VERSION ||
       typeof parsed.salt !== 'string' ||
@@ -189,7 +223,8 @@ export const loadVaultFromStorage = (
   storage: VaultStorage,
 ): CryptoResult<VaultRecord> => {
   const raw = storage.getItem(VAULT_STORAGE_KEY);
-  if (!raw) return { ok: false, code: 'missing', message: 'no vault in storage' };
+  if (!raw)
+    return { ok: false, code: 'missing', message: 'no vault in storage' };
   return decodeVaultRecord(raw);
 };
 

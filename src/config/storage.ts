@@ -11,6 +11,7 @@ import type {
 export type StorageLike = {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?(key: string): void;
 };
 
 const isKind = (value: unknown): value is SignalingKind => {
@@ -96,6 +97,9 @@ export const browserStorage = (): StorageLike => {
       getItem: (key) => memory.get(key) ?? null,
       setItem: (key, value) => {
         memory.set(key, value);
+      },
+      removeItem: (key) => {
+        memory.delete(key);
       },
     };
   }

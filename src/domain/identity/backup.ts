@@ -4,12 +4,13 @@
 
 import { getPublicKeyAsync } from '@noble/ed25519';
 import { fingerprintOf } from './encoding.ts';
-import type { CryptoResult, IdentityId, KeyPair, SecretKeyBytes } from './types.ts';
-import {
-  openSecretKey,
-  sealSecretKey,
-  type VaultRecord,
-} from './vault.ts';
+import type {
+  CryptoResult,
+  IdentityId,
+  KeyPair,
+  SecretKeyBytes,
+} from './types.ts';
+import { openSecretKey, sealSecretKey, type VaultRecord } from './vault.ts';
 
 export const BACKUP_PREFIX = 'nb1.';
 export const BACKUP_VERSION = 1 as const;
@@ -27,12 +28,16 @@ const dec = new TextDecoder();
 const toBase64Url = (bytes: Uint8Array): string => {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 };
 
 const fromBase64Url = (text: string): CryptoResult<Uint8Array> => {
   const padded = text.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
+  const pad =
+    padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
   try {
     const binary = atob(padded + pad);
     const bytes = new Uint8Array(binary.length);
@@ -90,7 +95,11 @@ export const decodeIdentityBackup = (
       typeof parsed.fingerprint !== 'string' ||
       !parsed.vault
     ) {
-      return { ok: false, code: 'bad-shape', message: 'invalid backup payload' };
+      return {
+        ok: false,
+        code: 'bad-shape',
+        message: 'invalid backup payload',
+      };
     }
     return { ok: true, value: parsed };
   } catch {

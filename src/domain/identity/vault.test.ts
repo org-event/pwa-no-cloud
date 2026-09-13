@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { fingerprintOf, generateKeyPair, publicKeyFromSecret } from './index.ts';
+import {
+  fingerprintOf,
+  generateKeyPair,
+  publicKeyFromSecret,
+} from './index.ts';
 import {
   VAULT_PREFIX,
   VAULT_STORAGE_KEY,

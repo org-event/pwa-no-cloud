@@ -32,12 +32,16 @@ export const hexToBytes = (hex: string): CryptoResult<Uint8Array> => {
 const toBase64Url = (bytes: Uint8Array): string => {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 };
 
 const fromBase64Url = (text: string): CryptoResult<Uint8Array> => {
   const padded = text.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
+  const pad =
+    padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
   try {
     const binary = atob(padded + pad);
     const bytes = new Uint8Array(binary.length);
@@ -59,13 +63,21 @@ export const encodePublicKey = (publicKey: PublicKeyBytes): string => {
 export const decodePublicKey = (text: string): CryptoResult<PublicKeyBytes> => {
   const raw = text.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
   if (!raw.startsWith(PUBLIC_KEY_PREFIX)) {
-    return { ok: false, code: 'bad-prefix', message: 'expected pk1. public key' };
+    return {
+      ok: false,
+      code: 'bad-prefix',
+      message: 'expected pk1. public key',
+    };
   }
   const actual = raw.slice(PUBLIC_KEY_PREFIX.length);
   const decoded = fromBase64Url(actual);
   if (!decoded.ok) return decoded;
   if (decoded.value.byteLength !== 32) {
-    return { ok: false, code: 'bad-length', message: 'public key must be 32 bytes' };
+    return {
+      ok: false,
+      code: 'bad-length',
+      message: 'public key must be 32 bytes',
+    };
   }
   return { ok: true, value: decoded.value };
 };
