@@ -115,21 +115,29 @@ export {
   setActiveRelay,
 } from './discovery/index.ts';
 export type {
+  RelayBundleMessage,
   RelayCapabilities,
   RelayChallenge,
   RelayChallengeAnswer,
   RelayChallengeOffer,
   RelayChallengeResponse,
+  RelayHint,
+  RelayHintCaps,
 } from './relay/index.ts';
 export {
+  RELAY_BUNDLE_MAX,
+  RELAY_BUNDLE_VERSION,
   RELAY_CHALLENGE_VERSION,
   canonicalRelayChallenge,
   createNoopAbuseGuard,
   createRateLimitGuard,
   isRelayChallenge,
   isRelayChallengeResponse,
+  parseRelayBundleMessage,
   parseRelayChallengeAnswer,
   parseRelayChallengeOffer,
+  parseRelayHint,
+  relayUrlsOf,
 } from './relay/index.ts';
 export type {
   AbuseCheckInput,

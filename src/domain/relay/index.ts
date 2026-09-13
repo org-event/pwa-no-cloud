@@ -106,3 +106,12 @@ export type {
   RateLimitOptions,
 } from './abuse.ts';
 export { createNoopAbuseGuard, createRateLimitGuard } from './abuse.ts';
+
+export type { RelayBundleMessage, RelayHint, RelayHintCaps } from './bundle.ts';
+export {
+  RELAY_BUNDLE_MAX,
+  RELAY_BUNDLE_VERSION,
+  parseRelayBundleMessage,
+  parseRelayHint,
+  relayUrlsOf,
+} from './bundle.ts';

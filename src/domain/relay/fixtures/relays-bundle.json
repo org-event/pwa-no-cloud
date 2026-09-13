@@ -1,0 +1,23 @@
+{
+  "op": "relays",
+  "v": 1,
+  "issuedAt": 1720000000000,
+  "relays": [
+    {
+      "url": "wss://relay-a.example/ws",
+      "caps": {
+        "signaling": true,
+        "stun": true,
+        "challengeAuth": true
+      }
+    },
+    "https://relay-b.example",
+    {
+      "url": "wss://relay-c.example/signal",
+      "caps": {
+        "signaling": true,
+        "turn": true
+      }
+    }
+  ]
+}
