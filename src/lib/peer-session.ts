@@ -229,10 +229,8 @@ export class PeerSession extends EventEmitter {
       for (const track of previous.getTracks()) track.stop();
     }
     this.localStream = stream;
-    if (!pc) return;
-    if (stream) {
-      attachLocalMediaTracks(pc, stream);
-    }
+    if (!pc || !stream) return;
+    attachLocalMediaTracks(pc, stream);
     if (
       pc.signalingState === 'stable' &&
       this.peerId &&
