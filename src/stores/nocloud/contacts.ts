@@ -26,18 +26,35 @@ import { fileToAvatarDataUrl } from '@/lib/avatar.ts';
 import { createGroup, saveAddressBook } from '@/lib/contacts-store.ts';
 import { bindIdentityProfile, saveProfile } from '@/lib/profile-store.ts';
 import { inviteToQr } from '@/lib/qr.ts';
+import { OwnedSecret } from '@/lib/owned-secret.ts';
 import type { NocloudContext } from './context.ts';
 import { peerIsLive, socketBlocked, usesRoomLink } from './views.ts';
 
 export function createContactsSlice(ctx: NocloudContext) {
   const { state, storage, skippedPeers, touch, note } = ctx;
-  let signingKeys: KeyPair | null = null;
+  let signingPublicKey: KeyPair['publicKey'] | null = null;
+  let ownedSecret: OwnedSecret | null = null;
+
+  const clearOwnedSecret = () => {
+    ownedSecret?.dispose();
+    ownedSecret = null;
+    signingPublicKey = null;
+  };
+
+  const currentKeyPair = (): KeyPair | null => {
+    if (!signingPublicKey || !ownedSecret) return null;
+    return {
+      publicKey: signingPublicKey,
+      secretKey: ownedSecret.borrow(),
+    };
+  };
 
   const refreshIdentityCard = async () => {
-    if (signingKeys && state.me.id) {
+    const keyPair = currentKeyPair();
+    if (keyPair && state.me.id) {
       const invite = await createIdentityInvite(
         { nick: state.me.nick || defaultNick(state.me.id) },
-        signingKeys,
+        keyPair,
       );
       if (invite.ok) {
         state.cardText = invite.value;
@@ -173,8 +190,12 @@ export function createContactsSlice(ctx: NocloudContext) {
 
   function onBindIdentity(fingerprint: string, keyPair?: KeyPair) {
     state.me = bindIdentityProfile(storage, fingerprint);
-    if (keyPair) signingKeys = keyPair;
-    ctx.refs.getIdentityKeyPair = () => signingKeys;
+    clearOwnedSecret();
+    if (keyPair) {
+      ownedSecret = new OwnedSecret(keyPair.secretKey);
+      signingPublicKey = keyPair.publicKey;
+    }
+    ctx.refs.getIdentityKeyPair = () => currentKeyPair();
     state.peer?.setProfile(state.me);
     void refreshIdentityCard();
   }

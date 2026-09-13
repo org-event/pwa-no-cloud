@@ -185,6 +185,9 @@ importers:
       '@scure/bip39':
         specifier: ^2.4.0
         version: 2.4.0
+      '@vue/runtime-vapor':
+        specifier: 3.6.0-rc.8
+        version: 3.6.0-rc.8(@vue/runtime-dom@3.6.0-rc.8)
       pinia:
         specifier: ^4.0.3
         version: 4.0.3(@vue/devtools-api@8.2.1)(typescript@7.0.2)(vue@3.6.0-rc.8(typescript@7.0.2))

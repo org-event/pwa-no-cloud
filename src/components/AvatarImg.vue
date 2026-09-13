@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" vapor>
 import { computed } from 'vue';
 import { avatarSrc } from '@/lib/avatar.ts';
 
