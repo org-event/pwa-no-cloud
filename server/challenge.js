@@ -1,6 +1,7 @@
 /**
  * Relay challenge auth (S3.2): issue nonce, verify Ed25519 response, rate-limit stub.
  * Canonical message must match src/domain/relay (nocloud.relay.challenge.v1|…).
+ * Abuse slot: rate-limit only in M1 (see src/domain/relay/abuse.ts for client-side twin).
  */
 
 import { randomBytes } from 'node:crypto';

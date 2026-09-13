@@ -106,10 +106,18 @@ export type {
 export {
   RELAY_CHALLENGE_VERSION,
   canonicalRelayChallenge,
+  createNoopAbuseGuard,
+  createRateLimitGuard,
   isRelayChallenge,
   isRelayChallengeResponse,
   parseRelayChallengeAnswer,
   parseRelayChallengeOffer,
+} from './relay/index.ts';
+export type {
+  AbuseCheckInput,
+  AbuseDecision,
+  AbuseGuard,
+  RateLimitOptions,
 } from './relay/index.ts';
 export type { AddressBook, Contact, ProfileCard } from './contacts/index.ts';
 export {

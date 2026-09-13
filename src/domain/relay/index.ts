@@ -98,3 +98,11 @@ export const parseRelayChallengeAnswer = (
   }
   return { op: 'challenge-response', response: row.response };
 };
+
+export type {
+  AbuseCheckInput,
+  AbuseDecision,
+  AbuseGuard,
+  RateLimitOptions,
+} from './abuse.ts';
+export { createNoopAbuseGuard, createRateLimitGuard } from './abuse.ts';
