@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PRESET_ID } from './defaults.ts';
-import {
-  SERVER_PRESETS,
-  getDefaultPreset,
-  getPreset,
-} from './servers.ts';
+import { SERVER_PRESETS, getDefaultPreset, getPreset } from './servers.ts';
 
 describe('server presets (S5.4 shell screen)', () => {
   it('keeps the known preset ids for the Servers section', () => {
