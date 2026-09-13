@@ -1,6 +1,7 @@
 import type { StorageLike } from '@/config/storage.ts';
 import type { Application } from '@/lib/application.ts';
 import type { CustomServerDraft } from '@/config/types.ts';
+import type { KeyPair } from '@/domain/identity/index.ts';
 import type { ProfileCard } from '@/domain/profile.ts';
 import { PeerSession } from '@/lib/peer-session.ts';
 import type { Ref } from 'vue';
@@ -27,6 +28,7 @@ export type NocloudRefs = {
   copyText?: (text: string) => Promise<boolean>;
   seedDemoContacts?: () => void | Promise<void>;
   onRemoteTrack?: (stream: MediaStream) => void;
+  getIdentityKeyPair?: () => KeyPair | null;
 };
 
 export type NocloudContext = {

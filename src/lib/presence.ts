@@ -1,4 +1,4 @@
-import { meetRoomId } from '@/domain/profile.ts';
+import { isProfileId, meetRoomId } from '@/domain/profile.ts';
 import {
   createSignalingPort,
   type SignalingHandle,
@@ -12,6 +12,9 @@ export const isWatchClient = (id: string): boolean =>
   id.startsWith(WATCH_PREFIX);
 
 export const watchClientId = (meId: string): string => `${WATCH_PREFIX}${meId}`;
+
+/** Presence peer / lobby owner must be an identity fingerprint (S3.4). */
+export const isPresencePeerId = (id: string): boolean => isProfileId(id);
 
 export type PresenceSnapshot = {
   available: boolean;
@@ -68,11 +71,16 @@ export class PresenceHub {
   }
 
   setContacts(ids: string[]) {
-    this.contactIds = [...new Set(ids.filter((id) => id && id !== this.meId))];
+    this.contactIds = [
+      ...new Set(
+        ids.filter((id) => id && id !== this.meId && isPresencePeerId(id)),
+      ),
+    ];
   }
 
   async start(): Promise<boolean> {
     if (this.signaling.kind === 'manual' || !this.signaling.url) return false;
+    if (!isPresencePeerId(this.meId)) return false;
     if (this.running) return true;
     this.running = true;
     this.lobby = createSignalingPort(this.signaling);
@@ -171,6 +179,7 @@ export class PresenceHub {
   }
 
   private async probeOne(ownerId: string): Promise<boolean> {
+    if (!isPresencePeerId(ownerId)) return false;
     if (this.signaling.kind === 'manual' || !this.signaling.url) return false;
     const port = createSignalingPort(this.signaling);
     try {

@@ -1,6 +1,8 @@
 import { presenceCopy } from '@/content/index.ts';
+import { isProfileId } from '@/domain/profile.ts';
 import type { CallIntent } from '@/lib/call-intent.ts';
 import { PresenceHub } from '@/lib/presence.ts';
+import { loginRelayChallenge } from '@/lib/relay-auth.ts';
 import {
   releaseWakeLock,
   requestWakeLock,
@@ -13,21 +15,24 @@ export function createPresenceSlice(ctx: NocloudContext) {
   const { state, touch, note } = ctx;
   let hub: PresenceHub | null = null;
   let hubKey = '';
+  let relaySessionId: string | null = null;
 
   const publish = () => {
     touch();
   };
 
-  const contactIds = (): string[] => state.book.contacts.map((item) => item.id);
+  const contactIds = (): string[] =>
+    state.book.contacts.map((item) => item.id).filter((id) => isProfileId(id));
 
   const signalingKey = (signaling: ReturnType<typeof peerSignaling>): string =>
     `${signaling.kind}:${'url' in signaling ? (signaling.url ?? '') : ''}`;
 
   const ensureHub = (): PresenceHub | null => {
     if (!usesRoomLink(ctx)) return null;
+    if (!isProfileId(state.me.id)) return null;
     const signaling = peerSignaling(ctx);
     if (signaling.kind === 'manual' || !signaling.url) return null;
-    const key = signalingKey(signaling);
+    const key = `${signalingKey(signaling)}:${state.me.id}`;
     if (hub && hubKey === key) {
       hub.setContacts(contactIds());
       return hub;
@@ -61,8 +66,28 @@ export function createPresenceSlice(ctx: NocloudContext) {
 
   const peerIsConnected = (): boolean => state.peer?.state === 'connected';
 
+  const ensureRelaySession = async (): Promise<void> => {
+    if (relaySessionId) return;
+    const signaling = peerSignaling(ctx);
+    if (signaling.kind === 'manual' || !signaling.url) return;
+    const keyPair = ctx.refs.getIdentityKeyPair?.();
+    if (!keyPair) return;
+    const session = await loginRelayChallenge({
+      signalingUrl: signaling.url,
+      keyPair,
+    });
+    if (session.ok) relaySessionId = session.value.sessionId;
+  };
+
   async function startPresence(options?: { quiet?: boolean }) {
     const quiet = options?.quiet === true;
+    if (!isProfileId(state.me.id)) {
+      if (!quiet) {
+        state.contactsNotice = presenceCopy.needIdentity;
+        publish();
+      }
+      return false;
+    }
     if (!usesRoomLink(ctx)) {
       if (!quiet) {
         state.contactsNotice = presenceCopy.needS1;
@@ -70,6 +95,7 @@ export function createPresenceSlice(ctx: NocloudContext) {
       }
       return false;
     }
+    await ensureRelaySession();
     const next = ensureHub();
     if (!next) {
       if (!quiet) {
@@ -104,6 +130,7 @@ export function createPresenceSlice(ctx: NocloudContext) {
     hub?.stop();
     hub = null;
     hubKey = '';
+    relaySessionId = null;
     state.presenceAvailable = false;
     state.presenceOnlineIds = [];
     state.contactsNotice = presenceCopy.unavailable;

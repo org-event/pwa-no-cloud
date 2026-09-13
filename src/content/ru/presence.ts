@@ -1,5 +1,6 @@
 export const presenceCopy = {
   needS1: 'Нужен пакет S1., чтобы быть в сети и стучаться.',
+  needIdentity: 'Сначала создайте или разблокируйте личность.',
   startFailed: 'Не удалось войти в лобби presence. Проверьте S1.',
   available: 'Вы в сети — контакты видят вас онлайн. Экран не засыпает.',
   availableNote: 'presence: доступны',

@@ -174,6 +174,7 @@ export function createContactsSlice(ctx: NocloudContext) {
   function onBindIdentity(fingerprint: string, keyPair?: KeyPair) {
     state.me = bindIdentityProfile(storage, fingerprint);
     if (keyPair) signingKeys = keyPair;
+    ctx.refs.getIdentityKeyPair = () => signingKeys;
     state.peer?.setProfile(state.me);
     void refreshIdentityCard();
   }
