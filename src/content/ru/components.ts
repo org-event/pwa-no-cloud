@@ -65,6 +65,15 @@ export const componentsCopy = {
     turnPass: 'TURN пароль',
     iceJson: 'или iceServers JSON',
     saveToList: 'Сохранить в список',
+    relayLegend: 'Пучок реле (M1)',
+    relayHint:
+      'Несколько URL сигналинга, активен один. Переключение вручную — без авто-failover.',
+    relayUrl: 'URL реле',
+    relayAdd: 'Добавить',
+    relaySelect: 'Сделать активным',
+    relayRemove: 'Убрать',
+    relayEmpty: 'Пока пусто — добавьте wss:// или https:// адрес реле.',
+    relayActive: 'активно',
   },
   pendingPeer: {
     legend: 'Новый человек',

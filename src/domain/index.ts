@@ -88,7 +88,14 @@ export type {
 export type { Call, CallLeg, CallLegId, CallState } from './call/index.ts';
 export type { PresenceEntry, PresenceStatus } from './presence/index.ts';
 export type { RelayBundle, RelayUrl } from './discovery/index.ts';
-export { emptyRelayBundle } from './discovery/index.ts';
+export {
+  activeRelayOf,
+  addRelayUrl,
+  emptyRelayBundle,
+  normalizeRelayUrl,
+  removeRelayUrl,
+  setActiveRelay,
+} from './discovery/index.ts';
 export type {
   RelayCapabilities,
   RelayChallenge,

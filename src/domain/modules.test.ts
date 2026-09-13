@@ -16,7 +16,7 @@ describe('domain module barrels', () => {
 
   it('builds an empty relay bundle', () => {
     const bundle = emptyRelayBundle();
-    expect(bundle.active).toEqual([]);
-    expect(bundle.cached).toEqual([]);
+    expect(bundle.urls).toEqual([]);
+    expect(bundle.activeUrl).toBeNull();
   });
 });

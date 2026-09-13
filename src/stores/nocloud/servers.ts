@@ -8,10 +8,16 @@ import {
   saveUserSettings,
 } from '@/config/index.ts';
 import type { CustomServerDraft } from '@/config/types.ts';
+import {
+  addRelayUrl,
+  removeRelayUrl,
+  setActiveRelay,
+} from '@/domain/discovery/index.ts';
 import { titleFromDraft } from '@/domain/saved-server.ts';
 import { createSavedServer, type SavedServer } from '@/domain/saved-server.ts';
 import { canScanQr, decodeQrFromFile } from '@/lib/scan-qr.ts';
 import { probeSignaling } from '@/lib/probe-signaling.ts';
+import { saveRelayBundle } from '@/lib/relay-bundle-store.ts';
 import {
   saveSavedServers,
   upsertSavedServer,
@@ -253,6 +259,58 @@ export function createServersSlice(ctx: NocloudContext) {
     touch();
   }
 
+  const persistRelayBundle = () => {
+    saveRelayBundle(storage, state.relayBundle);
+  };
+
+  const applyActiveRelayToSettings = () => {
+    const url = state.relayBundle.activeUrl;
+    if (!url) return;
+    const kind = /^https?:/i.test(url) ? 'http-poll' : 'websocket';
+    const draft: CustomServerDraft = {
+      signaling: { kind, url },
+      iceServers: state.settings.custom.iceServers.map((server) => ({
+        ...server,
+      })),
+    };
+    state.settings = createUserSettings('custom', draft);
+    saveUserSettings(state.settings, storage);
+    void ctx.refs.ensurePresenceActive?.();
+  };
+
+  function onAddRelayUrl(raw: string) {
+    const next = addRelayUrl(state.relayBundle, raw);
+    if (next === state.relayBundle) {
+      state.hostNotice = serversCopy.relayInvalid;
+      touch();
+      return false;
+    }
+    state.relayBundle = next;
+    persistRelayBundle();
+    applyActiveRelayToSettings();
+    state.hostNotice = serversCopy.relayAdded;
+    touch();
+    return true;
+  }
+
+  function onSelectRelayUrl(raw: string) {
+    const next = setActiveRelay(state.relayBundle, raw);
+    if (next === state.relayBundle) return;
+    state.relayBundle = next;
+    persistRelayBundle();
+    applyActiveRelayToSettings();
+    state.hostNotice = serversCopy.relayActive;
+    touch();
+  }
+
+  function onRemoveRelayUrl(raw: string) {
+    state.relayBundle = removeRelayUrl(state.relayBundle, raw);
+    persistRelayBundle();
+    applyActiveRelayToSettings();
+    state.hostNotice = serversCopy.relayRemoved;
+    touch();
+  }
+
   return {
     persistSavedServers,
     activateSavedServer,
@@ -274,5 +332,8 @@ export function createServersSlice(ctx: NocloudContext) {
     onScanSharePack,
     onShareWithPeer,
     seedDemoServers,
+    onAddRelayUrl,
+    onSelectRelayUrl,
+    onRemoveRelayUrl,
   };
 }

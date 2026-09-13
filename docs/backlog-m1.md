@@ -163,7 +163,7 @@
 | S3.2 | done | 5 |
 | S3.3 | done | 3 |
 | S3.4 | done | 5 |
-| S3.5 | todo | 3 |
+| S3.5 | done | 3 |
 | S3.6 | todo | 2 |
 | S4.1 | todo | 3 |
 | S4.2 | todo | 5 |

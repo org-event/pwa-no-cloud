@@ -16,4 +16,8 @@ export const serversCopy = {
   qrNotRecognized: 'QR не распознан.',
   packFromQrSaved: 'Серверы из QR сохранены. Можно создавать приглашение.',
   installerCopied: 'Команда установщика скопирована',
+  relayInvalid: 'Нужен нормальный URL реле (ws/wss/http/https).',
+  relayAdded: 'Реле добавлено в пучок.',
+  relayActive: 'Активное реле переключено.',
+  relayRemoved: 'Реле удалено из пучка.',
 } as const;

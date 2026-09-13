@@ -12,6 +12,7 @@ const { state } = storeToRefs(store);
 
 const formError = ref('');
 const probeNotice = ref('');
+const relayDraft = ref('');
 const customForm = reactive(customDraftToForm(state.value.settings.custom));
 const editing = ref(false);
 const openId = ref<string | null>(state.value.activeServerId);
@@ -33,12 +34,17 @@ watch(
 
 const savedServers = computed(() => state.value.savedServers);
 const activeServerId = computed(() => state.value.activeServerId);
+const relayBundle = computed(() => state.value.relayBundle);
 const manualReach = computed(() => state.value.manualReach);
 const hasServers = computed(() => savedServers.value.length > 0);
 
 onMounted(() => {
   store.seedDemoServers();
 });
+
+const onAddRelay = () => {
+  if (store.onAddRelayUrl(relayDraft.value)) relayDraft.value = '';
+};
 
 const onToggle = (id: string) => {
   openId.value = openId.value === id ? null : id;
@@ -174,6 +180,52 @@ const onSaveManual = async (event: Event) => {
     </div>
   </Card>
 
+  <Card
+    :title="componentsCopy.servers.relayLegend"
+    :hint="componentsCopy.servers.relayHint"
+  >
+    <FieldInput
+      v-model="relayDraft"
+      :label="componentsCopy.servers.relayUrl"
+      name="relayUrl"
+    />
+    <div class="home-actions">
+      <button type="button" class="button button-accent" @click="onAddRelay">
+        {{ componentsCopy.servers.relayAdd }}
+      </button>
+    </div>
+    <p v-if="relayBundle.urls.length === 0" class="tagline">
+      {{ componentsCopy.servers.relayEmpty }}
+    </p>
+    <ul v-else class="relay-list">
+      <li v-for="url in relayBundle.urls" :key="url" class="relay-row">
+        <span class="tagline">
+          {{ url }}
+          <strong v-if="url === relayBundle.activeUrl">
+            · {{ componentsCopy.servers.relayActive }}
+          </strong>
+        </span>
+        <span class="home-actions">
+          <button
+            type="button"
+            class="button button-secondary"
+            :disabled="url === relayBundle.activeUrl"
+            @click="store.onSelectRelayUrl(url)"
+          >
+            {{ componentsCopy.servers.relaySelect }}
+          </button>
+          <button
+            type="button"
+            class="button button-secondary"
+            @click="store.onRemoveRelayUrl(url)"
+          >
+            {{ componentsCopy.servers.relayRemove }}
+          </button>
+        </span>
+      </li>
+    </ul>
+  </Card>
+
   <form
     @submit="onSaveManual"
     @focusin="editing = true"
@@ -256,3 +308,17 @@ const onSaveManual = async (event: Event) => {
 
   <p v-if="formError" class="error" role="alert">{{ formError }}</p>
 </template>
+
+<style scoped>
+.relay-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.relay-row {
+  display: grid;
+  gap: 0.35rem;
+}
+</style>

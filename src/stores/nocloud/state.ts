@@ -1,6 +1,7 @@
 import { loadUserSettings } from '@/config/index.ts';
 import type { UserSettings } from '@/config/types.ts';
 import { EMPTY_TURN_HOST, type TurnHostDraft } from '@/domain/index.ts';
+import type { RelayBundle } from '@/domain/discovery/index.ts';
 import type { SavedServer, ServerReach } from '@/domain/saved-server.ts';
 import {
   EMPTY_BOOK,
@@ -12,6 +13,7 @@ import type { InboxEntry, OpfsStore } from '@/lib/opfs.ts';
 import { appendLog } from '@/lib/opfs.ts';
 import type { PickedFile } from '@/lib/folder-walk.ts';
 import { loadProfile } from '@/lib/profile-store.ts';
+import { loadRelayBundle } from '@/lib/relay-bundle-store.ts';
 import { PeerSession } from '@/lib/peer-session.ts';
 import type { StorageLike } from '@/config/storage.ts';
 import type { InviteRole } from '@/stores/types.ts';
@@ -35,6 +37,7 @@ export type NocloudState = {
   hostNotice: string;
   savedServers: SavedServer[];
   activeServerId: string | null;
+  relayBundle: RelayBundle;
   manualReach: ServerReach;
   shareWithPeer: boolean;
   queuedFiles: File[];
@@ -82,6 +85,7 @@ export function createNocloudState(storage: StorageLike) {
     hostNotice: '',
     savedServers: [] as SavedServer[],
     activeServerId: null as string | null,
+    relayBundle: loadRelayBundle(storage),
     manualReach: 'unknown' as ServerReach,
     shareWithPeer: true,
     queuedFiles: [] as File[],
