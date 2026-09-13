@@ -98,11 +98,14 @@ export type { AddressBook, Contact, ProfileCard } from './contacts/index.ts';
 export {
   CONTACT_CARD_PREFIX,
   LEGACY_CONTACT_CARD_PREFIX,
+  contactDisplayName,
   encodeContactCard,
   meetRoomId,
   parseContactCard,
   parseProfileCard,
   sanitizeNick,
+  setContactAlias,
+  toNetworkProfile,
   upsertContact,
 } from './contacts/index.ts';
 export type { SignedProfile, SignedProfileDraft } from './contacts/index.ts';

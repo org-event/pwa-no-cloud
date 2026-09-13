@@ -13,6 +13,8 @@ describe('contacts store', () => {
           id: 'abcd1234ef567890',
           nick: 'Вася',
           avatar: '',
+          publicKey: 'pk1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+          localAlias: 'Брат',
           addedAt: 1,
           updatedAt: 1,
         },
@@ -30,6 +32,8 @@ describe('contacts store', () => {
     const loaded = await loadAddressBook(opened.value);
     expect(loaded.contacts).toHaveLength(1);
     expect(loaded.contacts[0]?.nick).toBe('Вася');
+    expect(loaded.contacts[0]?.localAlias).toBe('Брат');
+    expect(loaded.contacts[0]?.publicKey?.startsWith('pk1.')).toBe(true);
     expect(loaded.groups[0]?.name).toBe('дом');
   });
 });

@@ -128,6 +128,10 @@ export const parseProfileCard = (raw: unknown): ProfileCard | null => {
 export type Contact = ProfileCard & {
   addedAt: number;
   updatedAt: number;
+  /** Wire pubkey `pk1.…` when known (from signed profile / invite). */
+  publicKey?: string;
+  /** Local-only label; never sent on the wire (FR-PR-02). */
+  localAlias?: string;
 };
 
 export type ContactGroup = {
@@ -143,22 +147,72 @@ export type AddressBook = {
 
 export const EMPTY_BOOK: AddressBook = { contacts: [], groups: [] };
 
+export type UpsertContactInput = ProfileCard & {
+  publicKey?: string;
+};
+
+/** Name shown in UI: local alias wins over network nick. */
+export const contactDisplayName = (contact: Contact): string => {
+  const alias = contact.localAlias?.trim();
+  return alias || contact.nick;
+};
+
+/** Strip local-only fields before any network / invite payload. */
+export const toNetworkProfile = (contact: Contact): ProfileCard => {
+  return {
+    id: contact.id,
+    nick: contact.nick,
+    avatar: contact.avatar,
+  };
+};
+
 export const upsertContact = (
   book: AddressBook,
-  card: ProfileCard,
+  card: UpsertContactInput,
   now = Date.now(),
 ): AddressBook => {
   const id = card.id.toLowerCase();
   const next = book.contacts.filter((item) => item.id !== id);
   const previous = book.contacts.find((item) => item.id === id);
+  const publicKey = card.publicKey ?? previous?.publicKey;
   next.push({
-    ...card,
     id,
+    nick: card.nick,
+    avatar: card.avatar,
     addedAt: previous?.addedAt ?? now,
     updatedAt: now,
+    ...(publicKey ? { publicKey } : {}),
+    ...(previous?.localAlias ? { localAlias: previous.localAlias } : {}),
   });
-  next.sort((left, right) => left.nick.localeCompare(right.nick, 'ru'));
+  next.sort((left, right) =>
+    contactDisplayName(left).localeCompare(contactDisplayName(right), 'ru'),
+  );
   return { ...book, contacts: next };
+};
+
+export const setContactAlias = (
+  book: AddressBook,
+  id: string,
+  alias: string,
+): AddressBook => {
+  const normalized = id.toLowerCase();
+  const label = sanitizeNick(alias);
+  return {
+    ...book,
+    contacts: book.contacts
+      .map((item) => {
+        if (item.id !== normalized) return item;
+        if (!label) {
+          const { localAlias: _removed, ...rest } = item;
+          void _removed;
+          return rest;
+        }
+        return { ...item, localAlias: label };
+      })
+      .sort((left, right) =>
+        contactDisplayName(left).localeCompare(contactDisplayName(right), 'ru'),
+      ),
+  };
 };
 
 export const removeContact = (book: AddressBook, id: string): AddressBook => {

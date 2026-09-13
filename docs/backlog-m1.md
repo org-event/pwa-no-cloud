@@ -156,7 +156,7 @@
 | S1.6 | done | 5 |
 | S1.7 | todo (хвост) | 5 |
 | S2.1 | done | 3 |
-| S2.2 | todo | 3 |
+| S2.2 | done | 3 |
 | S2.3 | todo | 5 |
 | S2.4 | todo | 3 |
 | S3.1 | todo | 2 |

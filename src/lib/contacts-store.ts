@@ -26,6 +26,8 @@ const parseBook = (raw: string): AddressBook => {
         avatar?: unknown;
         addedAt?: unknown;
         updatedAt?: unknown;
+        publicKey?: unknown;
+        localAlias?: unknown;
       };
       const card = parseProfileCard({
         id: row.id,
@@ -33,10 +35,20 @@ const parseBook = (raw: string): AddressBook => {
         avatar: row.avatar,
       });
       if (!card) continue;
+      const publicKey =
+        typeof row.publicKey === 'string' && row.publicKey.startsWith('pk1.')
+          ? row.publicKey
+          : undefined;
+      const localAlias =
+        typeof row.localAlias === 'string'
+          ? row.localAlias.trim() || undefined
+          : undefined;
       contacts.push({
         ...card,
         addedAt: typeof row.addedAt === 'number' ? row.addedAt : 0,
         updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+        ...(publicKey ? { publicKey } : {}),
+        ...(localAlias ? { localAlias } : {}),
       });
     }
     const groups: ContactGroup[] = [];

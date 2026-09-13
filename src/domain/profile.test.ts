@@ -9,6 +9,8 @@ import {
   parseContactCard,
   parseProfileCard,
   sanitizeNick,
+  setContactAlias,
+  toNetworkProfile,
   upsertContact,
   type AddressBook,
 } from './profile.ts';
@@ -83,5 +85,26 @@ describe('profile card', () => {
     expect(expandRecipients(book, [], ['g1']).map((item) => item.nick)).toEqual(
       ['A', 'B'],
     );
+  });
+
+  it('keeps localAlias across upsert and omits it from network profile', () => {
+    let book: AddressBook = { contacts: [], groups: [] };
+    const pk = 'pk1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+    book = upsertContact(
+      book,
+      { id: FP_A, nick: 'Вася', avatar: '', publicKey: pk },
+      1,
+    );
+    book = setContactAlias(book, FP_A, 'Брат');
+    expect(book.contacts[0]?.localAlias).toBe('Брат');
+    book = upsertContact(book, { id: FP_A, nick: 'Василий', avatar: '' }, 2);
+    expect(book.contacts[0]?.nick).toBe('Василий');
+    expect(book.contacts[0]?.localAlias).toBe('Брат');
+    expect(book.contacts[0]?.publicKey).toBe(pk);
+    const wire = toNetworkProfile(book.contacts[0]!);
+    expect(wire).toEqual({ id: FP_A, nick: 'Василий', avatar: '' });
+    expect(JSON.stringify(wire)).not.toContain('localAlias');
+    expect(JSON.stringify(wire)).not.toContain('Брат');
+    expect(JSON.stringify(wire)).not.toContain('publicKey');
   });
 });

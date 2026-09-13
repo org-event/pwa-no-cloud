@@ -7,11 +7,14 @@ export type { AddressBook, Contact, ProfileCard } from '../profile.ts';
 export {
   CONTACT_CARD_PREFIX,
   LEGACY_CONTACT_CARD_PREFIX,
+  contactDisplayName,
   encodeContactCard,
   meetRoomId,
   parseContactCard,
   parseProfileCard,
   sanitizeNick,
+  setContactAlias,
+  toNetworkProfile,
   upsertContact,
 } from '../profile.ts';
 export type { SignedProfile, SignedProfileDraft } from '../signed-profile.ts';
