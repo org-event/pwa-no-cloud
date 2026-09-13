@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { createRooms } from './rooms.js';
 import { createStunServer } from './stun.js';
+import { createChallengeAuth, createRateLimiter } from './challenge.js';
 
 const PORT = Number(process.env.PORT) || 8000;
 const STUN_PORT = Number(process.env.STUN_PORT) || 3478;
@@ -32,6 +33,8 @@ const CORS = {
 };
 
 const rooms = createRooms();
+const challengeAuth = createChallengeAuth();
+const challengeLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
 
 const sendJSON = (res, status, body) => {
   res.writeHead(status, { ...CORS, 'Content-Type': 'application/json' });
@@ -110,11 +113,66 @@ const leaveRoom = async (req, res) => {
   sendJSON(res, 200, { ok: true });
 };
 
+const clientIp = (req) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0]?.trim() || 'unknown';
+  }
+  return req.socket.remoteAddress || 'unknown';
+};
+
+const getChallenge = (_req, res) => {
+  const challenge = challengeAuth.issue();
+  sendJSON(res, 200, { op: 'challenge', challenge });
+};
+
+const postChallenge = async (req, res) => {
+  const limited = challengeLimiter.allow(clientIp(req));
+  if (!limited.ok) {
+    sendJSON(res, 429, {
+      error: limited.code,
+      retryAfterMs: limited.retryAfterMs,
+    });
+    return;
+  }
+  let body = {};
+  try {
+    body = await parseBody(req);
+  } catch {
+    sendJSON(res, 400, { error: 'bad json' });
+    return;
+  }
+  const response = body.response ?? body;
+  const verified = await challengeAuth.verify(response);
+  if (!verified.ok) {
+    sendJSON(res, 401, { error: verified.code, message: verified.message });
+    return;
+  }
+  sendJSON(res, 200, {
+    ok: true,
+    sessionId: verified.value.sessionId,
+    publicKey: verified.value.publicKey,
+  });
+};
+
+const getHealth = (_req, res) => {
+  sendJSON(res, 200, {
+    ok: true,
+    capabilities: {
+      signaling: true,
+      stun: true,
+      challengeAuth: true,
+    },
+  });
+};
+
 const routes = new Map([
   ['/join', { post: joinRoom }],
   ['/leave', { post: leaveRoom }],
   ['/signal', { post: sendSignal, get: getSignal }],
   ['/peers', { get: getPeers }],
+  ['/challenge', { get: getChallenge, post: postChallenge }],
+  ['/health', { get: getHealth }],
 ]);
 
 const prepareFile = async (urlPath) => {
