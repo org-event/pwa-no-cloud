@@ -50,14 +50,16 @@ export function createPresenceSlice(ctx: NocloudContext) {
       },
       onVisitor: (peerId) => {
         if (state.livePeerId === peerId && peerIsConnected()) return;
-        if (state.peer?.state === 'connected') {
+        if (
+          state.peer?.state === 'connected' ||
+          !ctx.refs.onIncomingCall?.(peerId)
+        ) {
           state.contactsNotice = presenceCopy.busyIncoming(peerId);
           publish();
           return;
         }
         state.contactsNotice = presenceCopy.incomingKnock;
         publish();
-        void ctx.refs.knockOn?.(state.me.id, true);
       },
     });
     hub.setContacts(contactIds());

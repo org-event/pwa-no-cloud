@@ -32,6 +32,16 @@ export function createCallsSlice(ctx: NocloudContext) {
     callSession.value = next;
   };
 
+  const clearMediaUi = () => {
+    stopStream(localMedia.value);
+    localMedia.value = null;
+    remoteMedia.value = null;
+    callKind.value = null;
+    callPeerId.value = null;
+    callError.value = '';
+    state.peer?.clearLocalStream();
+  };
+
   const onRemoteTrack = (stream: MediaStream) => {
     remoteMedia.value = markRaw(stream);
     const leg = primaryCallLeg(callSession.value);
@@ -99,7 +109,6 @@ export function createCallsSlice(ctx: NocloudContext) {
 
   function onIncomingCall(peerId: string) {
     if (isCallBusy(callSession.value)) {
-      // Active call stays; remote should receive busy via signaling (later).
       return false;
     }
     setSession(
@@ -109,20 +118,45 @@ export function createCallsSlice(ctx: NocloudContext) {
       }),
     );
     callPeerId.value = peerId;
+    callKind.value = null;
+    callError.value = '';
     publish();
     return true;
   }
 
-  function onAcceptCall() {
+  async function onAcceptCall(kind: MediaCallKind = 'audio') {
     const leg = primaryCallLeg(callSession.value);
     if (!leg || leg.state !== 'ringing' || leg.direction !== 'in') return;
-    setSession(
-      applyCallSessionEvent(callSession.value, {
-        type: 'accept',
-        legId: leg.id,
-      }),
-    );
-    publish();
+    callError.value = '';
+    try {
+      const stream = await openCallMedia(kind);
+      stopStream(localMedia.value);
+      localMedia.value = markRaw(stream);
+      callKind.value = kind;
+      callPeerId.value = leg.peerId;
+      setSession(
+        applyCallSessionEvent(callSession.value, {
+          type: 'accept',
+          legId: leg.id,
+        }),
+      );
+      state.peer?.setLocalStream(stream);
+      state.contactsNotice = `${componentsCopy.calls.active} (${CALL_KIND_LABEL[kind]})`;
+      publish();
+      await ctx.refs.knockOn?.(state.me.id, true);
+      publish();
+    } catch {
+      setSession(
+        applyCallSessionEvent(callSession.value, {
+          type: 'leg-fail',
+          legId: leg.id,
+          message: componentsCopy.calls.needPermission,
+        }),
+      );
+      callError.value = componentsCopy.calls.needPermission;
+      state.contactsNotice = componentsCopy.calls.needPermission;
+      publish();
+    }
   }
 
   function onRejectCall() {
@@ -134,20 +168,13 @@ export function createCallsSlice(ctx: NocloudContext) {
         legId: leg.id,
       }),
     );
-    callKind.value = null;
-    callPeerId.value = null;
+    clearMediaUi();
     publish();
   }
 
   function onHangUp() {
     setSession(applyCallSessionEvent(callSession.value, { type: 'hangup' }));
-    stopStream(localMedia.value);
-    localMedia.value = null;
-    remoteMedia.value = null;
-    callKind.value = null;
-    callPeerId.value = null;
-    callError.value = '';
-    state.peer?.clearLocalStream();
+    clearMediaUi();
     publish();
   }
 

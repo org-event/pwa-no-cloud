@@ -60,6 +60,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
   const presence = createPresenceSlice(ctx);
   const calls = createCallsSlice(ctx);
   ctx.refs.onRemoteTrack = calls.onRemoteTrack;
+  ctx.refs.onIncomingCall = calls.onIncomingCall;
   const session = createSessionSlice(ctx, servers.shareDraftForInvite);
   const shell = createShellSlice(ctx);
 

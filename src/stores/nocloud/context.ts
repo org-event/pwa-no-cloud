@@ -28,6 +28,7 @@ export type NocloudRefs = {
   copyText?: (text: string) => Promise<boolean>;
   seedDemoContacts?: () => void | Promise<void>;
   onRemoteTrack?: (stream: MediaStream) => void;
+  onIncomingCall?: (peerId: string) => boolean;
   getIdentityKeyPair?: () => KeyPair | null;
 };
 

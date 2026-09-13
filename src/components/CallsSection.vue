@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { componentsCopy } from '@/content/index.ts';
+import { primaryCallLeg } from '@/domain/call/index.ts';
 import type { MediaCallKind } from '@/stores/nocloud/calls.ts';
 import { useNocloudStore } from '@/stores/nocloud.ts';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -9,12 +10,33 @@ import Card from './Card.vue';
 import ContactRow from './ContactRow.vue';
 
 const store = useNocloudStore();
-const { contacts, callKind, callPeerId, callError, localMedia, remoteMedia } =
-  storeToRefs(store);
+const {
+  contacts,
+  callKind,
+  callPeerId,
+  callError,
+  callSession,
+  localMedia,
+  remoteMedia,
+} = storeToRefs(store);
 
 const copy = componentsCopy.calls;
 const localVideo = ref<HTMLVideoElement | null>(null);
 const remoteVideo = ref<HTMLVideoElement | null>(null);
+
+const leg = computed(() => primaryCallLeg(callSession.value));
+const legState = computed(() => leg.value?.state ?? null);
+const incomingRinging = computed(
+  () => leg.value?.direction === 'in' && legState.value === 'ringing',
+);
+const inCallUi = computed(
+  () =>
+    Boolean(callKind.value) ||
+    incomingRinging.value ||
+    legState.value === 'outbound' ||
+    (leg.value?.direction === 'out' && legState.value === 'ringing') ||
+    legState.value === 'active',
+);
 
 const sortedContacts = computed(() => {
   const list = [...contacts.value.book.contacts];
@@ -30,13 +52,20 @@ const activeContact = computed(() => {
 
 const statusText = computed(() => {
   if (callError.value) return callError.value;
-  if (!callKind.value) return copy.hint;
-  if (remoteMedia.value) return copy.active;
-  return copy.calling;
+  if (incomingRinging.value) return copy.ringing;
+  if (legState.value === 'active' || remoteMedia.value) return copy.active;
+  if (
+    legState.value === 'outbound' ||
+    (leg.value?.direction === 'out' && legState.value === 'ringing')
+  ) {
+    return copy.calling;
+  }
+  if (callKind.value) return copy.calling;
+  return copy.hint;
 });
 
 const contactDetail = (id: string) => {
-  if (callPeerId.value === id && callKind.value) return copy.inCall;
+  if (callPeerId.value === id && inCallUi.value) return copy.inCall;
   if (store.isPresenceOnline(id)) return copy.online;
   return copy.offline;
 };
@@ -44,6 +73,8 @@ const contactDetail = (id: string) => {
 const start = (id: string, kind: MediaCallKind) => {
   void store.onStartCall(id, kind);
 };
+
+const busy = computed(() => inCallUi.value);
 
 watch(
   localMedia,
@@ -72,37 +103,73 @@ onBeforeUnmount(() => {
 <template>
   <div class="card-stack">
     <Card title="Звонок" :hint="statusText">
-      <div v-if="callKind" class="call-stage">
-        <div class="call-tile call-tile-remote">
-          <video
-            ref="remoteVideo"
-            class="call-video"
-            autoplay
-            playsinline
-            :aria-label="copy.remoteLabel"
+      <div v-if="inCallUi" class="call-stage">
+        <div class="call-hero">
+          <AvatarImg
+            v-if="activeContact || callPeerId"
+            class="call-hero-avatar"
+            :id="activeContact?.id || callPeerId || ''"
+            :avatar="activeContact?.avatar || ''"
+            :size="72"
           />
-          <p class="call-tile-label">
+          <p class="call-hero-name">
             {{ activeContact?.nick || copy.remoteLabel }}
           </p>
+          <p class="call-hero-status">{{ statusText }}</p>
         </div>
-        <div class="call-tile call-tile-local">
-          <video
-            ref="localVideo"
-            class="call-video"
-            autoplay
-            muted
-            playsinline
-            :aria-label="copy.localLabel"
-          />
-          <p class="call-tile-label">{{ copy.localLabel }}</p>
+
+        <div v-if="callKind" class="call-tiles">
+          <div class="call-tile call-tile-remote">
+            <video
+              ref="remoteVideo"
+              class="call-video"
+              autoplay
+              playsinline
+              :aria-label="copy.remoteLabel"
+            />
+            <p class="call-tile-label">
+              {{ activeContact?.nick || copy.remoteLabel }}
+            </p>
+          </div>
+          <div class="call-tile call-tile-local">
+            <video
+              ref="localVideo"
+              class="call-video"
+              autoplay
+              muted
+              playsinline
+              :aria-label="copy.localLabel"
+            />
+            <p class="call-tile-label">{{ copy.localLabel }}</p>
+          </div>
         </div>
-        <button
-          type="button"
-          class="button button-accent"
-          @click="store.onHangUp()"
-        >
-          {{ copy.hangUp }}
-        </button>
+
+        <div class="call-actions">
+          <template v-if="incomingRinging">
+            <button
+              type="button"
+              class="button"
+              @click="store.onAcceptCall('audio')"
+            >
+              {{ copy.accept }}
+            </button>
+            <button
+              type="button"
+              class="button button-secondary"
+              @click="store.onRejectCall()"
+            >
+              {{ copy.reject }}
+            </button>
+          </template>
+          <button
+            v-else
+            type="button"
+            class="button button-accent"
+            @click="store.onHangUp()"
+          >
+            {{ copy.hangUp }}
+          </button>
+        </div>
       </div>
       <p v-else class="tagline">{{ copy.hint }}</p>
     </Card>
@@ -128,7 +195,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="button button-secondary"
-              :disabled="Boolean(callKind)"
+              :disabled="busy"
               @click="start(contact.id, 'audio')"
             >
               {{ copy.audio }}
@@ -136,7 +203,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="button button-secondary"
-              :disabled="Boolean(callKind)"
+              :disabled="busy"
               @click="start(contact.id, 'video')"
             >
               {{ copy.video }}
@@ -144,7 +211,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="button button-secondary"
-              :disabled="Boolean(callKind)"
+              :disabled="busy"
               @click="start(contact.id, 'screen')"
             >
               {{ copy.screen }}
