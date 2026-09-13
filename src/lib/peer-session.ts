@@ -30,6 +30,10 @@ import type { SignalingHandle } from './signaling/factory.ts';
 import { isManualPort } from './signaling/factory.ts';
 import type { SignalMessage } from './signaling/port.ts';
 import {
+  attachLocalMediaTracks,
+  detachLocalMediaTracks,
+} from './peer-media.ts';
+import {
   attachRemoteChannels,
   createLocalChannels,
   createPeerConnection,
@@ -209,34 +213,33 @@ export class PeerSession extends EventEmitter {
   }
 
   clearLocalStream() {
-    if (!this.localStream) return;
-    for (const track of this.localStream.getTracks()) track.stop();
-    this.localStream = null;
+    this.setLocalStream(null);
   }
 
   attachLocalTracks(pc: RTCPeerConnection) {
     if (!this.localStream) return;
-    for (const track of this.localStream.getTracks()) {
-      const sent = pc.getSenders().some((item) => item.track?.id === track.id);
-      if (!sent) pc.addTrack(track, this.localStream);
-    }
+    attachLocalMediaTracks(pc, this.localStream);
   }
 
   setLocalStream(stream: MediaStream | null) {
-    if (this.localStream && this.localStream !== stream) {
-      for (const track of this.localStream.getTracks()) track.stop();
+    const pc = this.links?.pc;
+    const previous = this.localStream;
+    if (previous && previous !== stream) {
+      if (pc) detachLocalMediaTracks(pc, previous);
+      for (const track of previous.getTracks()) track.stop();
     }
     this.localStream = stream;
-    const pc = this.links?.pc;
-    if (pc && stream) {
-      this.attachLocalTracks(pc);
-      if (
-        pc.signalingState === 'stable' &&
-        this.peerId &&
-        this.peerId !== '*'
-      ) {
-        void this.renegotiateOffer();
-      }
+    if (!pc) return;
+    if (stream) {
+      attachLocalMediaTracks(pc, stream);
+    }
+    if (
+      pc.signalingState === 'stable' &&
+      this.peerId &&
+      this.peerId !== '*' &&
+      previous !== stream
+    ) {
+      void this.renegotiateOffer();
     }
   }
 
