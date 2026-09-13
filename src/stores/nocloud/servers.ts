@@ -10,6 +10,7 @@ import {
 import type { CustomServerDraft } from '@/config/types.ts';
 import {
   addRelayUrl,
+  applyRelayFailover,
   mergeRemoteRelays,
   removeRelayUrl,
   setActiveRelay,
@@ -265,7 +266,9 @@ export function createServersSlice(ctx: NocloudContext) {
     saveRelayBundle(storage, state.relayBundle);
   };
 
-  const applyActiveRelayToSettings = () => {
+  const applyActiveRelayToSettings = (options?: {
+    restartPresence?: boolean;
+  }) => {
     const url = state.relayBundle.activeUrl;
     if (!url) return;
     const kind = /^https?:/i.test(url) ? 'http-poll' : 'websocket';
@@ -277,7 +280,9 @@ export function createServersSlice(ctx: NocloudContext) {
     };
     state.settings = createUserSettings('custom', draft);
     saveUserSettings(state.settings, storage);
-    void ctx.refs.ensurePresenceActive?.();
+    if (options?.restartPresence !== false) {
+      void ctx.refs.ensurePresenceActive?.();
+    }
   };
 
   function onAddRelayUrl(raw: string) {
@@ -343,6 +348,19 @@ export function createServersSlice(ctx: NocloudContext) {
     return true;
   }
 
+  /** Switch active relay after a connect failure; no presence restart (caller retries). */
+  function failoverRelay(failedUrl: string): boolean {
+    const next = applyRelayFailover(state.relayBundle, failedUrl);
+    if (!next) return false;
+    state.relayBundle = next;
+    persistRelayBundle();
+    applyActiveRelayToSettings({ restartPresence: false });
+    const active = next.activeUrl ?? failedUrl;
+    state.hostNotice = serversCopy.relayFailover(active);
+    touch();
+    return true;
+  }
+
   return {
     persistSavedServers,
     activateSavedServer,
@@ -368,5 +386,6 @@ export function createServersSlice(ctx: NocloudContext) {
     onSelectRelayUrl,
     onRemoveRelayUrl,
     refreshRelayBundleFrom,
+    failoverRelay,
   };
 }

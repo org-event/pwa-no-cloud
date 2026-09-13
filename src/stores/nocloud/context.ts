@@ -32,6 +32,7 @@ export type NocloudRefs = {
   onCallPeerError?: (message: string) => void;
   getIdentityKeyPair?: () => KeyPair | null;
   refreshRelayBundleFrom?: (signalingUrl: string) => Promise<boolean>;
+  failoverRelay?: (failedUrl: string) => boolean;
 };
 
 export type NocloudContext = {

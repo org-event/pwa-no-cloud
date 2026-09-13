@@ -109,8 +109,10 @@ export type { RelayBundle, RelayUrl } from './discovery/index.ts';
 export {
   activeRelayOf,
   addRelayUrl,
+  applyRelayFailover,
   emptyRelayBundle,
   mergeRemoteRelays,
+  nextFailoverRelay,
   normalizeRelayUrl,
   removeRelayUrl,
   setActiveRelay,

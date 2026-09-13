@@ -97,39 +97,55 @@ export function createPresenceSlice(ctx: NocloudContext) {
       }
       return false;
     }
-    await ensureRelaySession();
-    const next = ensureHub();
-    if (!next) {
-      if (!quiet) {
-        state.contactsNotice = presenceCopy.needS1;
-        publish();
+
+    const maxAttempts = Math.max(1, state.relayBundle.urls.length || 1);
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await ensureRelaySession();
+      const next = ensureHub();
+      if (!next) {
+        if (!quiet) {
+          state.contactsNotice = presenceCopy.needS1;
+          publish();
+        }
+        return false;
       }
-      return false;
-    }
-    next.setContacts(contactIds());
-    const wasAvailable = state.presenceAvailable && next.available;
-    const ok = await next.start();
-    if (!ok) {
-      if (!quiet) {
-        state.contactsNotice = presenceCopy.startFailed;
+      next.setContacts(contactIds());
+      const wasAvailable = state.presenceAvailable && next.available;
+      const ok = await next.start();
+      if (ok) {
+        const signaling = peerSignaling(ctx);
+        if (signaling.kind !== 'manual' && signaling.url) {
+          void ctx.refs.refreshRelayBundleFrom?.(signaling.url);
+        }
+        state.presenceAvailable = true;
+        if (!quiet) {
+          state.contactsNotice = presenceCopy.available;
+          note(presenceCopy.availableNote);
+        } else if (!wasAvailable) {
+          state.contactsNotice = presenceCopy.available;
+        }
+        void requestWakeLock();
         publish();
+        return true;
       }
-      return false;
+
+      const signaling = peerSignaling(ctx);
+      const failedUrl =
+        signaling.kind !== 'manual' && signaling.url ? signaling.url : '';
+      hub?.stop();
+      hub = null;
+      hubKey = '';
+      relaySessionId = null;
+      if (!failedUrl || !ctx.refs.failoverRelay?.(failedUrl)) {
+        break;
+      }
     }
-    const signaling = peerSignaling(ctx);
-    if (signaling.kind !== 'manual' && signaling.url) {
-      void ctx.refs.refreshRelayBundleFrom?.(signaling.url);
-    }
-    state.presenceAvailable = true;
+
     if (!quiet) {
-      state.contactsNotice = presenceCopy.available;
-      note(presenceCopy.availableNote);
-    } else if (!wasAvailable) {
-      state.contactsNotice = presenceCopy.available;
+      state.contactsNotice = presenceCopy.startFailed;
+      publish();
     }
-    void requestWakeLock();
-    publish();
-    return true;
+    return false;
   }
 
   function stopPresence() {

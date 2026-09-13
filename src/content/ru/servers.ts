@@ -20,4 +20,6 @@ export const serversCopy = {
   relayAdded: 'Реле добавлено в пучок.',
   relayActive: 'Активное реле переключено.',
   relayRemoved: 'Реле удалено из пучка.',
+  relayFailover: (url: string) =>
+    `Активное реле упало — переключились на ${url}.`,
 } as const;

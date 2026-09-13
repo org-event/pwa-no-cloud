@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activeRelayOf,
   addRelayUrl,
+  applyRelayFailover,
   emptyRelayBundle,
   mergeRemoteRelays,
   normalizeRelayUrl,
@@ -41,5 +42,20 @@ describe('relay bundle', () => {
     ]);
     expect(bundle.activeUrl).toBe('wss://home.example/ws');
     expect(bundle.updatedAt).toBe(2);
+  });
+
+  it('failovers to the next URL when ≥2 are known', () => {
+    let bundle = emptyRelayBundle();
+    bundle = addRelayUrl(bundle, 'wss://a.example/ws', 1);
+    bundle = addRelayUrl(bundle, 'https://b.example', 2);
+    bundle = addRelayUrl(bundle, 'wss://c.example/ws', 3);
+    const next = applyRelayFailover(bundle, 'wss://a.example/ws', 4);
+    expect(next?.activeUrl).toBe('https://b.example');
+    expect(
+      applyRelayFailover(
+        addRelayUrl(emptyRelayBundle(), 'wss://only'),
+        'wss://only',
+      ),
+    ).toBeNull();
   });
 });

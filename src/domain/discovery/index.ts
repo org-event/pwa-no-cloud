@@ -95,6 +95,38 @@ export const activeRelayOf = (bundle: RelayBundle): RelayUrl | null =>
     : (bundle.urls[0] ?? null);
 
 /**
+ * Pick the next URL after a failed one (needs ≥2 URLs).
+ * Skips the failed entry; wraps once around the list.
+ */
+export const nextFailoverRelay = (
+  bundle: RelayBundle,
+  failedUrl: string | null,
+): RelayUrl | null => {
+  if (bundle.urls.length < 2) return null;
+  const failed = failedUrl
+    ? (normalizeRelayUrl(failedUrl) ?? stripNoise(failedUrl))
+    : bundle.activeUrl;
+  const idx = failed ? bundle.urls.indexOf(failed) : -1;
+  const start = idx >= 0 ? idx + 1 : 0;
+  for (let step = 0; step < bundle.urls.length; step++) {
+    const url = bundle.urls[(start + step) % bundle.urls.length];
+    if (url && url !== failed) return url;
+  }
+  return null;
+};
+
+/** Switch active to next failover candidate, or null if none. */
+export const applyRelayFailover = (
+  bundle: RelayBundle,
+  failedUrl: string | null,
+  now = Date.now(),
+): RelayBundle | null => {
+  const next = nextFailoverRelay(bundle, failedUrl);
+  if (!next) return null;
+  return setActiveRelay(bundle, next, now);
+};
+
+/**
  * Merge remote live-bundle URLs into the local cache.
  * Keeps existing `activeUrl`; only sets it when previously empty.
  */

@@ -85,6 +85,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
   ctx.refs.copyText = session.copyText;
   ctx.refs.seedDemoContacts = contacts.seedDemoContacts;
   ctx.refs.refreshRelayBundleFrom = servers.refreshRelayBundleFrom;
+  ctx.refs.failoverRelay = servers.failoverRelay;
 
   const trackRevision = () => {
     void peerRevision.value;
