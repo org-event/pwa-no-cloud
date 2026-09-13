@@ -49,6 +49,14 @@ export {
 } from './vault.ts';
 export type { VaultRecord, VaultStorage } from './vault.ts';
 
+export {
+  createMnemonic,
+  isValidMnemonic,
+  keyPairFromMnemonic,
+  normalizeMnemonic,
+} from './mnemonic.ts';
+export type { MnemonicStrength } from './mnemonic.ts';
+
 const enc = new TextEncoder();
 
 export const generateKeyPair = async (): Promise<KeyPair> => {

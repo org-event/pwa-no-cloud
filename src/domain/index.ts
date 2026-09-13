@@ -48,6 +48,7 @@ export {
   VAULT_STORAGE_KEY,
   bytesToHex,
   clearVaultStorage,
+  createMnemonic,
   decodePublicKey,
   decodeVaultRecord,
   encodePublicKey,
@@ -56,8 +57,11 @@ export {
   formatFingerprint,
   generateKeyPair,
   hexToBytes,
+  isValidMnemonic,
+  keyPairFromMnemonic,
   loadVaultFromStorage,
   meetRoomIdFromFingerprint,
+  normalizeMnemonic,
   openSecretKey,
   parsePublicKey,
   publicKeyFromSecret,
@@ -69,7 +73,11 @@ export {
   verifyBytes,
   verifyText,
 } from './identity/index.ts';
-export type { VaultRecord, VaultStorage } from './identity/index.ts';
+export type {
+  MnemonicStrength,
+  VaultRecord,
+  VaultStorage,
+} from './identity/index.ts';
 export type { Call, CallLeg, CallLegId, CallState } from './call/index.ts';
 export type { PresenceEntry, PresenceStatus } from './presence/index.ts';
 export type { RelayBundle, RelayUrl } from './discovery/index.ts';
