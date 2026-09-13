@@ -31,3 +31,42 @@ export {
   transferProgress,
 } from './transfer.ts';
 export type { Transfer, TransferEvent, TransferState } from './transfer.ts';
+
+export type {
+  CryptoErr,
+  CryptoOk,
+  CryptoResult,
+  IdentityId,
+  KeyPair,
+  PublicKeyBytes,
+  SecretKeyBytes,
+  SignatureBytes,
+} from './identity/index.ts';
+export {
+  generateKeyPair,
+  publicKeyFromSecret,
+  signBytes,
+  signPayload,
+  signText,
+  verifyBytes,
+  verifyText,
+} from './identity/index.ts';
+export type { Call, CallLeg, CallLegId, CallState } from './call/index.ts';
+export type { PresenceEntry, PresenceStatus } from './presence/index.ts';
+export type { RelayBundle, RelayUrl } from './discovery/index.ts';
+export { emptyRelayBundle } from './discovery/index.ts';
+export type {
+  RelayCapabilities,
+  RelayChallenge,
+  RelayChallengeResponse,
+} from './relay/index.ts';
+export type { AddressBook, Contact, ProfileCard } from './contacts/index.ts';
+export {
+  CONTACT_CARD_PREFIX,
+  encodeContactCard,
+  meetRoomId,
+  parseContactCard,
+  parseProfileCard,
+  sanitizeNick,
+  upsertContact,
+} from './contacts/index.ts';

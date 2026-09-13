@@ -8,8 +8,17 @@ PWA для обмена файлами и папками между устрой
 
 1. [usage.md](./usage.md) — как соединиться и передать файл или папку.
 2. [turn.md](./turn.md) — свой coturn для режима через интернет. Чужой TURN не подключаем.
-3. [plan.md](./plan.md) — план развития по шагам.
-4. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI.
+3. [plan.md](./plan.md) — план фундамента (WebRTC, файлы, PWA) по шагам.
+4. [vision.md](./vision.md) — к чему идём шире: суверенная P2P-звонилка.
+5. [requirements.md](./requirements.md) — функциональные и нефункциональные требования + решения к закрытию.
+6. [architecture.md](./architecture.md) — системный дизайн со схемами (для новых разработчиков).
+7. [glossary.md](./glossary.md) — термины по-русски (P2P, STUN, TURN, реле, PoW…).
+8. [adr/](./adr/) — архитектурные решения (почему так).
+9. [roadmap-wide.md](./roadmap-wide.md) — пошаговый план горизонта + вопросы на закрытие пунктов.
+10. [backlog-m1.md](./backlog-m1.md) — нарезка M1 на стори со story points (норма 1–5 за заход).
+11. [sources/ideas-essence.md](./sources/ideas-essence.md) — сжатая суть идей горизонта.
+12. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI.
+13. [features-realtime.md](./features-realtime.md) — presence, стук, звонки (задел).
 
 ## Источники подхода
 
