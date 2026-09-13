@@ -7,6 +7,10 @@ import { WebSocketServer } from 'ws';
 import { createRooms } from './rooms.js';
 import { createStunServer } from './stun.js';
 import { createChallengeAuth, createRateLimiter } from './challenge.js';
+import {
+  createRelayBundleFactory,
+  selfUrlFromRequest,
+} from './relay-bundle.js';
 
 const PORT = Number(process.env.PORT) || 8000;
 const STUN_PORT = Number(process.env.STUN_PORT) || 3478;
@@ -35,6 +39,7 @@ const CORS = {
 const rooms = createRooms();
 const challengeAuth = createChallengeAuth();
 const challengeLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
+const buildRelayBundle = createRelayBundleFactory();
 
 const sendJSON = (res, status, body) => {
   res.writeHead(status, { ...CORS, 'Content-Type': 'application/json' });
@@ -166,11 +171,24 @@ const getHealth = (_req, res) => {
   });
 };
 
+const getRelays = (req, res) => {
+  const message = buildRelayBundle({ selfUrl: selfUrlFromRequest(req) });
+  if (message.relays.length === 0) {
+    sendJSON(res, 503, {
+      error: 'no-relays',
+      message: 'set RELAY_PUBLIC_URL or RELAY_URLS',
+    });
+    return;
+  }
+  sendJSON(res, 200, message);
+};
+
 const routes = new Map([
   ['/join', { post: joinRoom }],
   ['/leave', { post: leaveRoom }],
   ['/signal', { post: sendSignal, get: getSignal }],
   ['/peers', { get: getPeers }],
+  ['/relays', { get: getRelays }],
   ['/challenge', { get: getChallenge, post: postChallenge }],
   ['/health', { get: getHealth }],
 ]);
@@ -215,23 +233,28 @@ const handleRequest = async (req, res) => {
 
 const lanUrls = (port) => {
   const urls = [`http://127.0.0.1:${port}/`];
-  const nets = os.networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    const list = nets[name] ?? [];
-    for (const net of list) {
-      if (net.internal) continue;
-      if (net.family !== 'IPv4' && net.family !== 4) continue;
-      urls.push(`http://${net.address}:${port}/`);
+  try {
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      const list = nets[name] ?? [];
+      for (const net of list) {
+        if (net.internal) continue;
+        if (net.family !== 'IPv4' && net.family !== 4) continue;
+        urls.push(`http://${net.address}:${port}/`);
+      }
     }
+  } catch {
+    // Sandbox / restricted hosts may deny networkInterfaces().
   }
   return urls;
 };
 
 const attachSockets = (server) => {
   const wss = new WebSocketServer({ server, path: '/ws' });
-  wss.on('connection', (socket) => {
+  wss.on('connection', (socket, request) => {
     let roomId = '';
     let clientId = '';
+    const connectionSelfUrl = selfUrlFromRequest(request);
     socket.on('message', (raw) => {
       let body = {};
       try {
@@ -256,6 +279,15 @@ const attachSockets = (server) => {
         socket.send(
           JSON.stringify({ op: 'peers', peers: rooms.peers(roomId, clientId) }),
         );
+        return;
+      }
+      if (body.op === 'relays') {
+        const bundle = buildRelayBundle({ selfUrl: connectionSelfUrl });
+        if (bundle.relays.length === 0) {
+          socket.send(JSON.stringify({ op: 'error', message: 'no-relays' }));
+          return;
+        }
+        socket.send(JSON.stringify(bundle));
         return;
       }
       if (body.op === 'signal' && clientId) {
