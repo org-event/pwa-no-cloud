@@ -116,6 +116,10 @@ export function createPresenceSlice(ctx: NocloudContext) {
       }
       return false;
     }
+    const signaling = peerSignaling(ctx);
+    if (signaling.kind !== 'manual' && signaling.url) {
+      void ctx.refs.refreshRelayBundleFrom?.(signaling.url);
+    }
     state.presenceAvailable = true;
     if (!quiet) {
       state.contactsNotice = presenceCopy.available;

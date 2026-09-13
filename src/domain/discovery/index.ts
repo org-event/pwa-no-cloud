@@ -93,3 +93,32 @@ export const activeRelayOf = (bundle: RelayBundle): RelayUrl | null =>
   bundle.activeUrl && bundle.urls.includes(bundle.activeUrl)
     ? bundle.activeUrl
     : (bundle.urls[0] ?? null);
+
+/**
+ * Merge remote live-bundle URLs into the local cache.
+ * Keeps existing `activeUrl`; only sets it when previously empty.
+ */
+export const mergeRemoteRelays = (
+  bundle: RelayBundle,
+  remoteUrls: readonly string[],
+  now = Date.now(),
+): RelayBundle => {
+  const seen = new Set(bundle.urls);
+  const added: RelayUrl[] = [];
+  for (const raw of remoteUrls) {
+    const url = normalizeRelayUrl(raw);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    added.push(url);
+  }
+  if (added.length === 0) {
+    if (remoteUrls.length === 0) return bundle;
+    if (bundle.updatedAt === now) return bundle;
+    return { ...bundle, updatedAt: now };
+  }
+  return {
+    urls: [...bundle.urls, ...added],
+    activeUrl: bundle.activeUrl ?? added[0] ?? null,
+    updatedAt: now,
+  };
+};

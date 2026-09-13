@@ -31,6 +31,7 @@ export type NocloudRefs = {
   onIncomingCall?: (peerId: string) => boolean;
   onCallPeerError?: (message: string) => void;
   getIdentityKeyPair?: () => KeyPair | null;
+  refreshRelayBundleFrom?: (signalingUrl: string) => Promise<boolean>;
 };
 
 export type NocloudContext = {

@@ -10,6 +10,7 @@ import {
 import type { CustomServerDraft } from '@/config/types.ts';
 import {
   addRelayUrl,
+  mergeRemoteRelays,
   removeRelayUrl,
   setActiveRelay,
 } from '@/domain/discovery/index.ts';
@@ -17,6 +18,7 @@ import { titleFromDraft } from '@/domain/saved-server.ts';
 import { createSavedServer, type SavedServer } from '@/domain/saved-server.ts';
 import { canScanQr, decodeQrFromFile } from '@/lib/scan-qr.ts';
 import { probeSignaling } from '@/lib/probe-signaling.ts';
+import { fetchRelayBundle, remoteRelayUrls } from '@/lib/relay-bundle-fetch.ts';
 import { saveRelayBundle } from '@/lib/relay-bundle-store.ts';
 import {
   saveSavedServers,
@@ -311,6 +313,36 @@ export function createServersSlice(ctx: NocloudContext) {
     touch();
   }
 
+  /** Pull live bundle from the active relay and merge into local cache. */
+  async function refreshRelayBundleFrom(
+    signalingUrl: string,
+  ): Promise<boolean> {
+    const result = await fetchRelayBundle(signalingUrl);
+    if (!result.ok) return false;
+    const next = mergeRemoteRelays(
+      state.relayBundle,
+      remoteRelayUrls(result.value),
+      result.value.issuedAt,
+    );
+    // Also remember the URL we just used, if missing.
+    const withSelf = mergeRemoteRelays(
+      next,
+      [signalingUrl],
+      result.value.issuedAt,
+    );
+    if (
+      withSelf.urls.length === state.relayBundle.urls.length &&
+      withSelf.activeUrl === state.relayBundle.activeUrl &&
+      withSelf.updatedAt === state.relayBundle.updatedAt
+    ) {
+      return true;
+    }
+    state.relayBundle = withSelf;
+    persistRelayBundle();
+    touch();
+    return true;
+  }
+
   return {
     persistSavedServers,
     activateSavedServer,
@@ -335,5 +367,6 @@ export function createServersSlice(ctx: NocloudContext) {
     onAddRelayUrl,
     onSelectRelayUrl,
     onRemoveRelayUrl,
+    refreshRelayBundleFrom,
   };
 }

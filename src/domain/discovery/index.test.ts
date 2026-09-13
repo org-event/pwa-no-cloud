@@ -3,6 +3,7 @@ import {
   activeRelayOf,
   addRelayUrl,
   emptyRelayBundle,
+  mergeRemoteRelays,
   normalizeRelayUrl,
   removeRelayUrl,
   setActiveRelay,
@@ -25,5 +26,20 @@ describe('relay bundle', () => {
     bundle = removeRelayUrl(bundle, 'https://b.example', 4);
     expect(bundle.urls).toEqual(['wss://a.example/ws']);
     expect(activeRelayOf(bundle)).toBe('wss://a.example/ws');
+  });
+
+  it('merges remote URLs without stealing active', () => {
+    let bundle = addRelayUrl(emptyRelayBundle(), 'wss://home.example/ws', 1);
+    bundle = mergeRemoteRelays(
+      bundle,
+      ['wss://home.example/ws', 'https://spare.example', 'ftp://bad'],
+      2,
+    );
+    expect(bundle.urls).toEqual([
+      'wss://home.example/ws',
+      'https://spare.example',
+    ]);
+    expect(bundle.activeUrl).toBe('wss://home.example/ws');
+    expect(bundle.updatedAt).toBe(2);
   });
 });

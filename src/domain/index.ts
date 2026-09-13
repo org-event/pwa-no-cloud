@@ -110,6 +110,7 @@ export {
   activeRelayOf,
   addRelayUrl,
   emptyRelayBundle,
+  mergeRemoteRelays,
   normalizeRelayUrl,
   removeRelayUrl,
   setActiveRelay,
