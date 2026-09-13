@@ -77,8 +77,8 @@ const cardFromRecord = (id: unknown, nick: unknown): ProfileCard | null => {
 export const parseContactCard = (text: string): ProfileCard | null => {
   const raw = stripCardNoise(text);
   if (!raw) return null;
-  // Hard cut: exploratory C1. cards are not accepted.
-  if (raw.includes(LEGACY_CONTACT_CARD_PREFIX)) return null;
+  // Hard cut: exploratory C1. prefix only — not the substring inside nick/payload.
+  if (raw.startsWith(LEGACY_CONTACT_CARD_PREFIX)) return null;
   const packed = raw.match(/P1\.\s*(\{[\s\S]*\})/i);
   if (packed?.[1]) {
     try {

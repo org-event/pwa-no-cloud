@@ -105,3 +105,11 @@ export {
   sanitizeNick,
   upsertContact,
 } from './contacts/index.ts';
+export type { SignedProfile, SignedProfileDraft } from './contacts/index.ts';
+export {
+  SIGNED_PROFILE_VERSION,
+  canonicalSignedProfile,
+  parseSignedProfile,
+  signProfile,
+  verifySignedProfile,
+} from './contacts/index.ts';

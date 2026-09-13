@@ -14,3 +14,11 @@ export {
   sanitizeNick,
   upsertContact,
 } from '../profile.ts';
+export type { SignedProfile, SignedProfileDraft } from '../signed-profile.ts';
+export {
+  SIGNED_PROFILE_VERSION,
+  canonicalSignedProfile,
+  parseSignedProfile,
+  signProfile,
+  verifySignedProfile,
+} from '../signed-profile.ts';

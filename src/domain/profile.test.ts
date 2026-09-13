@@ -61,6 +61,11 @@ describe('profile card', () => {
         `${LEGACY_CONTACT_CARD_PREFIX}{"v":1,"id":"abc123xyz9","nick":"Вася"}`,
       ),
     ).toBeNull();
+    expect(
+      parseContactCard(
+        encodeContactCard({ id: FP_A, nick: 'C1.', avatar: '' }),
+      ),
+    ).toEqual({ id: FP_A, nick: 'C1.', avatar: '' });
     expect(encodeContactCard({ id: 'abc123xyz9', nick: 'x', avatar: '' })).toBe(
       '',
     );
