@@ -17,10 +17,11 @@ export type AbuseCheckInput = {
 /**
  * Pluggable gate before expensive relay work (challenge, TURN, heavy signaling).
  * Implementations must be side-effect free except for their own counters.
+ * M1 guards are sync; async PoW can wrap this later.
  */
 export type AbuseGuard = {
   readonly kind: 'rate-limit' | 'pow' | 'noop';
-  check(input: AbuseCheckInput): AbuseDecision | Promise<AbuseDecision>;
+  check(input: AbuseCheckInput): AbuseDecision;
 };
 
 export type RateLimitOptions = {
