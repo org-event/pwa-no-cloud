@@ -10,8 +10,16 @@ describe('domain module barrels', () => {
     };
     expect(pair.publicKey).toHaveLength(32);
 
-    const call: Call = { id: 'c1', legs: [] };
+    const call: Call = {
+      id: 'c1',
+      topology: 'mesh',
+      maxLegs: 1,
+      legs: [],
+      state: 'idle',
+      error: '',
+    };
     expect(call.legs).toEqual([]);
+    expect(call.maxLegs).toBe(1);
   });
 
   it('builds an empty relay bundle', () => {

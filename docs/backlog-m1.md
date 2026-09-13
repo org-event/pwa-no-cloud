@@ -165,7 +165,7 @@
 | S3.4 | done | 5 |
 | S3.5 | done | 3 |
 | S3.6 | done | 2 |
-| S4.1 | todo | 3 |
+| S4.1 | done | 3 |
 | S4.2 | todo | 5 |
 | S4.3 | todo | 5 |
 | S4.4 | todo | 5 |

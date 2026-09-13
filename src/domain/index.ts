@@ -85,7 +85,24 @@ export type {
   VaultRecord,
   VaultStorage,
 } from './identity/index.ts';
-export type { Call, CallLeg, CallLegId, CallState } from './call/index.ts';
+export type {
+  Call,
+  CallDirection,
+  CallLeg,
+  CallLegId,
+  CallLegState,
+  CallSession,
+  CallSessionEvent,
+  CallSessionState,
+  CallState,
+  CallTopology,
+} from './call/index.ts';
+export {
+  M1_MAX_CALL_LEGS,
+  applyCallSessionEvent,
+  createIdleCallSession,
+  primaryCallLeg,
+} from './call/index.ts';
 export type { PresenceEntry, PresenceStatus } from './presence/index.ts';
 export type { RelayBundle, RelayUrl } from './discovery/index.ts';
 export {
