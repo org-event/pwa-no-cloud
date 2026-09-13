@@ -99,7 +99,7 @@ M1 закрыт (`docs/backlog-m1.md`). M2 = must следующего срез�
 | T2.4 | done | 5 |
 | T3.1 | done | 3 |
 | T3.2 | done | 3 |
-| T3.3 | todo | 2 |
+| T3.3 | done | 2 |
 | T4.1 | todo | 3 |
 | T4.2 | todo | 2 |
 | T5.1 | todo | 3 |

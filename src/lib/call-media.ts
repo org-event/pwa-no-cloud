@@ -85,3 +85,28 @@ export const openCallMedia = async (kind: CallKind): Promise<MediaStream> => {
   if (kind === 'audio' || kind === 'video') return openUserMedia(kind);
   throw new Error('data has no media');
 };
+
+/** Soft mute/unmute without removing senders (keeps renegotiation-free). */
+export const setTracksEnabled = (
+  stream: MediaStream | null | undefined,
+  kind: 'audio' | 'video',
+  enabled: boolean,
+): boolean => {
+  if (!stream) return false;
+  let changed = false;
+  for (const track of stream.getTracks()) {
+    if (track.kind !== kind) continue;
+    track.enabled = enabled;
+    changed = true;
+  }
+  return changed;
+};
+
+export const tracksEnabled = (
+  stream: MediaStream | null | undefined,
+  kind: 'audio' | 'video',
+): boolean => {
+  if (!stream) return false;
+  const tracks = stream.getTracks().filter((track) => track.kind === kind);
+  return tracks.length > 0 && tracks.every((track) => track.enabled);
+};

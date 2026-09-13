@@ -4,7 +4,9 @@ import {
   isDisplayTrack,
   onScreenShareEnded,
   openCallMedia,
+  setTracksEnabled,
   stopStream,
+  tracksEnabled,
 } from './call-media.ts';
 
 describe('call-media', () => {
@@ -111,5 +113,19 @@ describe('call-media', () => {
     expect(ended).toHaveBeenCalledTimes(1);
     unbind();
     expect(listeners.get('ended')).toEqual([]);
+  });
+
+  it('toggles track.enabled for mute/camera without stopping', () => {
+    const audio = { kind: 'audio', enabled: true };
+    const video = { kind: 'video', enabled: true };
+    const stream = {
+      getTracks: () => [audio, video],
+    } as unknown as MediaStream;
+    expect(setTracksEnabled(stream, 'audio', false)).toBe(true);
+    expect(audio.enabled).toBe(false);
+    expect(tracksEnabled(stream, 'audio')).toBe(false);
+    expect(tracksEnabled(stream, 'video')).toBe(true);
+    setTracksEnabled(stream, 'video', false);
+    expect(video.enabled).toBe(false);
   });
 });

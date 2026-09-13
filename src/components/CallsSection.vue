@@ -18,6 +18,8 @@ const {
   callSession,
   localMedia,
   remoteMedia,
+  micOn,
+  camOn,
 } = storeToRefs(store);
 
 const copy = componentsCopy.calls;
@@ -77,6 +79,9 @@ const start = (id: string, kind: MediaCallKind) => {
 };
 
 const busy = computed(() => inCallUi.value);
+const canToggleCamera = computed(
+  () => callKind.value === 'video' || callKind.value === 'screen',
+);
 
 watch(
   localMedia,
@@ -178,6 +183,23 @@ onBeforeUnmount(() => {
           >
             {{ callError ? copy.dismiss : copy.hangUp }}
           </button>
+          <template v-if="callKind && !incomingRinging && !callError">
+            <button
+              type="button"
+              class="button button-secondary"
+              @click="store.onToggleMute()"
+            >
+              {{ micOn ? copy.mute : copy.unmute }}
+            </button>
+            <button
+              v-if="canToggleCamera"
+              type="button"
+              class="button button-secondary"
+              @click="store.onToggleCamera()"
+            >
+              {{ camOn ? copy.cameraOff : copy.cameraOn }}
+            </button>
+          </template>
         </div>
       </div>
       <p v-else class="tagline">{{ copy.hint }}</p>

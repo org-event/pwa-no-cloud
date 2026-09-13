@@ -14,7 +14,9 @@ import {
 import {
   openCallMedia,
   onScreenShareEnded,
+  setTracksEnabled,
   stopStream,
+  tracksEnabled,
 } from '@/lib/call-media.ts';
 import { markRaw, shallowRef } from 'vue';
 import type { NocloudContext } from './context.ts';
@@ -29,12 +31,19 @@ export function createCallsSlice(ctx: NocloudContext) {
   const callPeerId = shallowRef<string | null>(null);
   const callError = shallowRef('');
   const callSession = shallowRef<CallSession>(createIdleCallSession());
+  const micOn = shallowRef(true);
+  const camOn = shallowRef(true);
   let unbindScreenEnded: (() => void) | null = null;
 
   const publish = () => touch();
 
   const setSession = (next: CallSession) => {
     callSession.value = next;
+  };
+
+  const syncTrackFlags = () => {
+    micOn.value = tracksEnabled(localMedia.value, 'audio');
+    camOn.value = tracksEnabled(localMedia.value, 'video');
   };
 
   const clearScreenEnded = () => {
@@ -50,6 +59,8 @@ export function createCallsSlice(ctx: NocloudContext) {
     callKind.value = null;
     callPeerId.value = null;
     callError.value = '';
+    micOn.value = true;
+    camOn.value = true;
     // Detach from PC first so data/ping stay; then stop display/mic tracks.
     state.peer?.clearLocalStream();
     stopStream(stream);
@@ -92,6 +103,7 @@ export function createCallsSlice(ctx: NocloudContext) {
       localMedia.value = markRaw(stream);
       callKind.value = kind;
       callPeerId.value = peerId;
+      syncTrackFlags();
       bindScreenIfNeeded(kind, stream);
       setSession(
         applyCallSessionEvent(callSession.value, {
@@ -158,6 +170,7 @@ export function createCallsSlice(ctx: NocloudContext) {
       localMedia.value = markRaw(stream);
       callKind.value = kind;
       callPeerId.value = leg.peerId;
+      syncTrackFlags();
       bindScreenIfNeeded(kind, stream);
       setSession(
         applyCallSessionEvent(callSession.value, {
@@ -222,6 +235,8 @@ export function createCallsSlice(ctx: NocloudContext) {
     localMedia.value = null;
     remoteMedia.value = null;
     callKind.value = null;
+    micOn.value = true;
+    camOn.value = true;
     state.peer?.clearLocalStream();
     stopStream(stream);
     publish();
@@ -230,6 +245,23 @@ export function createCallsSlice(ctx: NocloudContext) {
   function onHangUp() {
     setSession(applyCallSessionEvent(callSession.value, { type: 'hangup' }));
     clearMediaUi();
+    publish();
+  }
+
+  function onToggleMute() {
+    if (!localMedia.value) return;
+    const next = !micOn.value;
+    if (!setTracksEnabled(localMedia.value, 'audio', next)) return;
+    micOn.value = next;
+    publish();
+  }
+
+  function onToggleCamera() {
+    if (!localMedia.value) return;
+    if (callKind.value !== 'video' && callKind.value !== 'screen') return;
+    const next = !camOn.value;
+    if (!setTracksEnabled(localMedia.value, 'video', next)) return;
+    camOn.value = next;
     publish();
   }
 
@@ -245,6 +277,8 @@ export function createCallsSlice(ctx: NocloudContext) {
     callPeerId,
     callError,
     callSession,
+    micOn,
+    camOn,
     onRemoteTrack,
     onStartCall,
     onIncomingCall,
@@ -252,6 +286,8 @@ export function createCallsSlice(ctx: NocloudContext) {
     onRejectCall,
     onHangUp,
     onPeerError,
+    onToggleMute,
+    onToggleCamera,
     startCallIntent,
   };
 }
