@@ -115,3 +115,16 @@ export {
   parseRelayHint,
   relayUrlsOf,
 } from './bundle.ts';
+
+export type { RelayRedirectDraft, RelayRedirectNote } from './redirect.ts';
+export {
+  REDIRECT_NOTE_DEFAULT_TTL_MS,
+  REDIRECT_NOTE_MAX_RELAYS,
+  REDIRECT_NOTE_PREFIX,
+  REDIRECT_NOTE_VERSION,
+  canonicalRelayRedirect,
+  createRelayRedirectNote,
+  parseAndVerifyRelayRedirectNote,
+  parseRelayRedirectNote,
+  verifyRelayRedirectNote,
+} from './redirect.ts';

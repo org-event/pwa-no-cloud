@@ -1,0 +1,9 @@
+{
+  "op": "redirect",
+  "v": 1,
+  "pk": "pk1.fixture",
+  "relays": ["wss://new.example/ws", "https://spare.example"],
+  "issuedAt": 1720000000000,
+  "expiresAt": 1722592000000,
+  "sig": "00"
+}
