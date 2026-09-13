@@ -57,6 +57,17 @@ export {
 } from './mnemonic.ts';
 export type { MnemonicStrength } from './mnemonic.ts';
 
+export {
+  BACKUP_PREFIX,
+  BACKUP_VERSION,
+  backupFileName,
+  createIdentityBackup,
+  decodeIdentityBackup,
+  encodeIdentityBackup,
+  restoreKeyPairFromBackup,
+} from './backup.ts';
+export type { IdentityBackup } from './backup.ts';
+
 const enc = new TextEncoder();
 
 export const generateKeyPair = async (): Promise<KeyPair> => {

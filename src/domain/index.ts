@@ -43,14 +43,19 @@ export type {
   SignatureBytes,
 } from './identity/index.ts';
 export {
+  BACKUP_PREFIX,
   PUBLIC_KEY_PREFIX,
   VAULT_PREFIX,
   VAULT_STORAGE_KEY,
+  backupFileName,
   bytesToHex,
   clearVaultStorage,
+  createIdentityBackup,
   createMnemonic,
+  decodeIdentityBackup,
   decodePublicKey,
   decodeVaultRecord,
+  encodeIdentityBackup,
   encodePublicKey,
   encodeVaultRecord,
   fingerprintOf,
@@ -65,6 +70,7 @@ export {
   openSecretKey,
   parsePublicKey,
   publicKeyFromSecret,
+  restoreKeyPairFromBackup,
   saveVaultToStorage,
   sealSecretKey,
   signBytes,
@@ -74,6 +80,7 @@ export {
   verifyText,
 } from './identity/index.ts';
 export type {
+  IdentityBackup,
   MnemonicStrength,
   VaultRecord,
   VaultStorage,
