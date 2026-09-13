@@ -8,6 +8,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { createNocloudContext } from './nocloud/context.ts';
 import { createCallsSlice } from './nocloud/calls.ts';
+import { createChatSlice } from './nocloud/chat.ts';
 import { createContactsSlice } from './nocloud/contacts.ts';
 import { createPresenceSlice } from './nocloud/presence.ts';
 import { createServersSlice } from './nocloud/servers.ts';
@@ -59,9 +60,11 @@ export const useNocloudStore = defineStore('nocloud', () => {
   const contacts = createContactsSlice(ctx);
   const presence = createPresenceSlice(ctx);
   const calls = createCallsSlice(ctx);
+  const chat = createChatSlice(ctx);
   ctx.refs.onRemoteTrack = calls.onRemoteTrack;
   ctx.refs.onIncomingCall = calls.onIncomingCall;
   ctx.refs.onCallPeerError = calls.onPeerError;
+  ctx.refs.onIncomingChatWire = chat.onIncomingChatWire;
   const session = createSessionSlice(ctx, servers.shareDraftForInvite);
   const shell = createShellSlice(ctx);
 
@@ -272,6 +275,8 @@ export const useNocloudStore = defineStore('nocloud', () => {
     onSaveGroup: contacts.onSaveGroup,
     onRemoveGroup: contacts.onRemoveGroup,
     seedDemoContacts: contacts.seedDemoContacts,
+    onSendChat: chat.onSendChat,
+    listChatMessages: chat.listMessages,
     onCopy: session.onCopy,
     onPing: session.onPing,
     onPickFile: session.onPickFile,

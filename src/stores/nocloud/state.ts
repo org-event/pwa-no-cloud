@@ -14,9 +14,11 @@ import { appendLog } from '@/lib/opfs.ts';
 import type { PickedFile } from '@/lib/folder-walk.ts';
 import { loadProfile } from '@/lib/profile-store.ts';
 import { loadRelayBundle } from '@/lib/relay-bundle-store.ts';
+import { loadChatStore } from '@/lib/chat-store.ts';
 import { PeerSession } from '@/lib/peer-session.ts';
 import type { StorageLike } from '@/config/storage.ts';
 import type { InviteRole } from '@/stores/types.ts';
+import type { ChatStoreState } from '@/domain/chat/thread.ts';
 import { reactive } from 'vue';
 
 export type NocloudState = {
@@ -61,6 +63,7 @@ export type NocloudState = {
   identityQrUrl: string | null;
   updateChecking: boolean;
   updateNotice: string;
+  chat: ChatStoreState;
 };
 
 export const LOG_CAP = 80_000;
@@ -109,6 +112,7 @@ export function createNocloudState(storage: StorageLike) {
     identityQrUrl: null as string | null,
     updateChecking: false,
     updateNotice: '',
+    chat: loadChatStore(storage),
   }) as NocloudState;
 }
 

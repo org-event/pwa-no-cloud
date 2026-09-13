@@ -41,6 +41,7 @@ import {
   waitIceGathering,
   type PeerLinks,
 } from './webrtc.ts';
+import { isChatControlFrame } from './peer-chat.ts';
 
 export type PeerRole = 'idle' | 'caller' | 'callee';
 
@@ -391,6 +392,15 @@ export class PeerSession extends EventEmitter {
     if (!channel || channel.readyState !== 'open') return;
     const payload = JSON.stringify({ type: 'ping', t: Date.now() });
     channel.send(payload);
+  }
+
+  /** Send a signed H1. chat wire on the control channel. */
+  sendChatWire(wire: string): boolean {
+    const channel = this.links?.control;
+    if (!channel || channel.readyState !== 'open') return false;
+    if (!isChatControlFrame(wire)) return false;
+    channel.send(wire);
+    return true;
   }
 
   startKeepAlive() {
@@ -783,6 +793,10 @@ export class PeerSession extends EventEmitter {
 
   onControl(raw: string) {
     if (this.pipe?.onControlRaw(raw)) return;
+    if (isChatControlFrame(raw)) {
+      this.emit('chat', raw.replace(/[\u200B-\u200D\uFEFF]/g, '').trim());
+      return;
+    }
     try {
       const data = JSON.parse(raw) as { type?: string; t?: number };
       if (data.type === 'profile') {

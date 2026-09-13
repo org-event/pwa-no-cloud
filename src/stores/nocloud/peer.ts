@@ -108,6 +108,9 @@ export function createPeerSlice(
         touch();
       })();
     });
+    next.on('chat', (value) => {
+      void ctx.refs.onIncomingChatWire?.(String(value));
+    });
     next.setStore(state.store);
     state.peer = next;
     return next;

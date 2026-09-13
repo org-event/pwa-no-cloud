@@ -1,15 +1,8 @@
 <script setup lang="ts">
-import { browserStorage } from '@/config/index.ts';
 import { componentsCopy, shellCopy } from '@/content/index.ts';
-import {
-  appendChatMessage,
-  listThreadMessages,
-  type ChatStoredMessage,
-} from '@/domain/chat/index.ts';
-import { encodePublicKey } from '@/domain/identity/index.ts';
+import type { ChatStoredMessage } from '@/domain/chat/index.ts';
 import { contactDisplayName } from '@/domain/profile.ts';
 import type { UnlockedIdentity } from '@/lib/identity-session.ts';
-import { loadChatStore, saveChatStore } from '@/lib/chat-store.ts';
 import { useNocloudStore } from '@/stores/nocloud.ts';
 import { isSelfPeer } from '@/ui/shell-nav.ts';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -30,8 +23,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useNocloudStore();
-const { contacts } = storeToRefs(store);
-const storage = browserStorage();
+const { contacts, peerRevision, state } = storeToRefs(store);
 
 const messages = ref<ChatStoredMessage[]>([]);
 const draft = ref('');
@@ -99,8 +91,14 @@ const online = computed(() =>
 );
 const presenceCopy = componentsCopy.contacts;
 
+const channelOpen = computed(
+  () => isSelf.value || store.isChannelOpen(props.peerId),
+);
+
 const reload = () => {
-  messages.value = listThreadMessages(loadChatStore(storage), props.peerId);
+  void peerRevision.value;
+  void state.value.chat;
+  messages.value = store.listChatMessages(props.peerId);
 };
 
 const scrollToEnd = async () => {
@@ -110,14 +108,20 @@ const scrollToEnd = async () => {
 };
 
 watch(
-  () => props.peerId,
+  () => [props.peerId, peerRevision.value] as const,
   () => {
-    draft.value = '';
     reload();
     void scrollToEnd();
     void nextTick(resizeInput);
   },
   { immediate: true },
+);
+
+watch(
+  () => props.peerId,
+  () => {
+    draft.value = '';
+  },
 );
 
 watch(draft, () => {
@@ -134,20 +138,14 @@ const onSend = () => {
   const text = draft.value.trim();
   if (!text) return;
   if (!isSelf.value) store.onSelectContact(props.peerId);
-  const next = appendChatMessage(loadChatStore(storage), props.peerId, {
-    id: crypto.randomUUID(),
-    fromPk: encodePublicKey(props.identity.keyPair.publicKey),
-    toId: isSelf.value ? props.identity.fingerprint : props.peerId,
-    text,
-    ts: Date.now(),
-    direction: 'out',
-  });
-  saveChatStore(storage, next);
-  draft.value = '';
-  reload();
-  void nextTick(() => {
-    resizeInput();
-    void scrollToEnd();
+  void store.onSendChat(props.peerId, text).then((ok) => {
+    if (!ok) return;
+    draft.value = '';
+    reload();
+    void nextTick(() => {
+      resizeInput();
+      void scrollToEnd();
+    });
   });
 };
 </script>
@@ -249,7 +247,7 @@ const onSend = () => {
         </li>
       </ul>
       <p v-if="!isSelf" class="chat-thread-note tagline">
-        {{ shellCopy.chatLocalOnly }}
+        {{ channelOpen ? shellCopy.chatLocalOnly : shellCopy.chatQueuedLocal }}
       </p>
       <p v-else class="chat-thread-note tagline">
         {{ shellCopy.selfChatHint }}
