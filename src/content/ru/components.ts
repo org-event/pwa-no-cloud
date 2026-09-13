@@ -40,6 +40,8 @@ export const componentsCopy = {
     hangUp: 'Завершить',
     dismiss: 'Понятно',
     accept: 'Принять',
+    acceptAudio: 'Принять аудио',
+    acceptVideo: 'Принять видео',
     reject: 'Отклонить',
     localLabel: 'Вы',
     remoteLabel: 'Собеседник',

@@ -10,7 +10,11 @@ describe('call-media', () => {
     });
     expect(constraintsForKind('video')).toEqual({
       audio: true,
-      video: { facingMode: 'user' },
+      video: {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
     });
     expect(constraintsForKind('screen')).toBeNull();
   });

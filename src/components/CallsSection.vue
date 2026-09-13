@@ -153,7 +153,14 @@ onBeforeUnmount(() => {
               class="button"
               @click="store.onAcceptCall('audio')"
             >
-              {{ copy.accept }}
+              {{ copy.acceptAudio }}
+            </button>
+            <button
+              type="button"
+              class="button"
+              @click="store.onAcceptCall('video')"
+            >
+              {{ copy.acceptVideo }}
             </button>
             <button
               type="button"

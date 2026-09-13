@@ -11,7 +11,11 @@ export const constraintsForKind = (kind: CallKind): MediaConstraints | null => {
   if (kind === 'video') {
     return {
       audio: true,
-      video: { facingMode: 'user' },
+      video: {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
     };
   }
   return null;
