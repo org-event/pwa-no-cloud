@@ -19,6 +19,12 @@ import TransferPanel from './components/TransferPanel.vue';
 import { useNocloudStore } from './stores/nocloud.ts';
 import type { UnlockedIdentity } from '@/lib/identity-session.ts';
 import {
+  cycleTheme,
+  initTheme,
+  saveTheme,
+  type ThemeMode,
+} from './lib/theme.ts';
+import {
   APP_SECTIONS,
   parseSectionHash,
   type AppSection,
@@ -33,6 +39,17 @@ import {
 
 const store = useNocloudStore();
 const { status, state, contacts } = storeToRefs(store);
+
+const themeMode = ref<ThemeMode>(initTheme());
+const themeLabel = computed(() => {
+  if (themeMode.value === 'dark') return componentsCopy.app.themeDark;
+  if (themeMode.value === 'system') return componentsCopy.app.themeSystem;
+  return componentsCopy.app.themeLight;
+});
+const onToggleTheme = () => {
+  themeMode.value = cycleTheme(themeMode.value);
+  saveTheme(themeMode.value);
+};
 
 const identity = ref<UnlockedIdentity | null>(null);
 const onIdentityUnlocked = (value: UnlockedIdentity) => {
@@ -386,6 +403,78 @@ onUnmounted(() => {
         </p>
 
         <div class="topbar-end">
+          <button
+            type="button"
+            class="icon-button"
+            :title="themeLabel"
+            :aria-label="themeLabel"
+            @click="onToggleTheme"
+          >
+            <svg
+              v-if="themeMode === 'dark'"
+              viewBox="0 0 24 24"
+              class="icon"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5Z"
+              />
+            </svg>
+            <svg
+              v-else-if="themeMode === 'system'"
+              viewBox="0 0 24 24"
+              class="icon"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <rect
+                x="3"
+                y="4"
+                width="18"
+                height="14"
+                rx="2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+              <path
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                d="M8 20h8"
+              />
+            </svg>
+            <svg
+              v-else
+              viewBox="0 0 24 24"
+              class="icon"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="4"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+              <path
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+              />
+            </svg>
+          </button>
           <SessionTools
             v-if="!toolsInDrawer"
             :version-title="versionTitle"

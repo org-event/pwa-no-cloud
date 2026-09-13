@@ -1,39 +1,80 @@
 :root {
-  color-scheme: dark;
-  --color-primary: #2563eb;
-  --color-primary-hover: #3b82f6;
+  /* Telegram Mini Apps UI Kit (Community) — light default */
+  color-scheme: light;
+  --color-primary: #007aff;
+  --color-primary-hover: #3395ff;
   --color-on-primary: #ffffff;
-  --color-accent: #d97706;
-  --color-accent-hover: #f59e0b;
-  --color-on-accent: #000000;
-  --color-background: #0f172a;
-  --color-foreground: #f8fafc;
-  --color-card: #111827;
-  --color-muted: #1e293b;
-  --color-muted-foreground: #cbd5e1;
-  --color-border: #334155;
-  --color-ring: #2563eb;
-  --color-destructive: #fca5a5;
+  --color-accent: #007aff;
+  --color-accent-hover: #3395ff;
+  --color-on-accent: #ffffff;
+  --color-background: #efeff4;
+  --color-foreground: #000000;
+  --color-card: #ffffff;
+  --color-muted: #f7f7f7;
+  --color-muted-foreground: #707579;
+  --color-border: #d9d9d9;
+  --color-ring: #007aff;
+  --color-destructive: #e53935;
   --color-on-destructive: #ffffff;
-  --color-warn: #ca8a04;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --font-sans: Inter, system-ui, sans-serif;
+  --color-warn: #c27c0e;
+  --space-xs: 0.25rem; /* 4 */
+  --space-sm: 0.5rem; /* 8 */
+  --space-md: 0.75rem; /* 12 — kit padding mode */
+  --space-lg: 1rem; /* 16 */
+  --space-xl: 1.5rem; /* 24 */
+  --radius-control: 0.625rem; /* 10 — Button (iOS) */
+  --radius-field: 0.75rem; /* 12 */
+  --control-height: 50px;
+  --field-height: 44px;
+  --avatar-gap: 0.75rem; /* 12 — name ↔ avatar in cells */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+    'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-size-body: 1.0625rem; /* 17 */
+  --font-size-secondary: 0.9375rem; /* 15 */
+  --line-height-body: 1.375; /* ~22/17 */
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: light;
-    --color-background: #f8fafc;
-    --color-foreground: #0f172a;
-    --color-card: #ffffff;
-    --color-muted: #e2e8f0;
-    --color-muted-foreground: #334155;
-    --color-border: #cbd5e1;
-    --color-warn: #a16207;
-    --color-destructive: #b91c1c;
+@media (prefers-color-scheme: dark) {
+  html[data-theme='system'] {
+    color-scheme: dark;
+    --color-primary: #007aff;
+    --color-primary-hover: #3395ff;
+    --color-on-primary: #ffffff;
+    --color-accent: #007aff;
+    --color-accent-hover: #3395ff;
+    --color-on-accent: #ffffff;
+    --color-background: #000000;
+    --color-foreground: #ffffff;
+    --color-card: #1c1c1e;
+    --color-muted: #2c2c2e;
+    --color-muted-foreground: #8e8e93;
+    --color-border: #38383a;
+    --color-ring: #0a84ff;
+    --color-destructive: #ff453a;
+    --color-on-destructive: #ffffff;
+    --color-warn: #ffd60a;
   }
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --color-primary: #007aff;
+  --color-primary-hover: #3395ff;
+  --color-on-primary: #ffffff;
+  --color-accent: #007aff;
+  --color-accent-hover: #3395ff;
+  --color-on-accent: #ffffff;
+  --color-background: #000000;
+  --color-foreground: #ffffff;
+  --color-card: #1c1c1e;
+  --color-muted: #2c2c2e;
+  --color-muted-foreground: #8e8e93;
+  --color-border: #38383a;
+  --color-ring: #0a84ff;
+  --color-destructive: #ff453a;
+  --color-on-destructive: #ffffff;
+  --color-warn: #ffd60a;
 }
 
 *,
@@ -50,8 +91,11 @@ body {
 
 body {
   font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
   color: var(--color-foreground);
   background: var(--color-background);
+  -webkit-font-smoothing: antialiased;
 }
 
 #app {
@@ -418,14 +462,14 @@ body {
   justify-content: center;
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-control);
   background: var(--color-muted);
   color: var(--color-foreground);
   cursor: pointer;
 }
 
 .icon-button:hover {
-  background: var(--color-border);
+  background: color-mix(in srgb, var(--color-muted) 70%, var(--color-border));
 }
 
 .icon {
@@ -726,25 +770,27 @@ h1 {
 }
 
 .outlined-field {
-  margin: 0 0 var(--space-md);
-  padding: 0 0.35rem 0.35rem;
+  margin: 0 0 var(--space-lg);
+  padding: 0.25rem 0.75rem 0.5rem;
   min-inline-size: 0;
   border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
-  background: transparent;
+  border-radius: var(--radius-field);
+  background: var(--color-card);
 }
 
 .outlined-field legend {
-  margin-left: 0.4rem;
+  margin-left: 0.25rem;
   padding: 0 0.35rem;
   color: var(--color-muted-foreground);
   background: var(--color-card);
-  font-size: 0.875rem;
+  font-size: var(--font-size-secondary);
   font-weight: 500;
+  line-height: 1.25;
 }
 
 .outlined-field:focus-within {
   border-color: var(--color-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 22%, transparent);
 }
 
 .outlined-field:focus-within legend {
@@ -756,13 +802,15 @@ h1 {
 .outlined-field-row input {
   box-sizing: border-box;
   width: 100%;
-  min-height: 44px;
-  padding: 0.35rem 0.5rem;
+  min-height: var(--field-height);
+  padding: 0.5rem 0.25rem;
   border: 0;
   border-radius: 0.35rem;
   background: transparent;
   color: var(--color-foreground);
   font: inherit;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .outlined-field > textarea {
@@ -776,9 +824,16 @@ h1 {
   outline: none;
 }
 
+.outlined-field > input::placeholder,
+.outlined-field > textarea::placeholder,
+.outlined-field-row input::placeholder {
+  color: var(--color-muted-foreground);
+  opacity: 1;
+}
+
 .outlined-field-row {
   display: flex;
-  gap: 0.35rem;
+  gap: var(--space-sm);
   align-items: stretch;
 }
 
@@ -792,12 +847,12 @@ h1 {
 .outlined-field-row .icon-button {
   flex-shrink: 0;
   align-self: stretch;
-  min-height: 40px;
+  min-height: var(--field-height);
   padding-block: 0.4rem;
 }
 
 .outlined-field-row .icon-button {
-  width: 40px;
+  width: var(--field-height);
   height: auto;
   padding: 0;
 }
@@ -810,14 +865,16 @@ a.button {
 }
 
 .button {
-  min-height: 44px;
-  padding: 0.7rem 1rem;
+  min-height: var(--control-height);
+  padding: 0.75rem 1.25rem;
   border: 0;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-on-primary);
   font: inherit;
+  font-size: var(--font-size-body);
   font-weight: 600;
+  line-height: 1.25;
   cursor: pointer;
   transition:
     background-color 150ms ease,
@@ -828,6 +885,11 @@ a.button {
   background: var(--color-primary-hover);
 }
 
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .button-secondary {
   background: var(--color-muted);
   color: var(--color-foreground);
@@ -835,7 +897,7 @@ a.button {
 }
 
 .button-secondary:hover {
-  background: var(--color-border);
+  background: color-mix(in srgb, var(--color-muted) 70%, var(--color-border));
 }
 
 .button-accent {
@@ -949,9 +1011,9 @@ a.button {
 
 .contact-row {
   display: flex;
-  min-height: 44px;
+  min-height: 52px;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--avatar-gap);
 }
 
 .contact-row-main {
@@ -962,6 +1024,10 @@ a.button {
 .contact-row-actions {
   flex: 0 0 auto;
   margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: flex-end;
 }
 
 .contact-name {

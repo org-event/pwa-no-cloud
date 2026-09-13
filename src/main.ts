@@ -3,7 +3,10 @@ import { vaporInteropPlugin } from '@vue/runtime-vapor';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import { useNocloudStore } from './stores/nocloud.ts';
+import { initTheme } from './lib/theme.ts';
 import './style.css';
+
+initTheme();
 
 const app = createApp(App);
 const pinia = createPinia();
