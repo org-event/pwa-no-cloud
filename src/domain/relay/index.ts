@@ -103,9 +103,15 @@ export type {
   AbuseCheckInput,
   AbuseDecision,
   AbuseGuard,
+  PowOptions,
   RateLimitOptions,
 } from './abuse.ts';
-export { createNoopAbuseGuard, createRateLimitGuard } from './abuse.ts';
+export {
+  createNoopAbuseGuard,
+  createPowAbuseGuard,
+  createRateLimitGuard,
+  solvePowStub,
+} from './abuse.ts';
 
 export type { RelayBundleMessage, RelayHint, RelayHintCaps } from './bundle.ts';
 export {

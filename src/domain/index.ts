@@ -140,6 +140,7 @@ export {
   canonicalRelayChallenge,
   canonicalRelayRedirect,
   createNoopAbuseGuard,
+  createPowAbuseGuard,
   createRateLimitGuard,
   createRelayRedirectNote,
   isRelayChallenge,
@@ -151,12 +152,14 @@ export {
   parseRelayHint,
   parseRelayRedirectNote,
   relayUrlsOf,
+  solvePowStub,
   verifyRelayRedirectNote,
 } from './relay/index.ts';
 export type {
   AbuseCheckInput,
   AbuseDecision,
   AbuseGuard,
+  PowOptions,
   RateLimitOptions,
 } from './relay/index.ts';
 export type {

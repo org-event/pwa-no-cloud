@@ -115,6 +115,15 @@ PC, а после смены реле можно снова найтись бе�
 
 Готово, когда unit smoke `server/redirect-store.test.ts` зелёный.
 
+## Чеклист M3 — PoW slot в abuse guard (U4.1)
+
+1. По умолчанию `createNoopAbuseGuard()` — всегда `ok`.
+2. `createPowAbuseGuard({ difficulty: 2 })` требует `powSeed` + nonce с
+   `sha256(seed:nonce)` на 2 ведущих нуля в hex.
+3. Unit: `solvePowStub` находит nonce; плохой nonce → `pow-failed`.
+
+Готово, когда `src/domain/relay/abuse.test.ts` зелёный.
+
 ## Заметка M2 — пучок реле и failover (T2.4)
 
 1. В пучке ≥2 URL (руками в «Серверы» или после `GET /relays` при presence).
