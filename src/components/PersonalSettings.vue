@@ -9,6 +9,7 @@ defineProps<{
 
 const emit = defineEmits<{
   openTransfer: [];
+  lock: [];
 }>();
 </script>
 
@@ -18,9 +19,17 @@ const emit = defineEmits<{
     <p class="identity-chip">
       <code>{{ identity.displayFingerprint }}</code>
     </p>
+    <p class="tagline">{{ shellCopy.personalLockHint }}</p>
     <template #actions>
       <button type="button" class="button" @click="emit('openTransfer')">
         {{ shellCopy.personalTransfer }}
+      </button>
+      <button
+        type="button"
+        class="button button-secondary"
+        @click="emit('lock')"
+      >
+        {{ shellCopy.personalLock }}
       </button>
     </template>
   </Card>

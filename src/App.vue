@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { APP_VERSION } from './config/index.ts';
+import { APP_VERSION, browserStorage } from './config/index.ts';
 import { componentsCopy, shellCopy } from '@/content/index.ts';
 import ContactsSection from './components/ContactsSection.vue';
 import HelpSection from './components/HelpSection.vue';
@@ -22,6 +22,7 @@ import AppShell from './layouts/AppShell.vue';
 import ShellRail from './layouts/ShellRail.vue';
 import { useNocloudStore } from './stores/nocloud.ts';
 import type { UnlockedIdentity } from '@/lib/identity-session.ts';
+import { PENDING_FIRST_SCREEN_PASTE_KEY } from '@/lib/first-screen-paste.ts';
 import {
   cycleTheme,
   initTheme,
@@ -60,6 +61,20 @@ const identity = ref<UnlockedIdentity | null>(null);
 const onIdentityUnlocked = (value: UnlockedIdentity) => {
   identity.value = value;
   store.onBindIdentity(value.fingerprint, value.keyPair);
+  const storage = browserStorage();
+  const pending = storage.getItem(PENDING_FIRST_SCREEN_PASTE_KEY);
+  if (pending) {
+    storage.removeItem?.(PENDING_FIRST_SCREEN_PASTE_KEY);
+    void store.onAddContact(pending);
+  }
+};
+
+const onLockIdentity = () => {
+  identity.value = null;
+};
+
+const onFirstScreenPack = (text: string) => {
+  store.onApplySharePack(text);
 };
 
 const page = ref<HTMLElement | null>(null);
@@ -335,7 +350,10 @@ onUnmounted(() => {
     @skip-to-content="skipToContent"
   >
     <section v-if="!identity" class="page page-solo" data-section="identity">
-      <IdentityOnboarding @unlocked="onIdentityUnlocked" />
+      <IdentityOnboarding
+        @unlocked="onIdentityUnlocked"
+        @apply-pack="onFirstScreenPack"
+      />
     </section>
 
     <div v-else class="shell-body">
@@ -496,6 +514,7 @@ onUnmounted(() => {
               <PersonalSettings
                 :identity="identity"
                 @open-transfer="openTransfer"
+                @lock="onLockIdentity"
               />
             </section>
           </template>

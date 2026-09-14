@@ -63,4 +63,7 @@ export const shellCopy = {
   personalHint: 'Идентичность, тема (в шапке) и передача файлов.',
   personalId: 'Ваш ID',
   personalTransfer: 'Передача файлов',
+  personalLock: 'Выйти из учётки',
+  personalLockHint:
+    'Ключ остаётся в vault на устройстве; нужна мастер-фраза или биометрия.',
 } as const;
