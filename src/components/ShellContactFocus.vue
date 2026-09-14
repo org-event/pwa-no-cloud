@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { componentsCopy, shellCopy } from '@/content/index.ts';
-import { contactDisplayName } from '@/domain/profile.ts';
+import { contactDisplayName, contactTrustOf } from '@/domain/profile.ts';
 import { useNocloudStore } from '@/stores/nocloud.ts';
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
@@ -35,11 +35,23 @@ const name = computed(() =>
 
 const online = computed(() => store.isPresenceOnline(props.peerId));
 const inChannel = computed(() => store.isChannelOpen(props.peerId));
+const trust = computed(() =>
+  contact.value ? contactTrustOf(contact.value) : 'unverified',
+);
 
 const detail = computed(() => {
-  if (inChannel.value) return copy.inCall;
-  if (online.value) return copy.online;
-  return copy.offline;
+  const mark =
+    trust.value === 'met'
+      ? copy.trustMet
+      : trust.value === 'introduced'
+        ? copy.trustIntroduced
+        : '';
+  const presence = inChannel.value
+    ? copy.inCall
+    : online.value
+      ? copy.online
+      : copy.offline;
+  return mark ? `${mark} · ${presence}` : presence;
 });
 
 const stagedCount = computed(
@@ -62,6 +74,13 @@ const canIntroduce = computed(() => Boolean(contact.value?.publicKey));
 
 const onIntroduce = () => {
   void store.onIntroduceContact(props.peerId);
+};
+
+const onToggleTrust = () => {
+  store.onSetContactTrust(
+    props.peerId,
+    trust.value === 'met' ? 'unverified' : 'met',
+  );
 };
 
 const ensureSelected = () => {
@@ -119,6 +138,14 @@ const onSend = () => {
             @click="onIntroduce"
           >
             {{ shellCopy.introduce }}
+          </button>
+          <button
+            v-if="contact"
+            type="button"
+            class="button button-secondary"
+            @click="onToggleTrust"
+          >
+            {{ trust === 'met' ? copy.trustClear : copy.trustMet }}
           </button>
           <button
             type="button"

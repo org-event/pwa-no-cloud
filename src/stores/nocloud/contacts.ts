@@ -23,8 +23,11 @@ import {
   removeContact,
   sanitizeNick,
   setContactAlias,
+  setContactTrust,
   contactDisplayName,
+  contactTrustOf,
   upsertContact,
+  type ContactTrust,
   type ProfileCard,
 } from '@/domain/profile.ts';
 import { fileToAvatarDataUrl } from '@/lib/avatar.ts';
@@ -310,7 +313,12 @@ export function createContactsSlice(ctx: NocloudContext) {
         touch();
         return false;
       }
+      const id = introduced.value.contact.id;
+      const previous = findContact(state.book, id);
       state.book = upsertContact(state.book, introduced.value.contact);
+      if (!previous || contactTrustOf(previous) === 'unverified') {
+        state.book = setContactTrust(state.book, id, 'introduced');
+      }
       void persistBook();
       state.contactsNotice = contactsCopy.introduced(
         introduced.value.contact.nick,
@@ -361,6 +369,14 @@ export function createContactsSlice(ctx: NocloudContext) {
     state.book = setContactAlias(state.book, id, alias);
     void persistBook();
     state.contactsNotice = contactsCopy.aliasSaved;
+    touch();
+  }
+
+  function onSetContactTrust(id: string, trust: ContactTrust) {
+    state.book = setContactTrust(state.book, id, trust);
+    void persistBook();
+    state.contactsNotice =
+      trust === 'met' ? contactsCopy.trustMetSaved : contactsCopy.trustCleared;
     touch();
   }
 
@@ -451,6 +467,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     onAddContact,
     onIntroduceContact,
     onRenameAlias,
+    onSetContactTrust,
     onRemoveContact,
     onSaveGroup,
     onRemoveGroup,

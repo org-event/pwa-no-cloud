@@ -22,6 +22,8 @@ export const contactsCopy = {
   introduceFailed: 'Не удалось создать представление.',
   ownCard: 'Это ваша карточка.',
   aliasSaved: 'Локальное имя сохранено.',
+  trustMetSaved: 'Отметили: видели лично.',
+  trustCleared: 'Метка доверия снята.',
   removed: 'Удалено.',
   groupNeedMembers: 'Нужны название и хотя бы один человек.',
   groupSaved: (label: string) => `Группа «${label}». Канал всё равно 1:1.`,

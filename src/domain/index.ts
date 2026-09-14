@@ -159,17 +159,24 @@ export type {
   AbuseGuard,
   RateLimitOptions,
 } from './relay/index.ts';
-export type { AddressBook, Contact, ProfileCard } from './contacts/index.ts';
+export type {
+  AddressBook,
+  Contact,
+  ContactTrust,
+  ProfileCard,
+} from './contacts/index.ts';
 export {
   CONTACT_CARD_PREFIX,
   LEGACY_CONTACT_CARD_PREFIX,
   contactDisplayName,
+  contactTrustOf,
   encodeContactCard,
   meetRoomId,
   parseContactCard,
   parseProfileCard,
   sanitizeNick,
   setContactAlias,
+  setContactTrust,
   toNetworkProfile,
   upsertContact,
 } from './contacts/index.ts';

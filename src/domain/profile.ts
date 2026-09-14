@@ -125,6 +125,9 @@ export const parseProfileCard = (raw: unknown): ProfileCard | null => {
   return { id, nick, avatar };
 };
 
+/** Local-only trust; never on the wire (FR-PR-07). */
+export type ContactTrust = 'unverified' | 'introduced' | 'met';
+
 export type Contact = ProfileCard & {
   addedAt: number;
   updatedAt: number;
@@ -132,6 +135,8 @@ export type Contact = ProfileCard & {
   publicKey?: string;
   /** Local-only label; never sent on the wire (FR-PR-02). */
   localAlias?: string;
+  /** Local-only trust mark (FR-PR-07). */
+  trust?: ContactTrust;
 };
 
 export type ContactGroup = {
@@ -183,11 +188,42 @@ export const upsertContact = (
     updatedAt: now,
     ...(publicKey ? { publicKey } : {}),
     ...(previous?.localAlias ? { localAlias: previous.localAlias } : {}),
+    ...(previous?.trust ? { trust: previous.trust } : {}),
   });
   next.sort((left, right) =>
     contactDisplayName(left).localeCompare(contactDisplayName(right), 'ru'),
   );
   return { ...book, contacts: next };
+};
+
+export const parseContactTrust = (value: unknown): ContactTrust => {
+  if (value === 'met' || value === 'introduced' || value === 'unverified') {
+    return value;
+  }
+  return 'unverified';
+};
+
+export const contactTrustOf = (contact: Contact): ContactTrust =>
+  contact.trust ?? 'unverified';
+
+export const setContactTrust = (
+  book: AddressBook,
+  id: string,
+  trust: ContactTrust,
+): AddressBook => {
+  const normalized = id.toLowerCase();
+  return {
+    ...book,
+    contacts: book.contacts.map((item) => {
+      if (item.id !== normalized) return item;
+      if (trust === 'unverified') {
+        const { trust: _removed, ...rest } = item;
+        void _removed;
+        return rest;
+      }
+      return { ...item, trust };
+    }),
+  };
 };
 
 export const setContactAlias = (

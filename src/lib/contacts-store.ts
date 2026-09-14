@@ -1,4 +1,5 @@
 import {
+  parseContactTrust,
   parseProfileCard,
   type AddressBook,
   type ContactGroup,
@@ -28,6 +29,7 @@ const parseBook = (raw: string): AddressBook => {
         updatedAt?: unknown;
         publicKey?: unknown;
         localAlias?: unknown;
+        trust?: unknown;
       };
       const card = parseProfileCard({
         id: row.id,
@@ -43,12 +45,14 @@ const parseBook = (raw: string): AddressBook => {
         typeof row.localAlias === 'string'
           ? row.localAlias.trim() || undefined
           : undefined;
+      const trust = parseContactTrust(row.trust);
       contacts.push({
         ...card,
         addedAt: typeof row.addedAt === 'number' ? row.addedAt : 0,
         updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
         ...(publicKey ? { publicKey } : {}),
         ...(localAlias ? { localAlias } : {}),
+        ...(trust !== 'unverified' ? { trust } : {}),
       });
     }
     const groups: ContactGroup[] = [];

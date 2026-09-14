@@ -10,6 +10,8 @@ import {
   parseProfileCard,
   sanitizeNick,
   setContactAlias,
+  setContactTrust,
+  contactTrustOf,
   toNetworkProfile,
   upsertContact,
   type AddressBook,
@@ -106,5 +108,20 @@ describe('profile card', () => {
     expect(JSON.stringify(wire)).not.toContain('localAlias');
     expect(JSON.stringify(wire)).not.toContain('Брат');
     expect(JSON.stringify(wire)).not.toContain('publicKey');
+  });
+
+  it('keeps trust across upsert and omits it from network profile', () => {
+    let book: AddressBook = { contacts: [], groups: [] };
+    book = upsertContact(book, { id: FP_A, nick: 'Вася', avatar: '' }, 1);
+    expect(contactTrustOf(book.contacts[0]!)).toBe('unverified');
+    book = setContactTrust(book, FP_A, 'met');
+    expect(book.contacts[0]?.trust).toBe('met');
+    book = upsertContact(book, { id: FP_A, nick: 'Василий', avatar: '' }, 2);
+    expect(book.contacts[0]?.trust).toBe('met');
+    const wire = toNetworkProfile(book.contacts[0]!);
+    expect(JSON.stringify(wire)).not.toContain('trust');
+    expect(JSON.stringify(wire)).not.toContain('met');
+    book = setContactTrust(book, FP_A, 'unverified');
+    expect(book.contacts[0]?.trust).toBeUndefined();
   });
 });

@@ -3,17 +3,25 @@
  * Profile card primitives still live in `../profile.ts` until S2.x migrates them.
  */
 
-export type { AddressBook, Contact, ProfileCard } from '../profile.ts';
+export type {
+  AddressBook,
+  Contact,
+  ContactTrust,
+  ProfileCard,
+} from '../profile.ts';
 export {
   CONTACT_CARD_PREFIX,
   LEGACY_CONTACT_CARD_PREFIX,
   contactDisplayName,
+  contactTrustOf,
   encodeContactCard,
   meetRoomId,
   parseContactCard,
+  parseContactTrust,
   parseProfileCard,
   sanitizeNick,
   setContactAlias,
+  setContactTrust,
   toNetworkProfile,
   upsertContact,
 } from '../profile.ts';

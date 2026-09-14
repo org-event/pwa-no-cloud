@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { componentsCopy, shellCopy } from '@/content/index.ts';
-import { contactDisplayName } from '@/domain/profile.ts';
+import { contactDisplayName, contactTrustOf } from '@/domain/profile.ts';
 import { useNocloudStore } from '@/stores/nocloud.ts';
 import { computed, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
@@ -32,10 +32,22 @@ const rows = computed(() => {
   return list.map((contact) => {
     const online = store.isPresenceOnline(contact.id);
     const inChannel = store.isChannelOpen(contact.id);
+    const trust = contactTrustOf(contact);
+    const mark =
+      trust === 'met'
+        ? copy.trustMet
+        : trust === 'introduced'
+          ? copy.trustIntroduced
+          : '';
+    const presence = inChannel
+      ? copy.inCall
+      : online
+        ? copy.online
+        : copy.offline;
     return {
       id: contact.id,
       title: contactDisplayName(contact),
-      detail: inChannel ? copy.inCall : online ? copy.online : copy.offline,
+      detail: mark ? `${mark} · ${presence}` : presence,
       online,
       avatar: contact.avatar,
     };

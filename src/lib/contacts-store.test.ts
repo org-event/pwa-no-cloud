@@ -15,6 +15,7 @@ describe('contacts store', () => {
           avatar: '',
           publicKey: 'pk1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
           localAlias: 'Брат',
+          trust: 'met',
           addedAt: 1,
           updatedAt: 1,
         },
@@ -33,6 +34,7 @@ describe('contacts store', () => {
     expect(loaded.contacts).toHaveLength(1);
     expect(loaded.contacts[0]?.nick).toBe('Вася');
     expect(loaded.contacts[0]?.localAlias).toBe('Брат');
+    expect(loaded.contacts[0]?.trust).toBe('met');
     expect(loaded.contacts[0]?.publicKey?.startsWith('pk1.')).toBe(true);
     expect(loaded.groups[0]?.name).toBe('дом');
   });

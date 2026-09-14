@@ -78,7 +78,7 @@ sync → identity + local store
 | FR-PR-04 | Пересылка чужого контакта (pubkey + hints); профиль догружается и verify | M2 | proposed |
 | FR-PR-05 | Новый ключ с тем же ником = другой человек (нет автослияния) | M1 | proposed |
 | FR-PR-06 | Группы контактов | L | proposed |
-| FR-PR-07 | Метка доверия «видели лично» в UI | ? | proposed |
+| FR-PR-07 | Метка доверия «видели лично» в UI | M3 | proposed |
 
 ### 1.3 Relay & discovery
 

@@ -271,6 +271,7 @@ export const useNocloudStore = defineStore('nocloud', () => {
     onToggleMute: calls.onToggleMute,
     onToggleCamera: calls.onToggleCamera,
     onRenameAlias: contacts.onRenameAlias,
+    onSetContactTrust: contacts.onSetContactTrust,
     onRemoveContact: contacts.onRemoveContact,
     onSaveGroup: contacts.onSaveGroup,
     onRemoveGroup: contacts.onRemoveGroup,

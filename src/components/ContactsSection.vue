@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { componentsCopy } from '@/content/index.ts';
-import { contactDisplayName } from '@/domain/profile.ts';
+import { contactDisplayName, contactTrustOf } from '@/domain/profile.ts';
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useNocloudStore } from '@/stores/nocloud.ts';
@@ -82,11 +82,30 @@ const toggleGroupMember = (id: string, checked: boolean) => {
 
 const isOnline = (id: string) => store.isPresenceOnline(id);
 
-const contactDetail = (id: string, networkNick: string, hasAlias: boolean) => {
-  if (store.isChannelOpen(id)) return copy.inCall;
-  if (store.isPresenceOnline(id)) return copy.online;
-  if (hasAlias) return copy.networkNick(networkNick);
-  return copy.offline;
+const trustLabel = (trust: ReturnType<typeof contactTrustOf>) => {
+  if (trust === 'met') return copy.trustMet;
+  if (trust === 'introduced') return copy.trustIntroduced;
+  return '';
+};
+
+const contactDetail = (
+  id: string,
+  networkNick: string,
+  hasAlias: boolean,
+  trust: ReturnType<typeof contactTrustOf> = 'unverified',
+) => {
+  const mark = trustLabel(trust);
+  const base = (() => {
+    if (store.isChannelOpen(id)) return copy.inCall;
+    if (store.isPresenceOnline(id)) return copy.online;
+    if (hasAlias) return copy.networkNick(networkNick);
+    return copy.offline;
+  })();
+  return mark ? `${mark} · ${base}` : base;
+};
+
+const toggleTrustMet = (id: string, current: ReturnType<typeof contactTrustOf>) => {
+  store.onSetContactTrust(id, current === 'met' ? 'unverified' : 'met');
 };
 
 const startAliasEdit = (id: string, current: string) => {
@@ -125,6 +144,7 @@ const saveAlias = () => {
           focusContact.id,
           focusContact.nick,
           Boolean(focusContact.localAlias),
+          contactTrustOf(focusContact),
         )
       "
     >
@@ -135,6 +155,7 @@ const saveAlias = () => {
             focusContact.id,
             focusContact.nick,
             Boolean(focusContact.localAlias),
+            contactTrustOf(focusContact),
           )
         "
         :online="isOnline(focusContact.id)"
@@ -160,6 +181,19 @@ const saveAlias = () => {
             @click="store.onIntroduceContact(focusContact.id)"
           >
             {{ copy.introduce }}
+          </button>
+          <button
+            type="button"
+            class="button button-secondary"
+            @click="
+              toggleTrustMet(focusContact.id, contactTrustOf(focusContact))
+            "
+          >
+            {{
+              contactTrustOf(focusContact) === 'met'
+                ? copy.trustClear
+                : copy.trustMet
+            }}
           </button>
           <button
             type="button"
@@ -311,7 +345,12 @@ const saveAlias = () => {
           :key="contact.id"
           :name="contactDisplayName(contact)"
           :detail="
-            contactDetail(contact.id, contact.nick, Boolean(contact.localAlias))
+            contactDetail(
+              contact.id,
+              contact.nick,
+              Boolean(contact.localAlias),
+              contactTrustOf(contact),
+            )
           "
           :online="isOnline(contact.id)"
           :online-label="copy.online"
@@ -336,6 +375,17 @@ const saveAlias = () => {
               @click="store.onIntroduceContact(contact.id)"
             >
               {{ copy.introduce }}
+            </button>
+            <button
+              type="button"
+              class="button button-secondary"
+              @click="toggleTrustMet(contact.id, contactTrustOf(contact))"
+            >
+              {{
+                contactTrustOf(contact) === 'met'
+                  ? copy.trustClear
+                  : copy.trustMet
+              }}
             </button>
             <button
               type="button"
