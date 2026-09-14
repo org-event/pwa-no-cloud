@@ -104,7 +104,10 @@ const contactDetail = (
   return mark ? `${mark} · ${base}` : base;
 };
 
-const toggleTrustMet = (id: string, current: ReturnType<typeof contactTrustOf>) => {
+const toggleTrustMet = (
+  id: string,
+  current: ReturnType<typeof contactTrustOf>,
+) => {
   store.onSetContactTrust(id, current === 'met' ? 'unverified' : 'met');
 };
 

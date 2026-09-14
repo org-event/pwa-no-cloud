@@ -31,9 +31,9 @@ describe('abuse guard', () => {
     const seed = 'relay-challenge-seed';
     const nonce = solvePowStub(seed, 2);
     expect(nonce).not.toBeNull();
-    expect(
-      guard.check({ key: 'a', powSeed: seed, powNonce: nonce! }),
-    ).toEqual({ ok: true });
+    expect(guard.check({ key: 'a', powSeed: seed, powNonce: nonce! })).toEqual({
+      ok: true,
+    });
     const bad = guard.check({ key: 'a', powSeed: seed, powNonce: 'nope' });
     expect(bad.ok).toBe(false);
     if (!bad.ok) expect(bad.code).toBe('pow-failed');

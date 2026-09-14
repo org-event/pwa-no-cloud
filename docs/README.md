@@ -6,21 +6,22 @@ PWA для обмена файлами и папками между устрой
 
 ## Как читать
 
-1. [usage.md](./usage.md) — установка, режимы A/B/C, чеклисты M1 (QR и реле).
+1. [usage.md](./usage.md) — установка, режимы A/B/C, чеклисты M1–M3.
 2. [turn.md](./turn.md) — свой coturn для режима через интернет. Чужой TURN не подключаем.
 3. [plan.md](./plan.md) — план фундамента (WebRTC, файлы, PWA) по шагам.
 4. [vision.md](./vision.md) — к чему идём шире: суверенная P2P-звонилка.
 5. [requirements.md](./requirements.md) — функциональные и нефункциональные требования + решения к закрытию.
 6. [architecture.md](./architecture.md) — системный дизайн со схемами (для новых разработчиков).
-7. [glossary.md](./glossary.md) — термины по-русски (P2P, STUN, TURN, реле, PoW…).
-8. [adr/](./adr/) — архитектурные решения (почему так).
-9. [roadmap-wide.md](./roadmap-wide.md) — пошаговый план горизонта + вопросы на закрытие пунктов.
-10. [backlog-m1.md](./backlog-m1.md) — нарезка M1 на стори (закрыт).
-10b. [backlog-m2.md](./backlog-m2.md) — нарезка M2 на стори (закрыт).
-10c. [backlog-m3.md](./backlog-m3.md) — нарезка M3 на стори (1–5 SP).
-11. [sources/ideas-essence.md](./sources/ideas-essence.md) — сжатая суть идей горизонта.
-12. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI.
-13. [features-realtime.md](./features-realtime.md) — presence, стук, звонки (задел).
+7. [threat-model.md](./threat-model.md) — противники, активы, что не обещаем (NFR-SE-02).
+8. [glossary.md](./glossary.md) — термины по-русски (P2P, STUN, TURN, реле, PoW…).
+9. [adr/](./adr/) — архитектурные решения (почему так).
+10. [roadmap-wide.md](./roadmap-wide.md) — пошаговый план горизонта + вопросы на закрытие пунктов.
+11. [backlog-m1.md](./backlog-m1.md) — нарезка M1 на стори (закрыт).
+11b. [backlog-m2.md](./backlog-m2.md) — нарезка M2 на стори (закрыт).
+11c. [backlog-m3.md](./backlog-m3.md) — нарезка M3 на стори (must-срез).
+12. [sources/ideas-essence.md](./sources/ideas-essence.md) — сжатая суть идей горизонта.
+13. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI.
+14. [features-realtime.md](./features-realtime.md) — presence, стук, звонки (задел).
 
 ## Источники подхода
 

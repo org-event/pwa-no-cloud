@@ -78,7 +78,7 @@ sync → identity + local store
 | FR-PR-04 | Пересылка чужого контакта (pubkey + hints); профиль догружается и verify | M2 | proposed |
 | FR-PR-05 | Новый ключ с тем же ником = другой человек (нет автослияния) | M1 | proposed |
 | FR-PR-06 | Группы контактов | L | proposed |
-| FR-PR-07 | Метка доверия «видели лично» в UI | M3 | proposed |
+| FR-PR-07 | Метка доверия «видели лично» в UI | M3 | accepted |
 
 ### 1.3 Relay & discovery
 
@@ -172,9 +172,9 @@ sync → identity + local store
 | id | требование | pri | status |
 |---|---|---|---|
 | NFR-SE-01 | Содержимое файлов/чата/медиа не на реле | M1 | accepted |
-| NFR-SE-02 | Threat model задокументирован до публичных обещаний «неубиваемо» | M1 | proposed |
+| NFR-SE-02 | Threat model задокументирован до публичных обещаний «неубиваемо» | M3 | accepted ([threat-model.md](./threat-model.md)) |
 | NFR-SE-03 | Ключ переживает обычный рестарт; потеря кэша PWA = честный UX восстановления | M1 | accepted (master-фраза + encrypted backup; биометрия = unlock opt-in) |
-| NFR-SE-04 | Целевой противник на M1: облако/случайный админ реле/фишинг ника — **не** полноценный DPI-state adversary | M1 | proposed |
+| NFR-SE-04 | Целевой противник на M1–M3: облако/случайный админ реле/фишинг ника — **не** полноценный DPI-state adversary | M3 | accepted |
 
 ### 2.3 Надёжность и сеть
 
@@ -207,8 +207,8 @@ sync → identity + local store
 
 | id | требование | pri | status |
 |---|---|---|---|
-| NFR-OP-01 | `vp check` + тесты доменов зелёные перед merge шага | M1 | proposed |
-| NFR-OP-02 | usage.md обновляется при user-visible change M1/M2 | M2 | proposed |
+| NFR-OP-01 | `vp check` + тесты доменов зелёные перед merge шага | M1 | accepted |
+| NFR-OP-02 | usage.md обновляется при user-visible change M1/M2/M3 | M3 | accepted |
 | NFR-OP-03 | Секреты TURN не в git | M1 | accepted |
 
 ---

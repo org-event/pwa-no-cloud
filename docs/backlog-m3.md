@@ -101,4 +101,11 @@ M1/M2 закрыты. M3 = must следующего среза из [requiremen
 | U2.1 | done | 3 |
 | U3.1 | done | 5 |
 | U4.1 | done | 3 |
-| U5.1 | todo | 5 |
+| U5.1 | done | 5 |
+
+---
+
+## Итог M3
+
+Must-стори U0–U5 закрыты. Shell UI ещё можно точить отдельно (не блокер
+закрытия среза). См. сводку в [usage.md](./usage.md) и [threat-model.md](./threat-model.md).

@@ -124,6 +124,21 @@ PC, а после смены реле можно снова найтись бе�
 
 Готово, когда `src/domain/relay/abuse.test.ts` зелёный.
 
+## Сводка M3 (U5.1)
+
+Must-срез закрыт, если зелёны чеклисты выше и пройдены:
+
+1. Чат 1:1 (`H1.`) + локальная история (U1.5).
+2. Первый экран: unlock + paste/скан (U1.6).
+3. Trust «видели лично» (U2.1).
+4. Redirect store `POST/GET /redirect` (U3.1).
+5. PoW slot (noop default) (U4.1).
+6. [threat-model.md](./threat-model.md) согласован с UI (без «неубиваемо»).
+7. `vp check` + `npm test` зелёные.
+
+**Вне M3 (не ждать):** полировка Telegram-shell, DHT, группы/SFU, sealed
+multi-device sync.
+
 ## Заметка M2 — пучок реле и failover (T2.4)
 
 1. В пучке ≥2 URL (руками в «Серверы» или после `GET /relays` при presence).

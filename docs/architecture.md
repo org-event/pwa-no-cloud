@@ -169,6 +169,7 @@ stateDiagram-v2
 | файл | зачем |
 |---|---|
 | [glossary.md](./glossary.md) | термины по-русски |
+| [threat-model.md](./threat-model.md) | противники и честные границы |
 | [requirements.md](./requirements.md) | FR/NFR и решения A/B |
 | [vision.md](./vision.md) | куда идём |
 | [roadmap-wide.md](./roadmap-wide.md) | шаги |
