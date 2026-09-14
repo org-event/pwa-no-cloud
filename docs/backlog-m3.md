@@ -99,6 +99,6 @@ M1/M2 закрыты. M3 = must следующего среза из [requiremen
 | U1.5 | done | 2 |
 | U1.6 | done | 5 |
 | U2.1 | done | 3 |
-| U3.1 | todo | 5 |
+| U3.1 | done | 5 |
 | U4.1 | todo | 3 |
 | U5.1 | todo | 5 |

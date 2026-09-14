@@ -11,6 +11,7 @@ import {
   createRelayBundleFactory,
   selfUrlFromRequest,
 } from './relay-bundle.js';
+import { createRedirectStore } from './redirect-store.js';
 
 const PORT = Number(process.env.PORT) || 8000;
 const STUN_PORT = Number(process.env.STUN_PORT) || 3478;
@@ -39,6 +40,8 @@ const CORS = {
 const rooms = createRooms();
 const challengeAuth = createChallengeAuth();
 const challengeLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
+const redirectLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
+const redirectStore = createRedirectStore();
 const buildRelayBundle = createRelayBundleFactory();
 
 const sendJSON = (res, status, body) => {
@@ -167,6 +170,7 @@ const getHealth = (_req, res) => {
       signaling: true,
       stun: true,
       challengeAuth: true,
+      redirectStore: true,
     },
   });
 };
@@ -183,12 +187,75 @@ const getRelays = (req, res) => {
   sendJSON(res, 200, message);
 };
 
+const postRedirect = async (req, res) => {
+  const limited = redirectLimiter.allow(clientIp(req));
+  if (!limited.ok) {
+    sendJSON(res, 429, {
+      error: limited.code,
+      retryAfterMs: limited.retryAfterMs,
+    });
+    return;
+  }
+  let body = {};
+  try {
+    body = await parseBody(req);
+  } catch {
+    sendJSON(res, 400, { error: 'bad json' });
+    return;
+  }
+  const wire =
+    typeof body.note === 'string'
+      ? body.note
+      : typeof body.text === 'string'
+        ? body.text
+        : typeof body === 'string'
+          ? body
+          : '';
+  if (!wire) {
+    sendJSON(res, 400, { error: 'note required' });
+    return;
+  }
+  const stored = await redirectStore.put(wire);
+  if (!stored.ok) {
+    const status =
+      stored.code === 'expired' || stored.code === 'bad-sig'
+        ? 401
+        : stored.code === 'full' || stored.code === 'stale'
+          ? 409
+          : 400;
+    sendJSON(res, status, { error: stored.code, message: stored.message });
+    return;
+  }
+  sendJSON(res, 200, {
+    ok: true,
+    pk: stored.value.pk,
+    expiresAt: stored.value.expiresAt,
+  });
+};
+
+const getRedirect = (req, res, url) => {
+  const pk = url.searchParams.get('pk') ?? '';
+  const found = redirectStore.get(pk);
+  if (!found.ok) {
+    const status = found.code === 'expired' ? 410 : 404;
+    sendJSON(res, status, { error: found.code, message: found.message });
+    return;
+  }
+  sendJSON(res, 200, {
+    ok: true,
+    pk: found.value.pk,
+    expiresAt: found.value.expiresAt,
+    note: found.value.note,
+  });
+};
+
 const routes = new Map([
   ['/join', { post: joinRoom }],
   ['/leave', { post: leaveRoom }],
   ['/signal', { post: sendSignal, get: getSignal }],
   ['/peers', { get: getPeers }],
   ['/relays', { get: getRelays }],
+  ['/redirect', { get: getRedirect, post: postRedirect }],
   ['/challenge', { get: getChallenge, post: postChallenge }],
   ['/health', { get: getHealth }],
 ]);

@@ -105,6 +105,16 @@ PC, а после смены реле можно снова найтись бе�
 
 Готово, когда метка переживает reload и не уходит в wire-профиль.
 
+## Чеклист M3 — R1. redirect store на реле (U3.1)
+
+1. Поднять `node server/index.js` (после `vp build` при нужде статики).
+2. **POST `/redirect`** с телом `{ "note": "R1.{…}" }` (подпись владельца,
+   `expiresAt` в будущем) → `ok` + `pk`.
+3. **GET `/redirect?pk=pk1.…`** → тот же `note` до TTL.
+4. После `expiresAt` GET → 410/404; подделка подписи → отказ.
+
+Готово, когда unit smoke `server/redirect-store.test.ts` зелёный.
+
 ## Заметка M2 — пучок реле и failover (T2.4)
 
 1. В пучке ≥2 URL (руками в «Серверы» или после `GET /relays` при presence).
