@@ -94,7 +94,7 @@ M1/M2 закрыты. M3 = must следующего среза из [requiremen
 | U0.1 | done | 2 |
 | U1.1 | done | 3 |
 | U1.2 | done | 3 |
-| U1.3 | wip | 5 |
+| U1.3 | done | 5 |
 | U1.4 | done | 5 |
 | U1.5 | todo | 2 |
 | U1.6 | todo | 5 |

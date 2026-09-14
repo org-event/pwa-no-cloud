@@ -127,7 +127,8 @@ const railTabsOnly = computed(
     !listMode.value &&
     ((activeTab.value === 'chats' && Boolean(activeContact.value)) ||
       (activeTab.value === 'calls' && Boolean(activeCallPeer.value)) ||
-      (activeTab.value === 'settings' && Boolean(settingsSection.value))),
+      (activeTab.value === 'settings' && Boolean(settingsSection.value)) ||
+      (activeTab.value === 'profile' && Boolean(activeProfileContact.value))),
 );
 
 const showPane = computed(() => {
@@ -245,7 +246,8 @@ const openProfileContact = (peerId: string) => {
 };
 
 const openContactCalls = () => {
-  const peerId = parseShellContactId(activeContact.value ?? '');
+  const contactId = activeContact.value;
+  const peerId = contactId ? parseShellContactId(contactId) : null;
   openTab('calls');
   if (peerId && !isSelfPeer(peerId)) {
     activeCallPeer.value = peerId;
