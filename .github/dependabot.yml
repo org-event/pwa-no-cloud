@@ -29,10 +29,17 @@ updates:
         dependency-type: development
         patterns:
           - '*'
+        update-types:
+          - minor
+          - patch
       npm-security:
         applies-to: security-updates
         patterns:
           - '*'
+    ignore:
+      # Majors need a deliberate PR (Vitest 5+, etc.); security group still opens CVE fixes.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     open-pull-requests-limit: 10
     labels:
       - dependencies
