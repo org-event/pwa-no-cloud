@@ -50,6 +50,22 @@ updates:
       include: scope
     rebase-strategy: auto
 
+  # --- Deploy signal image (standalone npm lockfile) ---
+  - package-ecosystem: npm
+    directory: /deploy/signal
+    schedule:
+      interval: weekly
+      time: '06:30'
+      timezone: Europe/Moscow
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - javascript
+    commit-message:
+      prefix: deps
+      include: scope
+    rebase-strategy: auto
+
   # --- GitHub Actions ---
   - package-ecosystem: github-actions
     directory: /
