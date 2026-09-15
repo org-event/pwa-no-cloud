@@ -1,5 +1,7 @@
 # NoCloud
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14655/badge)](https://www.bestpractices.dev/projects/14655)
+
 PWA для обмена файлами без облака. Файловый трафик идёт по WebRTC
 (`RTCDataChannel`). Сервер нужен только для знакомства клиентов
 и, при жёстком NAT, как свой TURN.
