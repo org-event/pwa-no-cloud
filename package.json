@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.8",
+    "fast-check": "^4.10.0",
     "typescript": "~7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:",

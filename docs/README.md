@@ -23,6 +23,7 @@ PWA для обмена файлами и папками между устрой
 13. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI.
 14. [features-realtime.md](./features-realtime.md) — presence, стук, звонки (задел).
 15. [.github/SECURITY.md](../.github/SECURITY.md) — disclosure + automated security checks.
+16. [CONTRIBUTING.md](../CONTRIBUTING.md) — check/test, PR, security.
 
 ## Источники подхода
 

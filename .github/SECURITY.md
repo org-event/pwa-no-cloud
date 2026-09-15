@@ -32,4 +32,12 @@ This repository is monitored with:
 - `pnpm audit` in CI
 - Dependency review on pull requests
 - OpenSSF Scorecard
+- Property-based fuzzing via [fast-check](https://fast-check.dev/) on paste/QR parsers
 - Secret scanning and push protection (GitHub)
+
+## OpenSSF Best Practices badge
+
+One-time registration (GitHub login): create a project at
+[bestpractices.dev](https://www.bestpractices.dev/) for
+`https://github.com/org-event/pwa-no-cloud`, then add the badge to the README.
+Scorecard’s CII-Best-Practices check reads that API.
