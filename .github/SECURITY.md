@@ -2,11 +2,11 @@
 
 ## Supported Versions
 
-| Version | Supported |
-| --- | --- |
-| `main` branch | Yes |
-| Latest [GitHub Pages](https://org-event.github.io/pwa-no-cloud/) build from `main` | Yes |
-| Other branches / older builds | Best effort |
+| Version                                                                            | Supported   |
+| ---------------------------------------------------------------------------------- | ----------- |
+| `main` branch                                                                      | Yes         |
+| Latest [GitHub Pages](https://org-event.github.io/pwa-no-cloud/) build from `main` | Yes         |
+| Other branches / older builds                                                      | Best effort |
 
 ## Reporting a Vulnerability
 
