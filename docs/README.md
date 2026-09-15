@@ -22,6 +22,7 @@ PWA для обмена файлами и папками между устрой
 12. [sources/ideas-essence.md](./sources/ideas-essence.md) — сжатая суть идей горизонта.
 13. [design-system/nocloud/MASTER.md](../design-system/nocloud/MASTER.md) — визуальные токены UI.
 14. [features-realtime.md](./features-realtime.md) — presence, стук, звонки (задел).
+15. [.github/SECURITY.md](../.github/SECURITY.md) — disclosure + automated security checks.
 
 ## Источники подхода
 

@@ -1,0 +1,68 @@
+# Dependabot version updates — scans manifests/lockfiles and opens PRs.
+# Security alerts/updates are configured separately in repo Settings → Code security.
+#
+# Ecosystems in this repo:
+#   npm             — package.json / pnpm-lock.yaml (Vite+ / Vue PWA)
+#   github-actions  — .github/workflows/*.yml
+
+version: 2
+
+updates:
+  # --- JavaScript / pnpm ---
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+      time: "06:30"
+      timezone: Europe/Moscow
+    allow:
+      - dependency-type: all
+    groups:
+      npm-prod:
+        dependency-type: production
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      npm-dev:
+        dependency-type: development
+        patterns:
+          - "*"
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - javascript
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+      include: scope
+    rebase-strategy: auto
+
+  # --- GitHub Actions ---
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+      time: "07:00"
+      timezone: Europe/Moscow
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+      github-actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: deps
+      include: scope
+    rebase-strategy: auto
