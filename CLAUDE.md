@@ -66,4 +66,8 @@ Default five roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 ### Domain docs
 
-Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
+Single-context: root `CONTEXT.md` (points at `docs/glossary.md`) + `docs/adr/`. See `docs/agents/domain.md`.
+
+### Deep modules
+
+New packages under `src/packages/` are deep modules: see [src/packages/README.md](./src/packages/README.md) before adding or importing one. Enforce with `pnpm run lint:boundaries`.
