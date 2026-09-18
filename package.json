@@ -9,7 +9,8 @@
     "preview": "vp preview",
     "serve": "node server/index.js",
     "check": "vp check",
-    "test": "vp test"
+    "test": "vp test",
+    "prepare": "vp config --hooks --no-agent"
   },
   "dependencies": {
     "@noble/ed25519": "^3.2.0",

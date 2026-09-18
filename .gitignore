@@ -29,3 +29,6 @@ dist-ssr
 .serena/
 .codegraph/
 *.fig
+
+# Vite+ generated hook dispatcher (recreated by `vp hooks enable` / prepare)
+.vite-hooks/_
