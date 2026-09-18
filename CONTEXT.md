@@ -90,6 +90,10 @@ _Avoid_: PeerSession (legacy name for the same implementation)
 Logical session made of legs to participants.
 _Avoid_: room (MVP rooms are signaling-only)
 
+**CallController**:
+Deep module for Call product behaviour: dial/accept/reject/hangup, media lifecycle, and attach to Link. The Pinia calls slice is a thin Vue adapter.
+_Avoid_: putting call orchestration only in the store slice
+
 **Leg**:
 Link to one peer (one PeerConnection).
 _Avoid_: call (when meaning a single peer link)

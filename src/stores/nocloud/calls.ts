@@ -1,16 +1,9 @@
-import { componentsCopy } from '@/content/index.ts';
 import {
-  applyCallSessionEvent,
-  createIdleCallSession,
-  isCallBusy,
-  primaryCallLeg,
-  type CallSession,
-} from '@/domain/call/index.ts';
-import {
-  CALL_KIND_LABEL,
-  type CallIntent,
-  type CallKind,
-} from '@/lib/call-intent.ts';
+  createCallController,
+  type CallControllerState,
+  type MediaCallKind,
+} from '@/lib/call-controller.ts';
+import type { CallIntent } from '@/lib/call-intent.ts';
 import {
   appendCallLog,
   loadCallLog,
@@ -18,17 +11,13 @@ import {
   type CallLogEntry,
   type CallLogOutcome,
 } from '@/lib/call-log.ts';
-import {
-  openCallMedia,
-  onScreenShareEnded,
-  setTracksEnabled,
-  stopStream,
-  tracksEnabled,
-} from '@/lib/call-media.ts';
+import { openCallMedia } from '@/lib/call-media.ts';
 import { markRaw, ref, shallowRef } from 'vue';
+import type { CallSession } from '@/domain/call/index.ts';
+import { createIdleCallSession } from '@/domain/call/index.ts';
 import type { NocloudContext } from './context.ts';
 
-export type MediaCallKind = Exclude<CallKind, 'data'>;
+export type { MediaCallKind };
 
 export function createCallsSlice(ctx: NocloudContext) {
   const { state, touch, storage } = ctx;
@@ -41,9 +30,19 @@ export function createCallsSlice(ctx: NocloudContext) {
   const callLog = ref<CallLogEntry[]>(loadCallLog(storage));
   const micOn = shallowRef(true);
   const camOn = shallowRef(true);
-  let unbindScreenEnded: (() => void) | null = null;
 
-  const publish = () => touch();
+  const syncUi = (next: CallControllerState) => {
+    callSession.value = next.session;
+    localMedia.value = next.localMedia ? markRaw(next.localMedia) : null;
+    remoteMedia.value = next.remoteMedia ? markRaw(next.remoteMedia) : null;
+    callKind.value = next.callKind;
+    callPeerId.value = next.callPeerId;
+    callError.value = next.callError;
+    micOn.value = next.micOn;
+    camOn.value = next.camOn;
+    if (next.notice) state.contactsNotice = next.notice;
+    touch();
+  };
 
   const recordCall = (
     peerId: string,
@@ -58,249 +57,20 @@ export function createCallsSlice(ctx: NocloudContext) {
     saveCallLog(storage, callLog.value);
   };
 
-  const setSession = (next: CallSession) => {
-    callSession.value = next;
-  };
-
-  const syncTrackFlags = () => {
-    micOn.value = tracksEnabled(localMedia.value, 'audio');
-    camOn.value = tracksEnabled(localMedia.value, 'video');
-  };
-
-  const clearScreenEnded = () => {
-    unbindScreenEnded?.();
-    unbindScreenEnded = null;
-  };
-
-  const clearMediaUi = () => {
-    clearScreenEnded();
-    const stream = localMedia.value;
-    localMedia.value = null;
-    remoteMedia.value = null;
-    callKind.value = null;
-    callPeerId.value = null;
-    callError.value = '';
-    micOn.value = true;
-    camOn.value = true;
-    state.peer?.clearLocalStream();
-    stopStream(stream);
-  };
-
-  const bindScreenIfNeeded = (kind: MediaCallKind, stream: MediaStream) => {
-    clearScreenEnded();
-    if (kind !== 'screen') return;
-    unbindScreenEnded = onScreenShareEnded(stream, () => {
-      onHangUp();
-    });
-  };
-
-  const onRemoteTrack = (stream: MediaStream) => {
-    remoteMedia.value = markRaw(stream);
-    const leg = primaryCallLeg(callSession.value);
-    if (leg && (leg.state === 'outbound' || leg.state === 'ringing')) {
-      setSession(
-        applyCallSessionEvent(callSession.value, {
-          type: 'leg-active',
-          legId: leg.id,
-        }),
-      );
-    }
-    publish();
-  };
-
-  async function onStartCall(peerId: string, kind: MediaCallKind) {
-    callError.value = '';
-    if (isCallBusy(callSession.value)) {
-      callError.value = componentsCopy.calls.inCall;
-      state.contactsNotice = componentsCopy.calls.inCall;
-      publish();
-      return;
-    }
-    try {
-      const stream = await openCallMedia(kind);
-      clearScreenEnded();
-      stopStream(localMedia.value);
-      localMedia.value = markRaw(stream);
-      callKind.value = kind;
-      callPeerId.value = peerId;
-      syncTrackFlags();
-      bindScreenIfNeeded(kind, stream);
-      setSession(
-        applyCallSessionEvent(callSession.value, {
-          type: 'dial',
-          peerId,
-        }),
-      );
-      recordCall(peerId, 'out', 'started');
-      state.peer?.setLocalStream(stream);
-      state.contactsNotice = `${componentsCopy.calls.calling} (${CALL_KIND_LABEL[kind]})`;
-      publish();
-      await ctx.refs.knockOn?.(peerId, false);
-      const leg = primaryCallLeg(callSession.value);
-      if (leg?.state === 'outbound') {
-        setSession(
-          applyCallSessionEvent(callSession.value, {
-            type: 'remote-ringing',
-            legId: leg.id,
-          }),
-        );
-      }
-      publish();
-    } catch {
-      const leg = primaryCallLeg(callSession.value);
-      if (leg) {
-        setSession(
-          applyCallSessionEvent(callSession.value, {
-            type: 'leg-fail',
-            legId: leg.id,
-            message: componentsCopy.calls.needPermission,
-          }),
-        );
-      }
-      recordCall(peerId, 'out', 'failed');
-      callError.value = componentsCopy.calls.needPermission;
-      state.contactsNotice = componentsCopy.calls.needPermission;
-      publish();
-    }
-  }
-
-  function onIncomingCall(peerId: string) {
-    if (isCallBusy(callSession.value)) {
-      return false;
-    }
-    setSession(
-      applyCallSessionEvent(callSession.value, {
-        type: 'incoming',
-        peerId,
-      }),
-    );
-    callPeerId.value = peerId;
-    callKind.value = null;
-    callError.value = '';
-    recordCall(peerId, 'in', 'started');
-    publish();
-    return true;
-  }
-
-  async function onAcceptCall(kind: MediaCallKind = 'audio') {
-    const leg = primaryCallLeg(callSession.value);
-    if (!leg || leg.state !== 'ringing' || leg.direction !== 'in') return;
-    callError.value = '';
-    try {
-      const stream = await openCallMedia(kind);
-      clearScreenEnded();
-      stopStream(localMedia.value);
-      localMedia.value = markRaw(stream);
-      callKind.value = kind;
-      callPeerId.value = leg.peerId;
-      syncTrackFlags();
-      bindScreenIfNeeded(kind, stream);
-      setSession(
-        applyCallSessionEvent(callSession.value, {
-          type: 'accept',
-          legId: leg.id,
-        }),
-      );
-      recordCall(leg.peerId, 'in', 'answered');
-      state.peer?.setLocalStream(stream);
-      state.contactsNotice = `${componentsCopy.calls.active} (${CALL_KIND_LABEL[kind]})`;
-      publish();
-      await ctx.refs.knockOn?.(state.me.id, true);
-      publish();
-    } catch {
-      setSession(
-        applyCallSessionEvent(callSession.value, {
-          type: 'leg-fail',
-          legId: leg.id,
-          message: componentsCopy.calls.needPermission,
-        }),
-      );
-      recordCall(leg.peerId, 'in', 'failed');
-      callError.value = componentsCopy.calls.needPermission;
-      state.contactsNotice = componentsCopy.calls.needPermission;
-      publish();
-    }
-  }
-
-  function onRejectCall() {
-    const leg = primaryCallLeg(callSession.value);
-    if (!leg || leg.state !== 'ringing') return;
-    setSession(
-      applyCallSessionEvent(callSession.value, {
-        type: 'reject',
-        legId: leg.id,
-      }),
-    );
-    recordCall(leg.peerId, leg.direction, 'rejected');
-    clearMediaUi();
-    publish();
-  }
-
-  function onPeerError(message: string) {
-    const leg = primaryCallLeg(callSession.value);
-    if (!leg) return;
-    if (
-      leg.state === 'ended' ||
-      leg.state === 'failed' ||
-      leg.state === 'rejected' ||
-      leg.state === 'busy'
-    ) {
-      return;
-    }
-    setSession(
-      applyCallSessionEvent(callSession.value, {
-        type: 'leg-fail',
-        legId: leg.id,
-        message,
-      }),
-    );
-    recordCall(leg.peerId, leg.direction, 'failed');
-    callError.value = message;
-    state.contactsNotice = message;
-    clearScreenEnded();
-    const stream = localMedia.value;
-    localMedia.value = null;
-    remoteMedia.value = null;
-    callKind.value = null;
-    micOn.value = true;
-    camOn.value = true;
-    state.peer?.clearLocalStream();
-    stopStream(stream);
-    publish();
-  }
-
-  function onHangUp() {
-    const leg = primaryCallLeg(callSession.value);
-    if (leg && !['ended', 'failed', 'rejected', 'busy'].includes(leg.state)) {
-      const outcome: CallLogOutcome =
-        leg.direction === 'in' && leg.state === 'ringing' ? 'missed' : 'ended';
-      recordCall(leg.peerId, leg.direction, outcome);
-    }
-    setSession(applyCallSessionEvent(callSession.value, { type: 'hangup' }));
-    clearMediaUi();
-    publish();
-  }
-
-  function onToggleMute() {
-    if (!localMedia.value) return;
-    const next = !micOn.value;
-    if (!setTracksEnabled(localMedia.value, 'audio', next)) return;
-    micOn.value = next;
-    publish();
-  }
-
-  function onToggleCamera() {
-    if (!localMedia.value) return;
-    if (callKind.value !== 'video' && callKind.value !== 'screen') return;
-    const next = !camOn.value;
-    if (!setTracksEnabled(localMedia.value, 'video', next)) return;
-    camOn.value = next;
-    publish();
-  }
+  const controller = createCallController({
+    openMedia: openCallMedia,
+    getPeer: () => state.peer,
+    knockOn: async (peerId, asHost) => {
+      await ctx.refs.knockOn?.(peerId, asHost);
+    },
+    selfId: () => state.me.id,
+    recordCall,
+    onChange: syncUi,
+  });
 
   async function startCallIntent(intent: CallIntent) {
     if (intent.kind === 'data') return;
-    await onStartCall(intent.peerId, intent.kind);
+    await controller.dial(intent.peerId, intent.kind);
   }
 
   return {
@@ -313,15 +83,15 @@ export function createCallsSlice(ctx: NocloudContext) {
     callLog,
     micOn,
     camOn,
-    onRemoteTrack,
-    onStartCall,
-    onIncomingCall,
-    onAcceptCall,
-    onRejectCall,
-    onHangUp,
-    onPeerError,
-    onToggleMute,
-    onToggleCamera,
+    onRemoteTrack: controller.remoteTrack,
+    onStartCall: controller.dial,
+    onIncomingCall: controller.incoming,
+    onAcceptCall: controller.accept,
+    onRejectCall: controller.reject,
+    onHangUp: controller.hangUp,
+    onPeerError: controller.peerError,
+    onToggleMute: controller.toggleMute,
+    onToggleCamera: controller.toggleCamera,
     startCallIntent,
   };
 }
