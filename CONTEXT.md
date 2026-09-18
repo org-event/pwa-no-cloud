@@ -115,6 +115,10 @@ _Avoid_: chat group (later)
 Sending a file or folder over a DataChannel.
 _Avoid_: upload to relay
 
+**TransferSession**:
+Deep module for Transfer product behaviour: stage queue, send over Link/`TransferPort`, accept/reject/cancel. The Pinia transfer slice keeps inbox (OPFS) UI and syncs staging into reactive state.
+_Avoid_: putting send/queue orchestration only in the store slice
+
 **OPFS**:
 Origin-private browser filesystem used as inbox storage.
 _Avoid_: server disk
