@@ -1,3 +1,4 @@
+import { fromAny } from '@total-typescript/shoehorn';
 import { describe, expect, it, vi } from 'vitest';
 import { createHttpPollPort } from './http-poll.ts';
 import type { SignalMessage } from './port.ts';
@@ -35,7 +36,7 @@ describe('http-poll signaling', () => {
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     });
     const port = createHttpPollPort('http://127.0.0.1:8000', {
-      fetch: request as unknown as typeof fetch,
+      fetch: fromAny(request),
       intervalMs: 20,
     });
     const received: SignalMessage[] = [];

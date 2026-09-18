@@ -1,3 +1,4 @@
+import { fromAny } from '@total-typescript/shoehorn';
 import { describe, expect, it, vi } from 'vitest';
 import {
   fetchRelayBundle,
@@ -15,15 +16,17 @@ describe('relay bundle fetch (T2.3)', () => {
   });
 
   it('parses a live bundle response', async () => {
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        op: 'relays',
-        v: 1,
-        issuedAt: 100,
-        relays: ['wss://a.example/ws', 'https://b.example'],
-      }),
-    })) as unknown as typeof fetch;
+    const fetchImpl: typeof fetch = fromAny(
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          op: 'relays',
+          v: 1,
+          issuedAt: 100,
+          relays: ['wss://a.example/ws', 'https://b.example'],
+        }),
+      })),
+    );
 
     const result = await fetchRelayBundle('wss://a.example/ws', fetchImpl);
     expect(result.ok).toBe(true);

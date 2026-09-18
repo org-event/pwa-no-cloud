@@ -1,3 +1,4 @@
+import { fromAny } from '@total-typescript/shoehorn';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   constraintsForKind,
@@ -33,7 +34,7 @@ describe('call-media', () => {
 
   it('stops all tracks on a stream', () => {
     const stops: string[] = [];
-    const stream = {
+    const stream: MediaStream = fromAny({
       getTracks: () => [
         {
           id: 'a',
@@ -48,7 +49,7 @@ describe('call-media', () => {
           },
         },
       ],
-    } as unknown as MediaStream;
+    });
     stopStream(stream);
     stopStream(null);
     expect(stops).toEqual(['a', 'v']);
@@ -79,10 +80,9 @@ describe('call-media', () => {
 
     const stream = await openCallMedia('screen');
     expect(getDisplayMedia).toHaveBeenCalled();
-    expect(isDisplayTrack(displayTrack as unknown as MediaStreamTrack)).toBe(
-      true,
-    );
-    stopStream(stream as unknown as MediaStream);
+    const typedDisplay: MediaStreamTrack = fromAny(displayTrack);
+    expect(isDisplayTrack(typedDisplay)).toBe(true);
+    stopStream(stream);
     expect(displayTrack.stop).toHaveBeenCalled();
   });
 
@@ -104,9 +104,9 @@ describe('call-media', () => {
         );
       },
     };
-    const stream = {
+    const stream: MediaStream = fromAny({
       getVideoTracks: () => [track],
-    } as unknown as MediaStream;
+    });
     const ended = vi.fn();
     const unbind = onScreenShareEnded(stream, ended);
     for (const fn of listeners.get('ended') ?? []) fn();
@@ -118,9 +118,9 @@ describe('call-media', () => {
   it('toggles track.enabled for mute/camera without stopping', () => {
     const audio = { kind: 'audio', enabled: true };
     const video = { kind: 'video', enabled: true };
-    const stream = {
+    const stream: MediaStream = fromAny({
       getTracks: () => [audio, video],
-    } as unknown as MediaStream;
+    });
     expect(setTracksEnabled(stream, 'audio', false)).toBe(true);
     expect(audio.enabled).toBe(false);
     expect(tracksEnabled(stream, 'audio')).toBe(false);

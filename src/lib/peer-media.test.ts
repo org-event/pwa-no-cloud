@@ -1,3 +1,4 @@
+import { fromAny, fromPartial } from '@total-typescript/shoehorn';
 import { describe, expect, it, vi } from 'vitest';
 import {
   attachLocalMediaTracks,
@@ -5,14 +6,14 @@ import {
 } from './peer-media.ts';
 
 const fakeTrack = (kind: 'audio' | 'video', id: string): MediaStreamTrack =>
-  ({ kind, id, stop: vi.fn() }) as unknown as MediaStreamTrack;
+  fromAny({ kind, id, stop: vi.fn() });
 
 const fakeStream = (tracks: MediaStreamTrack[]): MediaStream =>
-  ({
+  fromAny({
     getTracks: () => tracks,
     getAudioTracks: () => tracks.filter((t) => t.kind === 'audio'),
     getVideoTracks: () => tracks.filter((t) => t.kind === 'video'),
-  }) as unknown as MediaStream;
+  });
 
 describe('peer-media attach/detach', () => {
   it('adds only missing tracks to an existing PC', () => {
@@ -20,11 +21,11 @@ describe('peer-media attach/detach', () => {
     const stream = fakeStream([audio]);
     const senders: Array<{ track: MediaStreamTrack | null }> = [];
     const pc = {
-      getSenders: () => senders as RTCRtpSender[],
+      getSenders: () => fromPartial<RTCRtpSender[]>(senders),
       addTrack: vi.fn((track: MediaStreamTrack) => {
         const sender = { track };
         senders.push(sender);
-        return sender as RTCRtpSender;
+        return fromPartial<RTCRtpSender>(sender);
       }),
       removeTrack: vi.fn(),
     };
@@ -40,7 +41,7 @@ describe('peer-media attach/detach', () => {
     const mediaSender = { track: audio };
     const senders = [mediaSender];
     const pc = {
-      getSenders: () => senders as RTCRtpSender[],
+      getSenders: () => fromPartial<RTCRtpSender[]>(senders),
       addTrack: vi.fn(),
       removeTrack: vi.fn((sender: RTCRtpSender) => {
         const index = senders.findIndex((item) => item === sender);
@@ -59,7 +60,7 @@ describe('peer-media attach/detach', () => {
     const emptySender = { track: null };
     const senders = [mediaSender, emptySender];
     const pc = {
-      getSenders: () => senders as RTCRtpSender[],
+      getSenders: () => fromPartial<RTCRtpSender[]>(senders),
       addTrack: vi.fn(),
       removeTrack: vi.fn((sender: RTCRtpSender) => {
         const index = senders.findIndex((item) => item === sender);

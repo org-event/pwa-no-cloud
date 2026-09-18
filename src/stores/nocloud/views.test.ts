@@ -1,6 +1,6 @@
 import { createUserSettings } from '@/config/index.ts';
+import { fromPartial } from '@total-typescript/shoehorn';
 import { describe, expect, it, vi } from 'vitest';
-import type { InviteRole } from '@/stores/types.ts';
 import type { NocloudContext } from './context.ts';
 import type { NocloudState } from './state.ts';
 import {
@@ -14,24 +14,24 @@ function fakeCtx(
   state: Partial<NocloudState>,
   origin = 'https://example.test',
 ): NocloudContext {
-  return {
-    state: {
+  return fromPartial<NocloudContext>({
+    state: fromPartial<NocloudState>({
       settings: createUserSettings('manual-only'),
       peer: null,
       roomId: '',
-      inviteRole: 'idle' as InviteRole,
+      inviteRole: 'idle',
       outgoing: '',
       ...state,
-    } as NocloudState,
-    app: {} as NocloudContext['app'],
-    storage: {} as NocloudContext['storage'],
+    }),
+    app: fromPartial({}),
+    storage: fromPartial({}),
     origin,
     skippedPeers: new Set<string>(),
-    peerRevision: { value: 0 } as NocloudContext['peerRevision'],
+    peerRevision: { value: 0 },
     touch: () => {},
     note: () => {},
     refs: {},
-  };
+  });
 }
 
 describe('nocloud views', () => {
@@ -45,7 +45,7 @@ describe('nocloud views', () => {
         expect(
           peerIsLive(
             fakeCtx({
-              peer: { state } as NocloudState['peer'],
+              peer: fromPartial({ state }),
             }),
           ),
         ).toBe(false);
@@ -57,7 +57,7 @@ describe('nocloud views', () => {
         expect(
           peerIsLive(
             fakeCtx({
-              peer: { state } as NocloudState['peer'],
+              peer: fromPartial({ state }),
             }),
           ),
         ).toBe(true);

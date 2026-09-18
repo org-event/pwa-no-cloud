@@ -1,3 +1,4 @@
+import { fromAny } from '@total-typescript/shoehorn';
 import { describe, expect, it, vi } from 'vitest';
 import { healthUrlFromSignaling, probeSignaling } from './probe-signaling.ts';
 
@@ -17,10 +18,7 @@ describe('probe signaling', () => {
         }),
     );
     await expect(
-      probeSignaling(
-        'https://example.test:8443',
-        fetchImpl as unknown as typeof fetch,
-      ),
+      probeSignaling('https://example.test:8443', fromAny(fetchImpl)),
     ).resolves.toEqual({ ok: true });
   });
 });

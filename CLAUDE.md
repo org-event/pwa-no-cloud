@@ -53,6 +53,7 @@ Thin Node.js relay (plain JS, not the PWA): HTTP poll endpoints (`/join`, `/sign
 - TypeScript is strict with `verbatimModuleSyntax` and `erasableSyntaxOnly`; imports use explicit `.ts` extensions; path alias `@/` → `src/`.
 - Tests are colocated `*.test.ts` (vitest globals enabled); `fast-check` property/fuzz tests exist (e.g. `src/lib/parser-fuzz.test.ts`).
 - `vp check` runs on staged files via the `staged` config (lint-staged style) — expect `vp check --fix` on commit.
+- Review judgement calls: [CODING_STANDARDS.md](./CODING_STANDARDS.md).
 
 ## Agent skills
 

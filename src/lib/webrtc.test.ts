@@ -1,3 +1,4 @@
+import { fromAny } from '@total-typescript/shoehorn';
 import { describe, expect, it } from 'vitest';
 import { sdpHasRelay, waitIceGathering } from './webrtc.ts';
 
@@ -27,7 +28,7 @@ describe('waitIceGathering', () => {
         listeners.get(name)?.delete(fn);
       },
     };
-    await waitIceGathering(pc as unknown as RTCPeerConnection, {
+    await waitIceGathering(fromAny(pc), {
       wantRelay: true,
       timeoutMs: 50,
     });
