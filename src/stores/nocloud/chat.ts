@@ -57,7 +57,7 @@ export function createChatSlice(ctx: NocloudContext) {
     if (!body) return false;
 
     if (peerId === SELF_PEER_ID) {
-      const keyPair = ctx.refs.getIdentityKeyPair?.();
+      const keyPair = ctx.ports.contacts.getIdentityKeyPair?.();
       const entry: ChatStoredMessage = {
         id: crypto.randomUUID(),
         fromPk: keyPair ? encodePublicKey(keyPair.publicKey) : '',
@@ -70,7 +70,7 @@ export function createChatSlice(ctx: NocloudContext) {
       return true;
     }
 
-    const keyPair = ctx.refs.getIdentityKeyPair?.();
+    const keyPair = ctx.ports.contacts.getIdentityKeyPair?.();
     if (!keyPair) {
       state.contactsNotice = shellCopy.chatNeedIdentity;
       touch();
@@ -107,7 +107,7 @@ export function createChatSlice(ctx: NocloudContext) {
       return true;
     }
 
-    void ctx.refs.knockOn?.(peerId, false);
+    void ctx.ports.contacts.knockOn?.(peerId, false);
     state.contactsNotice = shellCopy.chatQueuedLocal;
     touch();
     return true;

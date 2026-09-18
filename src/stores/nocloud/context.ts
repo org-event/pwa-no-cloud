@@ -1,40 +1,10 @@
 import type { StorageLike } from '@/config/storage.ts';
 import type { Application } from '@/lib/application.ts';
-import type { CustomServerDraft } from '@/config/types.ts';
-import type { KeyPair } from '@/domain/identity/index.ts';
-import type { ProfileCard } from '@/domain/profile.ts';
-import type { Link } from '@/lib/link.ts';
 import type { Ref } from 'vue';
 import type { NocloudState } from './state.ts';
+import { createNocloudPortsBag, type NocloudPortsBag } from './ports.ts';
 
-export type NocloudRefs = {
-  startPeer?: () => Link | null;
-  applyPeerProfile?: (card: ProfileCard) => void;
-  ensureLivePeerInBook?: () => void;
-  applyShareDraft?: (draft: CustomServerDraft, notice: string) => void;
-  probeAndMark?: (serverId: string) => Promise<void>;
-  refreshInbox?: () => Promise<void>;
-  refreshOutgoing?: () => Promise<void>;
-  flushQueue?: () => void;
-  applyIncoming?: (text: string) => Promise<void>;
-  resumeMeetRoom?: () => void;
-  consumeDeepLink?: () => void;
-  queueFile?: (file: File) => void;
-  knockOn?: (ownerId: string, asHost: boolean) => Promise<void>;
-  startPresence?: (options?: { quiet?: boolean }) => Promise<boolean>;
-  syncPresenceContacts?: () => void;
-  ensurePresenceActive?: () => Promise<void>;
-  resumePresence?: () => Promise<void>;
-  copyText?: (text: string) => Promise<boolean>;
-  seedDemoContacts?: () => void | Promise<void>;
-  onRemoteTrack?: (stream: MediaStream) => void;
-  onIncomingCall?: (peerId: string) => boolean;
-  onCallPeerError?: (message: string) => void;
-  getIdentityKeyPair?: () => KeyPair | null;
-  onIncomingChatWire?: (wire: string) => void | Promise<void>;
-  refreshRelayBundleFrom?: (signalingUrl: string) => Promise<boolean>;
-  failoverRelay?: (failedUrl: string) => boolean;
-};
+export type { NocloudPorts, NocloudPortsBag } from './ports.ts';
 
 export type NocloudContext = {
   state: NocloudState;
@@ -45,7 +15,8 @@ export type NocloudContext = {
   peerRevision: Ref<number>;
   touch: () => void;
   note: (line: string) => void;
-  refs: NocloudRefs;
+  /** Typed cross-slice ports (replaces the old flat `refs` bag). */
+  ports: NocloudPortsBag;
 };
 
 export function createNocloudContext(
@@ -67,6 +38,6 @@ export function createNocloudContext(
     peerRevision,
     touch,
     note,
-    refs: {},
+    ports: createNocloudPortsBag(),
   };
 }

@@ -63,7 +63,7 @@ export function createTransferSlice(ctx: NocloudContext) {
         ? { state: state.peer.state, roomId: state.peer.roomId }
         : null,
     knockOn: async (peerId, asHost) => {
-      await ctx.refs.knockOn?.(peerId, asHost);
+      await ctx.ports.contacts.knockOn?.(peerId, asHost);
     },
     meetRoomId,
     resolveContactId: () => {
@@ -75,7 +75,7 @@ export function createTransferSlice(ctx: NocloudContext) {
       }
       return contactId;
     },
-    ensureLivePeerInBook: () => ctx.refs.ensureLivePeerInBook?.(),
+    ensureLivePeerInBook: () => ctx.ports.contacts.ensureLivePeerInBook?.(),
     requestNotify: () => {
       void requestNotifyPermission();
     },

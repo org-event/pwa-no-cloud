@@ -62,7 +62,7 @@ export function createPeerSlice(
         state.livePeerId = next.peerId;
       }
       note(notes.channelOpen);
-      ctx.refs.ensureLivePeerInBook?.();
+      ctx.ports.contacts.ensureLivePeerInBook?.();
       deps.flushQueue();
       touch();
     });
@@ -73,11 +73,11 @@ export function createPeerSlice(
     });
     next.on('profile', (value) => {
       const card = value as ProfileCard;
-      ctx.refs.applyPeerProfile?.(card);
+      ctx.ports.contacts.applyPeerProfile?.(card);
     });
     next.on('track', (value) => {
       const stream = value as MediaStream;
-      ctx.refs.onRemoteTrack?.(stream);
+      ctx.ports.call.onRemoteTrack?.(stream);
       touch();
     });
     next.on('ice', () => touch());
@@ -86,7 +86,7 @@ export function createPeerSlice(
       if (typeof value === 'string') {
         state.transferError = humanizeSignalingError(value);
         note(notes.error(state.transferError));
-        ctx.refs.onCallPeerError?.(state.transferError);
+        ctx.ports.call.onCallPeerError?.(state.transferError);
       }
       touch();
     });
@@ -102,14 +102,14 @@ export function createPeerSlice(
       const label = transfer.path || transfer.name || defaultFileLabel;
       void notifyFileReceived(label);
       note(notes.fileReceived(label));
-      ctx.refs.ensureLivePeerInBook?.();
+      ctx.ports.contacts.ensureLivePeerInBook?.();
       void (async () => {
         await deps.refreshInbox();
         touch();
       })();
     });
     next.on('chat', (value) => {
-      void ctx.refs.onIncomingChatWire?.(String(value));
+      void ctx.ports.chat.onIncomingChatWire?.(String(value));
     });
     next.setStore(state.store);
     state.peer = next;

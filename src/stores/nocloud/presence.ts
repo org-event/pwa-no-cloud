@@ -52,7 +52,7 @@ export function createPresenceSlice(ctx: NocloudContext) {
         if (state.livePeerId === peerId && peerIsConnected()) return;
         if (
           state.peer?.state === 'connected' ||
-          !ctx.refs.onIncomingCall?.(peerId)
+          !ctx.ports.call.onIncomingCall?.(peerId)
         ) {
           state.contactsNotice = presenceCopy.busyIncoming(peerId);
           publish();
@@ -72,7 +72,7 @@ export function createPresenceSlice(ctx: NocloudContext) {
     if (relaySessionId) return;
     const signaling = peerSignaling(ctx);
     if (signaling.kind === 'manual' || !signaling.url) return;
-    const keyPair = ctx.refs.getIdentityKeyPair?.();
+    const keyPair = ctx.ports.contacts.getIdentityKeyPair?.();
     if (!keyPair) return;
     const session = await loginRelayChallenge({
       signalingUrl: signaling.url,
@@ -115,7 +115,7 @@ export function createPresenceSlice(ctx: NocloudContext) {
       if (ok) {
         const signaling = peerSignaling(ctx);
         if (signaling.kind !== 'manual' && signaling.url) {
-          void ctx.refs.refreshRelayBundleFrom?.(signaling.url);
+          void ctx.ports.servers.refreshRelayBundleFrom?.(signaling.url);
         }
         state.presenceAvailable = true;
         if (!quiet) {
@@ -136,7 +136,7 @@ export function createPresenceSlice(ctx: NocloudContext) {
       hub = null;
       hubKey = '';
       relaySessionId = null;
-      if (!failedUrl || !ctx.refs.failoverRelay?.(failedUrl)) {
+      if (!failedUrl || !ctx.ports.servers.failoverRelay?.(failedUrl)) {
         break;
       }
     }
@@ -195,7 +195,7 @@ export function createPresenceSlice(ctx: NocloudContext) {
       // Still allow knock — peer may have just come online.
     }
     await startPresence();
-    await ctx.refs.knockOn?.(peerId, false);
+    await ctx.ports.contacts.knockOn?.(peerId, false);
   }
 
   function isPresenceOnline(id: string): boolean {

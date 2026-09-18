@@ -56,8 +56,8 @@ export function createShellSlice(ctx: NocloudContext) {
           ? Boolean((data as { online: boolean }).online)
           : app.online;
       if (online) {
-        ctx.refs.resumeMeetRoom?.();
-        void ctx.refs.ensurePresenceActive?.();
+        ctx.ports.session.resumeMeetRoom?.();
+        void ctx.ports.presence.ensurePresenceActive?.();
       }
     });
     app.on('install', redraw);
@@ -66,25 +66,25 @@ export function createShellSlice(ctx: NocloudContext) {
       const files = filesFromShare(data);
       if (files.length === 0) return;
       state.transferError = '';
-      for (const file of files) ctx.refs.queueFile?.(file);
-      ctx.refs.flushQueue?.();
+      for (const file of files) ctx.ports.transfer.queueFile?.(file);
+      ctx.ports.transfer.flushQueue?.();
       touch();
     });
 
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-          ctx.refs.resumeMeetRoom?.();
-          void ctx.refs.ensurePresenceActive?.();
+          ctx.ports.session.resumeMeetRoom?.();
+          void ctx.ports.presence.ensurePresenceActive?.();
         }
       });
     }
     if (typeof globalThis.addEventListener === 'function') {
       globalThis.addEventListener('pageshow', () => {
-        void ctx.refs.ensurePresenceActive?.();
+        void ctx.ports.presence.ensurePresenceActive?.();
       });
       globalThis.addEventListener('focus', () => {
-        void ctx.refs.ensurePresenceActive?.();
+        void ctx.ports.presence.ensurePresenceActive?.();
       });
     }
 
@@ -95,24 +95,24 @@ export function createShellSlice(ctx: NocloudContext) {
       const existing = await readAppLog(state.store);
       if (existing.ok) state.logText = existing.value;
       else state.logError = existing.message;
-      await ctx.refs.refreshInbox?.();
+      await ctx.ports.transfer.refreshInbox?.();
       state.hostDraft = await loadTurnHost(state.store);
       state.savedServers = await loadSavedServers(state.store);
       for (const server of state.savedServers)
-        void ctx.refs.probeAndMark?.(server.id);
+        void ctx.ports.servers.probeAndMark?.(server.id);
       state.book = await loadAddressBook(state.store);
       state.contactsNotice = '';
-      await ctx.refs.seedDemoContacts?.();
+      await ctx.ports.contacts.seedDemoContacts?.();
     } else {
       state.inboxError = opened.message;
       state.logError = opened.message;
     }
     touch();
-    ctx.refs.consumeDeepLink?.();
+    ctx.ports.session.consumeDeepLink?.();
     globalThis.addEventListener('hashchange', () =>
-      ctx.refs.consumeDeepLink?.(),
+      ctx.ports.session.consumeDeepLink?.(),
     );
-    void ctx.refs.ensurePresenceActive?.();
+    void ctx.ports.presence.ensurePresenceActive?.();
   }
 
   function onClearLogs() {

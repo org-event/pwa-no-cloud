@@ -77,13 +77,16 @@ export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
     state.inviteError = '';
     const packed = decodeSharePack(text);
     if (packed.ok) {
-      ctx.refs.applyShareDraft?.(packed.value, inviteCopy.serversFromPackSaved);
+      ctx.ports.servers.applyShareDraft?.(
+        packed.value,
+        inviteCopy.serversFromPackSaved,
+      );
       touch();
       return;
     }
     const decoded = await decodeInvite(text);
     if (decoded.ok && decoded.value.servers) {
-      ctx.refs.applyShareDraft?.(
+      ctx.ports.servers.applyShareDraft?.(
         decoded.value.servers,
         inviteCopy.serversFromInviteSaved,
       );
@@ -119,7 +122,10 @@ export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
         touch();
         return;
       }
-      ctx.refs.applyShareDraft?.(packed.value, inviteCopy.serversFromLinkSaved);
+      ctx.ports.servers.applyShareDraft?.(
+        packed.value,
+        inviteCopy.serversFromLinkSaved,
+      );
       touch();
       return;
     }

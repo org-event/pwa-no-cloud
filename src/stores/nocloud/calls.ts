@@ -61,7 +61,7 @@ export function createCallsSlice(ctx: NocloudContext) {
     openMedia: openCallMedia,
     getPeer: () => state.peer,
     knockOn: async (peerId, asHost) => {
-      await ctx.refs.knockOn?.(peerId, asHost);
+      await ctx.ports.contacts.knockOn?.(peerId, asHost);
     },
     selfId: () => state.me.id,
     recordCall,

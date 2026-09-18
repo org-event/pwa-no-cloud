@@ -105,7 +105,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       note(notes.contact(card.nick));
     }
     touch();
-    ctx.refs.syncPresenceContacts?.();
+    ctx.ports.presence.syncPresenceContacts?.();
   };
 
   /** After delete mid-call, put the live peer back into the book. */
@@ -124,7 +124,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       void persistBook();
       state.contactsNotice = contactsCopy.inBook(card.nick);
       note(notes.contact(card.nick));
-      ctx.refs.syncPresenceContacts?.();
+      ctx.ports.presence.syncPresenceContacts?.();
     }
     if (state.selectedContactIds[0] !== id) {
       state.selectedContactIds = [id];
@@ -152,7 +152,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     state.openedFromLink = false;
     state.roomId = target;
     state.inviteRole = 'caller';
-    const next = ctx.refs.startPeer?.();
+    const next = ctx.ports.session.startPeer?.();
     if (!next) return;
     state.contactsNotice = knockStartNotice(asHost, known?.nick);
     touch();
@@ -203,7 +203,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       ownedSecret = new OwnedSecret(keyPair.secretKey);
       signingPublicKey = keyPair.publicKey;
     }
-    ctx.refs.getIdentityKeyPair = () => currentKeyPair();
+    ctx.ports.contacts.getIdentityKeyPair = () => currentKeyPair();
     state.peer?.setProfile(state.me);
     void refreshIdentityCard();
   }
@@ -247,7 +247,7 @@ export function createContactsSlice(ctx: NocloudContext) {
   function onCopyCard() {
     void (async () => {
       await refreshIdentityCard();
-      const ok = await ctx.refs.copyText?.(state.cardText);
+      const ok = await ctx.ports.session.copyText?.(state.cardText);
       state.contactsNotice = ok
         ? contactsCopy.cardCopied
         : contactsCopy.cardCopyFailed;
@@ -255,7 +255,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       touch();
       // Publish lobby presence; keep waiting for WebRTC guests too.
       if (ok) {
-        await ctx.refs.startPresence?.();
+        await ctx.ports.presence.startPresence?.();
         await knockOn(state.me.id, true);
       }
     })();
@@ -297,7 +297,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       touch();
       return false;
     }
-    const ok = await ctx.refs.copyText?.(encoded.value);
+    const ok = await ctx.ports.session.copyText?.(encoded.value);
     state.contactsNotice = ok
       ? contactsCopy.introduceCopied(contactDisplayName(contact))
       : contactsCopy.cardCopyFailed;
@@ -324,7 +324,7 @@ export function createContactsSlice(ctx: NocloudContext) {
         introduced.value.contact.nick,
       );
       touch();
-      ctx.refs.syncPresenceContacts?.();
+      ctx.ports.presence.syncPresenceContacts?.();
       return true;
     }
     const invite = await parseIdentityInvite(text);
@@ -343,7 +343,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       void persistBook();
       state.contactsNotice = contactsCopy.inBook(invite.value.nick);
       touch();
-      ctx.refs.syncPresenceContacts?.();
+      ctx.ports.presence.syncPresenceContacts?.();
       return true;
     }
     const card = parseContactCard(text);
@@ -361,7 +361,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     void persistBook();
     state.contactsNotice = contactsCopy.inBook(card.nick);
     touch();
-    ctx.refs.syncPresenceContacts?.();
+    ctx.ports.presence.syncPresenceContacts?.();
     return true;
   }
 
@@ -389,7 +389,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     state.contactsNotice = contactsCopy.removed;
     void persistBook();
     touch();
-    ctx.refs.syncPresenceContacts?.();
+    ctx.ports.presence.syncPresenceContacts?.();
   }
 
   function onSaveGroup(name: string, memberIds: string[]) {
@@ -423,7 +423,7 @@ export function createContactsSlice(ctx: NocloudContext) {
 
   function onCopyId() {
     void (async () => {
-      const ok = await ctx.refs.copyText?.(state.me.id);
+      const ok = await ctx.ports.session.copyText?.(state.me.id);
       note(ok ? notes.idCopied : notes.idCopyFailed);
       touch();
     })();

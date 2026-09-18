@@ -132,3 +132,7 @@ _Avoid_: dumping crypto/SDP into the Shell
 **Adapter**:
 Transport wrapper (WebSocket, HTTP poll, manual QR) behind one SignalingPort contract.
 _Avoid_: leaking transport details into domain facades
+
+**NocloudPorts**:
+Typed cross-slice facades on the Pinia context (`call`, `chat`, `session`, `transfer`, `contacts`, `presence`, `servers`), bound once at store composition.
+_Avoid_: flat untyped `refs` callback bag
