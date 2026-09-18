@@ -2,9 +2,9 @@ import { defaultFileLabel, notes, peerCopy } from '@/content/index.ts';
 import { resolveServers } from '@/config/index.ts';
 import type { CustomServerDraft } from '@/config/types.ts';
 import type { ProfileCard } from '@/domain/profile.ts';
-import { PeerSession } from '@/lib/peer-session.ts';
-import { createSignalingPort } from '@/lib/signaling/factory.ts';
-import { humanizeSignalingError } from '@/lib/signaling/mixed-content.ts';
+import { createLink, type Link } from '@/lib/link.ts';
+import { createSignalingPort } from '@/packages/signaling/index.ts';
+import { humanizeSignalingError } from '@/packages/signaling/mixed-content.ts';
 import { notifyFileReceived } from '@/lib/notify.ts';
 import type { NocloudContext } from './context.ts';
 import { peerSignaling } from './views.ts';
@@ -22,7 +22,7 @@ export function createPeerSlice(
 ) {
   const { state, touch, note } = ctx;
 
-  const startPeer = (): PeerSession | null => {
+  const startPeer = (): Link | null => {
     const resolved = resolveServers(state.settings, ctx.origin);
     if (!resolved.ok) {
       state.inviteError = resolved.message;
@@ -37,7 +37,7 @@ export function createPeerSlice(
     state.lastLoggedState = '';
     state.peerNick = '';
     state.livePeerId = null;
-    const next = new PeerSession({
+    const next = createLink({
       iceServers: resolved.value.iceServers,
       signaling: createSignalingPort(peerSignaling(ctx)),
       shareServers: shareDraftForInvite(),

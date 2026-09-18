@@ -82,6 +82,10 @@ _Avoid_: “through our cloud”
 One WebRTC session between two sides (data + media).
 _Avoid_: one PC per feature
 
+**Link**:
+The deep module for one PeerConnection: signaling, ICE, control, and local media. File Transfer uses a separate TransferPort once channels are open.
+_Avoid_: PeerSession (legacy name for the same implementation)
+
 **Call**:
 Logical session made of legs to participants.
 _Avoid_: room (MVP rooms are signaling-only)

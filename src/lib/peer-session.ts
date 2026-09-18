@@ -13,6 +13,7 @@ import {
 } from '@/domain/session.ts';
 import { EventEmitter } from './events.ts';
 import { FilePipe, type DataSink } from './file-pipe.ts';
+import type { TransferPort } from './transfer-port.ts';
 import type { PickedFile } from './folder-walk.ts';
 import { generateId } from './id.ts';
 import type { OpfsStore } from './opfs.ts';
@@ -26,9 +27,9 @@ import {
   type IceCandidateInit,
   type IceReport,
 } from './ice.ts';
-import type { SignalingHandle } from './signaling/factory.ts';
-import { isManualPort } from './signaling/factory.ts';
-import type { SignalMessage } from './signaling/port.ts';
+import type { SignalingHandle } from '@/packages/signaling/index.ts';
+import { isManualPort } from '@/packages/signaling/index.ts';
+import type { SignalMessage } from '@/packages/signaling/port.ts';
 import {
   attachLocalMediaTracks,
   detachLocalMediaTracks,
@@ -45,7 +46,7 @@ import { isChatControlFrame } from './peer-chat.ts';
 
 export type PeerRole = 'idle' | 'caller' | 'callee';
 
-type PeerSessionConfig = {
+export type PeerSessionConfig = {
   iceServers: IceServerConfig[];
   signaling: SignalingHandle;
   shareServers?: CustomServerDraft | null;
@@ -82,6 +83,28 @@ export class PeerSession extends EventEmitter {
 
   get state(): SessionState {
     return this.session.state;
+  }
+
+  /** TransferPort once control+bytes are open; null beforehand. */
+  get transfer(): TransferPort | null {
+    this.ensurePipe();
+    if (!this.pipe) return null;
+    const pipe = this.pipe;
+    return {
+      sendFile: (file) => pipe.sendFile(file),
+      sendFolder: (entries) => pipe.sendFolder(entries),
+      accept: (id) => pipe.accept(id),
+      reject: (id, reason) => pipe.reject(id, reason),
+      cancel: () => pipe.cancel(),
+      pause: () => pipe.pause(),
+      resume: () => pipe.resume(),
+      current: () => pipe.current(),
+      currentFolder: () => pipe.currentFolder(),
+      activeFile: () => pipe.active,
+      incomingFile: () => pipe.incoming,
+      activeFolder: () => pipe.activeFolder,
+      incomingFolder: () => pipe.incomingFolder,
+    };
   }
 
   constructor(config: PeerSessionConfig) {

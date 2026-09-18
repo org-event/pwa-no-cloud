@@ -10,9 +10,9 @@ import {
   type DeepKind,
   type DeepLink,
 } from '@/lib/app-link.ts';
-import { PeerSession } from '@/lib/peer-session.ts';
+import type { Link } from '@/lib/link.ts';
 import { inviteToQr } from '@/lib/qr.ts';
-import { decodeInvite } from '@/lib/signaling/invite.ts';
+import { decodeInvite } from '@/packages/signaling/invite.ts';
 import { APP_BASE } from '@/workers/sw.ts';
 import { generateId } from '@/lib/id.ts';
 import type { NocloudContext } from './context.ts';
@@ -24,7 +24,7 @@ import {
 } from './views.ts';
 
 export type InviteDeps = {
-  startPeer: () => PeerSession | null;
+  startPeer: () => Link | null;
 };
 
 export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {

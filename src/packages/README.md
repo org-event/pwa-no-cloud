@@ -14,6 +14,8 @@ src/packages/<name>/
 
 Starter template: `src/packages/example/` (copy or delete).
 
+Real package: `src/packages/signaling/` — SignalingPort adapters (HTTP poll, WebSocket, manual). Import from `@/packages/signaling` entry points (`index`, `port`, `invite`, `mixed-content`, `manual`, …), never `lib/`.
+
 ## Rules
 
 1. **Entry-point boundary.** Outside a package (app code or another package), import only that package's **root files** — never anything in its subfolders.

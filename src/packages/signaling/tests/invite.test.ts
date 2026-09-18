@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { decodeInvite, encodeInvite } from './invite.ts';
-import { createManualPort } from './manual.ts';
-import type { SignalMessage } from './port.ts';
+import { decodeInvite, encodeInvite } from '../invite.ts';
+import { createManualPort } from '../manual.ts';
+import type { SignalMessage } from '../port.ts';
 
 const offer = (): SignalMessage => ({
   from: 'alice',

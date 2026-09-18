@@ -3,12 +3,12 @@ import type { Application } from '@/lib/application.ts';
 import type { CustomServerDraft } from '@/config/types.ts';
 import type { KeyPair } from '@/domain/identity/index.ts';
 import type { ProfileCard } from '@/domain/profile.ts';
-import { PeerSession } from '@/lib/peer-session.ts';
+import type { Link } from '@/lib/link.ts';
 import type { Ref } from 'vue';
 import type { NocloudState } from './state.ts';
 
 export type NocloudRefs = {
-  startPeer?: () => PeerSession | null;
+  startPeer?: () => Link | null;
   applyPeerProfile?: (card: ProfileCard) => void;
   ensureLivePeerInBook?: () => void;
   applyShareDraft?: (draft: CustomServerDraft, notice: string) => void;

@@ -42,17 +42,18 @@ export function createTransferSlice(ctx: NocloudContext) {
 
   const flushQueue = () => {
     if (!state.peer || state.peer.state !== 'connected') return;
-    if (state.peer.activeFile()) return;
+    const transfer = state.peer.transfer;
+    if (!transfer || transfer.activeFile()) return;
     if (state.queuedFolder && state.queuedFolder.length > 0) {
       const folder = state.queuedFolder;
       state.queuedFolder = null;
-      state.peer.sendFolder(folder);
+      transfer.sendFolder(folder);
       return;
     }
     const next = state.queuedFiles[0];
     if (!next) return;
     state.queuedFiles = state.queuedFiles.slice(1);
-    state.peer.sendFile(next);
+    transfer.sendFile(next);
   };
 
   const queueFile = (file: File) => {
@@ -152,27 +153,27 @@ export function createTransferSlice(ctx: NocloudContext) {
     state.transferError = '';
     ctx.refs.ensureLivePeerInBook?.();
     void requestNotifyPermission();
-    state.peer?.acceptFile(transferId);
+    state.peer?.transfer?.accept(transferId);
     touch();
   }
 
   function onRejectFile(transferId: string) {
-    state.peer?.rejectFile(transferId);
+    state.peer?.transfer?.reject(transferId);
     touch();
   }
 
   function onCancelFile() {
-    state.peer?.cancelFile();
+    state.peer?.transfer?.cancel();
     touch();
   }
 
   function onPauseFile() {
-    state.peer?.pauseFile();
+    state.peer?.transfer?.pause();
     touch();
   }
 
   function onResumeFile() {
-    state.peer?.resumeFile();
+    state.peer?.transfer?.resume();
     touch();
   }
 

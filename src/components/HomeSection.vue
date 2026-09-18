@@ -2,7 +2,7 @@
 import { componentsCopy } from '@/content/index.ts';
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { mixedContentBlocksSignaling } from '@/lib/signaling/mixed-content.ts';
+import { mixedContentBlocksSignaling } from '@/packages/signaling/mixed-content.ts';
 import { expandRecipients } from '@/domain/profile.ts';
 import { useNocloudStore } from '@/stores/nocloud.ts';
 import {
