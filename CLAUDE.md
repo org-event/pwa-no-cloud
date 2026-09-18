@@ -53,3 +53,17 @@ Thin Node.js relay (plain JS, not the PWA): HTTP poll endpoints (`/join`, `/sign
 - TypeScript is strict with `verbatimModuleSyntax` and `erasableSyntaxOnly`; imports use explicit `.ts` extensions; path alias `@/` → `src/`.
 - Tests are colocated `*.test.ts` (vitest globals enabled); `fast-check` property/fuzz tests exist (e.g. `src/lib/parser-fuzz.test.ts`).
 - `vp check` runs on staged files via the `staged` config (lint-staged style) — expect `vp check --fix` on commit.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues in `org-event/pwa-no-cloud` via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
