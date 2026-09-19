@@ -1,488 +1,95 @@
 import {
-  contactsCopy,
-  knockAlreadyNotice,
-  knockBlockedNotice,
-  knockStartNotice,
-  notes,
-} from '@/content/index.ts';
-import {
-  createIdentityInvite,
-  parseIdentityInvite,
-} from '@/domain/identity-invite.ts';
-import {
-  createIntroduceCard,
-  importIntroduceCard,
-} from '@/domain/introduce.ts';
-import { decodePublicKey, type KeyPair } from '@/domain/identity/index.ts';
-import {
-  defaultNick,
-  encodeContactCard,
-  findContact,
-  meetRoomId,
-  parseContactCard,
-  removeContact,
-  sanitizeNick,
-  setContactAlias,
-  setContactTrust,
-  contactDisplayName,
-  contactTrustOf,
-  upsertContact,
-  type ContactTrust,
-  type ProfileCard,
-} from '@/domain/profile.ts';
-import { fileToAvatarDataUrl } from '@/lib/avatar.ts';
-import { createGroup, saveAddressBook } from '@/lib/contacts-store.ts';
-import { bindIdentityProfile, saveProfile } from '@/lib/profile-store.ts';
-import { inviteToQr } from '@/lib/qr.ts';
-import { OwnedSecret, withBorrowedKeyPair } from '@/lib/owned-secret.ts';
+  createContactsController,
+  type ContactsControllerState,
+} from '@/lib/contacts-controller.ts';
 import type { NocloudContext } from './context.ts';
 import { peerIsLive, socketBlocked, usesRoomLink } from './views.ts';
 
 export function createContactsSlice(ctx: NocloudContext) {
   const { state, storage, skippedPeers, touch, note } = ctx;
-  let signingPublicKey: KeyPair['publicKey'] | null = null;
-  let ownedSecret: OwnedSecret | null = null;
 
-  const clearOwnedSecret = () => {
-    ownedSecret?.dispose();
-    ownedSecret = null;
-    signingPublicKey = null;
-  };
-
-  const withIdentityKeyPair = async <T>(
-    op: (keyPair: KeyPair) => T | Promise<T>,
-  ): Promise<T | null> => {
-    if (!signingPublicKey || !ownedSecret) return null;
-    return withBorrowedKeyPair(ownedSecret, signingPublicKey, op);
-  };
-
-  const refreshIdentityCard = async () => {
-    const invite = await withIdentityKeyPair(async (keyPair) => {
-      if (!state.me.id) return null;
-      return createIdentityInvite(
-        { nick: state.me.nick || defaultNick(state.me.id) },
-        keyPair,
-      );
-    });
-    if (invite?.ok) {
-      state.cardText = invite.value;
-      state.identityQrUrl = await inviteToQr(invite.value);
-      touch();
-      return;
-    }
-    state.cardText = encodeContactCard(state.me);
-    state.identityQrUrl = state.cardText
-      ? await inviteToQr(state.cardText)
-      : null;
+  const syncUi = (next: ContactsControllerState) => {
+    state.book = next.book;
+    state.pending = next.pending;
+    state.contactsNotice = next.notice;
+    state.me = next.me;
+    state.cardText = next.cardText;
+    state.identityQrUrl = next.identityQrUrl;
+    state.selectedContactIds = next.selectedContactIds;
+    state.selectedGroupIds = next.selectedGroupIds;
     touch();
   };
 
-  const persistBook = (): Promise<void> => {
-    const opfs = state.store;
-    if (!opfs) return Promise.resolve();
-    return (async () => {
-      const saved = await saveAddressBook(opfs, state.book);
-      if (!saved.ok) {
-        state.contactsNotice = saved.message;
-        touch();
-      }
-    })();
-  };
-
-  const applyPeerProfile = (card: ProfileCard) => {
-    if (card.id === state.me.id) return;
-    state.peerNick = card.nick;
-    state.livePeerId = card.id;
-    // Skip was “not now” — a live channel / transfer re-opens the door.
-    skippedPeers.delete(card.id);
-    const known = findContact(state.book, card.id);
-    state.book = upsertContact(state.book, card);
-    state.pending = null;
-    void persistBook();
-    if (!known) {
-      state.contactsNotice = contactsCopy.inBook(card.nick);
-      note(notes.contact(card.nick));
-    }
-    touch();
-    ctx.ports.presence.syncPresenceContacts?.();
-  };
-
-  /** After delete mid-call, put the live peer back into the book. */
-  const ensureLivePeerInBook = () => {
-    const id = state.livePeerId;
-    if (!id || id === state.me.id) return;
-    skippedPeers.delete(id);
-    const known = findContact(state.book, id);
-    if (!known) {
-      const card = {
-        id,
-        nick: state.peerNick || defaultNick(id),
-        avatar: '',
-      };
-      state.book = upsertContact(state.book, card);
-      void persistBook();
-      state.contactsNotice = contactsCopy.inBook(card.nick);
-      note(notes.contact(card.nick));
+  const controller = createContactsController({
+    storage,
+    getOpfsStore: () => state.store,
+    skippedPeers,
+    copyText: async (text) => ctx.ports.session.copyText?.(text),
+    note,
+    syncPresenceContacts: () => {
       ctx.ports.presence.syncPresenceContacts?.();
-    }
-    if (state.selectedContactIds[0] !== id) {
-      state.selectedContactIds = [id];
-      state.selectedGroupIds = [];
-    }
-    touch();
-  };
-
-  const knockOn = async (ownerId: string, asHost: boolean) => {
-    const known = findContact(state.book, ownerId);
-    if (!usesRoomLink(ctx)) {
-      state.contactsNotice = knockBlockedNotice(
-        known?.nick,
-        socketBlocked(ctx),
-      );
-      touch();
-      return;
-    }
-    const target = meetRoomId(ownerId);
-    if (peerIsLive(ctx) && state.roomId === target) {
-      state.contactsNotice = knockAlreadyNotice(asHost, known?.nick);
-      touch();
-      return;
-    }
-    state.openedFromLink = false;
-    state.roomId = target;
-    state.inviteRole = 'caller';
-    const next = ctx.ports.session.startPeer?.();
-    if (!next) return;
-    state.contactsNotice = knockStartNotice(asHost, known?.nick);
-    touch();
-    await next.enterRoom(target);
-    touch();
-  };
-
-  function onAcceptPending() {
-    if (!state.pending) return;
-    state.book = upsertContact(state.book, state.pending);
-    state.contactsNotice = contactsCopy.inBook(state.pending.nick);
-    skippedPeers.delete(state.pending.id);
-    state.pending = null;
-    void persistBook();
-    touch();
-  }
-
-  function onSkipPending() {
-    if (state.pending) skippedPeers.add(state.pending.id);
-    state.pending = null;
-    touch();
-  }
-
-  function onToggleContact(id: string) {
-    state.selectedContactIds = state.selectedContactIds.includes(id)
-      ? state.selectedContactIds.filter((item) => item !== id)
-      : [...state.selectedContactIds, id];
-    touch();
-  }
-
-  function onSelectContact(id: string) {
-    state.selectedContactIds = [id];
-    state.selectedGroupIds = [];
-    touch();
-  }
-
-  function onToggleGroup(id: string) {
-    state.selectedGroupIds = state.selectedGroupIds.includes(id)
-      ? state.selectedGroupIds.filter((item) => item !== id)
-      : [...state.selectedGroupIds, id];
-    touch();
-  }
-
-  function onBindIdentity(
-    fingerprint: string,
-    secret?: OwnedSecret,
-    publicKey?: KeyPair['publicKey'],
-  ) {
-    state.me = bindIdentityProfile(storage, fingerprint);
-    clearOwnedSecret();
-    if (secret) {
-      ownedSecret = secret;
-      signingPublicKey = publicKey ?? null;
-    }
-    ctx.ports.contacts.withIdentityKeyPair = withIdentityKeyPair;
-    state.peer?.setProfile(state.me);
-    void refreshIdentityCard();
-  }
-
-  function onLockIdentity() {
-    clearOwnedSecret();
-    ctx.ports.contacts.withIdentityKeyPair = async () => null;
-    touch();
-  }
-
-  function onSaveProfile(nick: string) {
-    const nextNick = sanitizeNick(nick);
-    if (!nextNick) {
-      state.contactsNotice = contactsCopy.nickRules;
-      touch();
-      return;
-    }
-    state.me = saveProfile(storage, {
-      nick: nextNick,
-      avatar: state.me.avatar,
-    });
-    state.peer?.setProfile(state.me);
-    state.contactsNotice = contactsCopy.nickSaved;
-    void refreshIdentityCard();
-  }
-
-  function onPickAvatar(file: File) {
-    void (async () => {
-      try {
-        const avatar = await fileToAvatarDataUrl(file);
-        if (!avatar) {
-          state.contactsNotice = contactsCopy.avatarUnreadable;
-          touch();
-          return;
-        }
-        state.me = saveProfile(storage, { nick: state.me.nick, avatar });
-        state.peer?.setProfile(state.me);
-        state.contactsNotice = contactsCopy.avatarSaved;
-        void refreshIdentityCard();
-      } catch {
-        state.contactsNotice = contactsCopy.avatarUnreadable;
-        touch();
-      }
-    })();
-  }
-
-  function onCopyCard() {
-    void (async () => {
-      await refreshIdentityCard();
-      const ok = await ctx.ports.session.copyText?.(state.cardText);
-      state.contactsNotice = ok
-        ? contactsCopy.cardCopied
-        : contactsCopy.cardCopyFailed;
-      note(ok ? notes.cardCopied : notes.cardCopyFailed);
-      touch();
-      // Publish lobby presence; keep waiting for WebRTC guests too.
-      if (ok) {
-        await ctx.ports.presence.startPresence?.();
-        await knockOn(state.me.id, true);
-      }
-    })();
-  }
-
-  async function onIntroduceContact(id: string): Promise<boolean> {
-    const contact = findContact(state.book, id);
-    if (!contact) {
-      state.contactsNotice = contactsCopy.introduceNotFound;
-      touch();
-      return false;
-    }
-    if (!contact.publicKey) {
-      state.contactsNotice = contactsCopy.introduceNeedKey;
-      touch();
-      return false;
-    }
-    const subjectPk = decodePublicKey(contact.publicKey);
-    if (!subjectPk.ok) {
-      state.contactsNotice = contactsCopy.introduceFailed;
-      touch();
-      return false;
-    }
-    const encoded = await withIdentityKeyPair(async (keyPair) =>
-      createIntroduceCard(
-        {
-          subjectPk: subjectPk.value,
-          subjectNick: contact.nick || defaultNick(contact.id),
-        },
-        keyPair,
-      ),
-    );
-    if (!encoded) {
-      state.contactsNotice = contactsCopy.introduceNeedIdentity;
-      touch();
-      return false;
-    }
-    if (!encoded.ok) {
-      state.contactsNotice = contactsCopy.introduceFailed;
-      touch();
-      return false;
-    }
-    const ok = await ctx.ports.session.copyText?.(encoded.value);
-    state.contactsNotice = ok
-      ? contactsCopy.introduceCopied(contactDisplayName(contact))
-      : contactsCopy.cardCopyFailed;
-    touch();
-    return ok ?? false;
-  }
-
-  async function onAddContact(text: string): Promise<boolean> {
-    const introduced = await importIntroduceCard(text);
-    if (introduced.ok) {
-      if (introduced.value.contact.id === state.me.id) {
-        state.contactsNotice = contactsCopy.ownCard;
-        touch();
-        return false;
-      }
-      const id = introduced.value.contact.id;
-      const previous = findContact(state.book, id);
-      state.book = upsertContact(state.book, introduced.value.contact);
-      if (!previous || contactTrustOf(previous) === 'unverified') {
-        state.book = setContactTrust(state.book, id, 'introduced');
-      }
-      void persistBook();
-      state.contactsNotice = contactsCopy.introduced(
-        introduced.value.contact.nick,
-      );
-      touch();
-      ctx.ports.presence.syncPresenceContacts?.();
-      return true;
-    }
-    const invite = await parseIdentityInvite(text);
-    if (invite.ok) {
-      if (invite.value.id === state.me.id) {
-        state.contactsNotice = contactsCopy.ownCard;
-        touch();
-        return false;
-      }
-      state.book = upsertContact(state.book, {
-        id: invite.value.id,
-        nick: invite.value.nick,
-        avatar: '',
-        publicKey: invite.value.publicKey,
-      });
-      void persistBook();
-      state.contactsNotice = contactsCopy.inBook(invite.value.nick);
-      touch();
-      ctx.ports.presence.syncPresenceContacts?.();
-      return true;
-    }
-    const card = parseContactCard(text);
-    if (!card) {
-      state.contactsNotice = contactsCopy.pasteCard;
-      touch();
-      return false;
-    }
-    if (card.id === state.me.id) {
-      state.contactsNotice = contactsCopy.ownCard;
-      touch();
-      return false;
-    }
-    state.book = upsertContact(state.book, card);
-    void persistBook();
-    state.contactsNotice = contactsCopy.inBook(card.nick);
-    touch();
-    ctx.ports.presence.syncPresenceContacts?.();
-    return true;
-  }
-
-  function onRenameAlias(id: string, alias: string) {
-    state.book = setContactAlias(state.book, id, alias);
-    void persistBook();
-    state.contactsNotice = contactsCopy.aliasSaved;
-    touch();
-  }
-
-  function onSetContactTrust(id: string, trust: ContactTrust) {
-    state.book = setContactTrust(state.book, id, trust);
-    void persistBook();
-    state.contactsNotice =
-      trust === 'met' ? contactsCopy.trustMetSaved : contactsCopy.trustCleared;
-    touch();
-  }
-
-  function onRemoveContact(id: string) {
-    state.book = removeContact(state.book, id);
-    state.selectedContactIds = state.selectedContactIds.filter(
-      (item) => item !== id,
-    );
-    skippedPeers.delete(id);
-    state.contactsNotice = contactsCopy.removed;
-    void persistBook();
-    touch();
-    ctx.ports.presence.syncPresenceContacts?.();
-  }
-
-  function onSaveGroup(name: string, memberIds: string[]) {
-    const label = sanitizeNick(name);
-    if (!label || memberIds.length === 0) {
-      state.contactsNotice = contactsCopy.groupNeedMembers;
-      touch();
-      return;
-    }
-    state.book = {
-      ...state.book,
-      groups: [...state.book.groups, createGroup(label, memberIds)],
-    };
-    state.contactsNotice = contactsCopy.groupSaved(label);
-    void persistBook();
-    touch();
-  }
-
-  function onRemoveGroup(id: string) {
-    state.book = {
-      ...state.book,
-      groups: state.book.groups.filter((group) => group.id !== id),
-    };
-    state.selectedGroupIds = state.selectedGroupIds.filter(
-      (item) => item !== id,
-    );
-    state.contactsNotice = contactsCopy.groupRemoved;
-    void persistBook();
-    touch();
-  }
-
-  function onCopyId() {
-    void (async () => {
-      const ok = await ctx.ports.session.copyText?.(state.me.id);
-      note(ok ? notes.idCopied : notes.idCopyFailed);
-      touch();
-    })();
-  }
-
-  async function seedDemoContacts() {
-    if (!state.store) return;
-    const demos: ProfileCard[] = [
-      { id: 'a11a11a11a11a11a', nick: 'Анна', avatar: '' },
-      { id: 'b22b22b22b22b22b', nick: 'Борис', avatar: '' },
-      { id: 'c33c33c33c33c33c', nick: 'Вика', avatar: '' },
-      { id: 'd44d44d44d44d44d', nick: 'Дима', avatar: '' },
-      { id: 'e55e55e55e55e55e', nick: 'Лена', avatar: '' },
-    ];
-    let changed = false;
-    for (const demo of demos) {
-      if (demo.id === state.me.id) continue;
-      if (findContact(state.book, demo.id)) continue;
-      state.book = upsertContact(state.book, demo);
-      changed = true;
-    }
-    if (!changed) return;
-    await persistBook();
-    touch();
-  }
+    },
+    startPresence: async () => {
+      await ctx.ports.presence.startPresence?.();
+    },
+    setPeerProfile: (me) => {
+      state.peer?.setProfile(me);
+    },
+    setLivePeer: (id, nick) => {
+      state.livePeerId = id;
+      state.peerNick = nick;
+    },
+    getLivePeerId: () => state.livePeerId,
+    getPeerNick: () => state.peerNick,
+    usesRoomLink: () => usesRoomLink(ctx),
+    socketBlocked: () => socketBlocked(ctx),
+    peerIsLive: () => peerIsLive(ctx),
+    getRoomId: () => state.roomId,
+    beginKnock: (roomId) => {
+      state.openedFromLink = false;
+      state.roomId = roomId;
+      state.inviteRole = 'caller';
+      return ctx.ports.session.startPeer?.() ?? null;
+    },
+    onIdentityKeyPairChange: (fn) => {
+      ctx.ports.contacts.withIdentityKeyPair = fn;
+    },
+    onChange: syncUi,
+    initial: {
+      book: state.book,
+      pending: state.pending,
+      notice: state.contactsNotice,
+      me: state.me,
+      cardText: state.cardText,
+      identityQrUrl: state.identityQrUrl,
+      selectedContactIds: state.selectedContactIds,
+      selectedGroupIds: state.selectedGroupIds,
+    },
+  });
 
   return {
-    persistBook,
-    applyPeerProfile,
-    ensureLivePeerInBook,
-    knockOn,
-    onAcceptPending,
-    onSkipPending,
-    onToggleContact,
-    onSelectContact,
-    onToggleGroup,
-    onBindIdentity,
-    onLockIdentity,
-    onSaveProfile,
-    onPickAvatar,
-    onCopyCard,
-    onAddContact,
-    onIntroduceContact,
-    onRenameAlias,
-    onSetContactTrust,
-    onRemoveContact,
-    onSaveGroup,
-    onRemoveGroup,
-    onCopyId,
-    seedDemoContacts,
+    persistBook: controller.persistBook,
+    applyPeerProfile: controller.applyPeerProfile,
+    ensureLivePeerInBook: controller.ensureLivePeerInBook,
+    knockOn: controller.knockOn,
+    onAcceptPending: controller.onAcceptPending,
+    onSkipPending: controller.onSkipPending,
+    onToggleContact: controller.onToggleContact,
+    onSelectContact: controller.onSelectContact,
+    onToggleGroup: controller.onToggleGroup,
+    onBindIdentity: controller.onBindIdentity,
+    onLockIdentity: controller.onLockIdentity,
+    onSaveProfile: controller.onSaveProfile,
+    onPickAvatar: controller.onPickAvatar,
+    onCopyCard: controller.onCopyCard,
+    onAddContact: controller.onAddContact,
+    onIntroduceContact: controller.onIntroduceContact,
+    onRenameAlias: controller.onRenameAlias,
+    onSetContactTrust: controller.onSetContactTrust,
+    onRemoveContact: controller.onRemoveContact,
+    onSaveGroup: controller.onSaveGroup,
+    onRemoveGroup: controller.onRemoveGroup,
+    onCopyId: controller.onCopyId,
+    seedDemoContacts: controller.seedDemoContacts,
   };
 }
