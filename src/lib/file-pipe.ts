@@ -39,6 +39,13 @@ import {
   type TransferCursor,
 } from './opfs.ts';
 import { estimateQuota, requestPersist } from './quota.ts';
+import { fillStreamBuffer } from './stream-fill.ts';
+import {
+  createAckGate,
+  createPauseGate,
+  type AckGate,
+  type PauseGate,
+} from './transfer-gates.ts';
 
 export type DataSink = {
   send(data: string | ArrayBuffer): void;
@@ -67,13 +74,6 @@ type FilePipeConfig = {
   persist?: () => Promise<boolean>;
 };
 
-const concat = (left: Uint8Array, right: Uint8Array): Uint8Array => {
-  const next = new Uint8Array(left.byteLength + right.byteLength);
-  next.set(left);
-  next.set(right, left.byteLength);
-  return next;
-};
-
 const isOpen = (folder: FolderTransfer | null): boolean => {
   if (!folder) return false;
   return (
@@ -96,11 +96,10 @@ export class FilePipe extends EventEmitter {
   writer: FileSystemWritableFileStream | null = null;
   expectBytes: { transferId: string; index: number; size: number } | null =
     null;
-  ackWaiters = new Map<string, (index: number) => void>();
-  resumeWaiters: Array<() => void> = [];
+  ackGate: AckGate = createAckGate();
+  pauseGate: PauseGate = createPauseGate();
   resumeCursor: TransferCursor | null = null;
   resumeInboxId: string | null = null;
-  paused = false;
   generation = 0;
 
   constructor(config: FilePipeConfig) {
@@ -153,7 +152,7 @@ export class FilePipe extends EventEmitter {
   pause() {
     const transfer = this.active ?? this.incoming;
     if (!transfer) return;
-    this.paused = true;
+    this.pauseGate.pause();
     this.sendControl({ type: 'file-pause', transferId: transfer.id });
     if (this.active && this.active.state !== 'paused') {
       const next = applyTransferEvent(this.active, { type: 'pause' });
@@ -166,7 +165,7 @@ export class FilePipe extends EventEmitter {
 
   resume() {
     const transfer = this.active ?? this.incoming;
-    this.paused = false;
+    this.pauseGate.resume();
     if (transfer) {
       this.sendControl({ type: 'file-resume', transferId: transfer.id });
     }
@@ -174,18 +173,13 @@ export class FilePipe extends EventEmitter {
       this.active = applyTransferEvent(this.active, { type: 'resume' });
       this.emit('transfer', this.active);
     }
-    for (const waiter of this.resumeWaiters) waiter();
-    this.resumeWaiters = [];
   }
 
   interrupt() {
     this.generation += 1;
-    for (const waiter of this.ackWaiters.values()) waiter(-1);
-    this.ackWaiters.clear();
-    for (const waiter of this.resumeWaiters) waiter();
-    this.resumeWaiters = [];
+    this.ackGate.clear(-1);
+    this.pauseGate.resume();
     this.expectBytes = null;
-    this.paused = false;
     const writer = this.writer;
     this.writer = null;
     if (writer) void writer.close();
@@ -301,9 +295,7 @@ export class FilePipe extends EventEmitter {
       return;
     }
     if (message.type === 'file-ack') {
-      const key = `${message.transferId}:${message.index}`;
-      const waiter = this.ackWaiters.get(key);
-      if (waiter) waiter(message.index);
+      this.ackGate.resolve(message.transferId, message.index);
       return;
     }
     if (message.type === 'file-chunk-meta') {
@@ -679,10 +671,12 @@ export class FilePipe extends EventEmitter {
     const total = transferChunks(transfer);
     try {
       while (index < total && gen === this.generation) {
-        await this.waitIfPaused();
+        await this.pauseGate.waitIfPaused();
         if (gen !== this.generation) return;
         const need = chunkLength(index, transfer.size, transfer.chunkSize);
-        leftover = new Uint8Array(await this.fill(reader, leftover, need));
+        leftover = new Uint8Array(
+          await fillStreamBuffer(reader, leftover, need),
+        );
         if (leftover.byteLength < need) {
           this.fail(transfer, 'short-read');
           return;
@@ -700,7 +694,7 @@ export class FilePipe extends EventEmitter {
         const copy = new Uint8Array(need);
         copy.set(chunk);
         this.config.bytes.send(copy.buffer);
-        await this.waitAck(transfer.id, index);
+        await this.ackGate.wait(transfer.id, index);
         if (gen !== this.generation) return;
         this.active = applyTransferEvent(this.active ?? transfer, {
           type: 'ack',
@@ -744,7 +738,7 @@ export class FilePipe extends EventEmitter {
   }
 
   pauseRemote() {
-    this.paused = true;
+    this.pauseGate.pause();
     if (this.active && this.active.state !== 'paused') {
       const next = applyTransferEvent(this.active, { type: 'pause' });
       if (next.state === 'paused') {
@@ -755,20 +749,11 @@ export class FilePipe extends EventEmitter {
   }
 
   resumeRemote() {
-    this.paused = false;
+    this.pauseGate.resume();
     if (this.active?.state === 'paused') {
       this.active = applyTransferEvent(this.active, { type: 'resume' });
       this.emit('transfer', this.active);
     }
-    for (const waiter of this.resumeWaiters) waiter();
-    this.resumeWaiters = [];
-  }
-
-  waitIfPaused(): Promise<void> {
-    if (!this.paused) return Promise.resolve();
-    return new Promise((resolve) => {
-      this.resumeWaiters.push(resolve);
-    });
   }
 
   async saveCursor(transfer: Transfer) {
@@ -824,27 +809,6 @@ export class FilePipe extends EventEmitter {
     }
   }
 
-  async fill(
-    reader: ReadableStreamDefaultReader<Uint8Array>,
-    leftover: Uint8Array,
-    need: number,
-  ): Promise<Uint8Array> {
-    let buffer = leftover;
-    while (buffer.byteLength < need) {
-      const read = await reader.read();
-      if (read.done) return buffer;
-      buffer = concat(buffer, read.value);
-    }
-    return buffer;
-  }
-
-  waitAck(transferId: string, index: number): Promise<number> {
-    const key = `${transferId}:${index}`;
-    return new Promise((resolve) => {
-      this.ackWaiters.set(key, resolve);
-    });
-  }
-
   sendControl(message: ControlMessage) {
     if (this.config.control.readyState !== 'open') return;
     this.config.control.send(JSON.stringify(message));
@@ -873,13 +837,10 @@ export class FilePipe extends EventEmitter {
     },
   ) {
     this.generation += 1;
-    for (const waiter of this.ackWaiters.values()) waiter(-1);
-    this.ackWaiters.clear();
+    this.ackGate.clear(-1);
     this.expectBytes = null;
     this.source = null;
-    this.paused = false;
-    for (const waiter of this.resumeWaiters) waiter();
-    this.resumeWaiters = [];
+    this.pauseGate.resume();
     const writer = this.writer;
     this.writer = null;
     if (writer) void writer.close();

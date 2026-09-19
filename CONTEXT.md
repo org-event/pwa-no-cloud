@@ -144,7 +144,7 @@ Sending a file or folder over a DataChannel.
 _Avoid_: upload to relay
 
 **TransferPort**:
-Byte-plane seam once Link control+bytes channels are open: send/accept/pause file and folder Transfer. FilePipe is the implementation; Link exposes only this port (via `bindTransferPort`), not FilePipe methods.
+Byte-plane seam once Link control+bytes channels are open: send/accept/pause file and folder Transfer. FilePipe is the implementation; Link exposes only this port (via `bindTransferPort`), not FilePipe methods. Internals (same package): `createAckGate` / `createPauseGate` for chunk wait/pause, `fillStreamBuffer` for send-side chunk assembly.
 _Avoid_: PeerSession sendFile/acceptFile pass-throughs; calling FilePipe from UI/store
 
 **TransferSession**:

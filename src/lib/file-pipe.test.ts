@@ -184,16 +184,16 @@ describe('file pipe', () => {
 
   it('waits while paused and continues after resume', async () => {
     const { alice } = await pair();
-    alice.paused = true;
+    alice.pauseGate.pause();
     let released = false;
-    const waiting = alice.waitIfPaused().then(() => {
+    const waiting = alice.pauseGate.waitIfPaused().then(() => {
       released = true;
     });
     expect(released).toBe(false);
     alice.resume();
     await waiting;
     expect(released).toBe(true);
-    expect(alice.paused).toBe(false);
+    expect(alice.pauseGate.paused).toBe(false);
   });
 
   it('rejects when the estimated free space is too small', async () => {
