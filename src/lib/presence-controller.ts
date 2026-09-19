@@ -47,7 +47,9 @@ export type PresenceControllerDeps = {
   relayUrlCount: () => number;
   livePeerId: () => string | null;
   linkConnected: () => boolean;
-  getKeyPair: () => KeyPair | null;
+  withKeyPair: <T>(
+    op: (keyPair: KeyPair) => T | Promise<T>,
+  ) => Promise<T | null>;
   loginRelay: (
     signalingUrl: string,
     keyPair: KeyPair,
@@ -154,10 +156,10 @@ export function createPresenceController(deps: PresenceControllerDeps) {
     if (relaySessionId) return;
     const signaling = deps.getSignaling();
     if (signaling.kind === 'manual' || !signaling.url) return;
-    const keyPair = deps.getKeyPair();
-    if (!keyPair) return;
-    const session = await deps.loginRelay(signaling.url, keyPair);
-    if (session.ok) relaySessionId = session.sessionId;
+    const session = await deps.withKeyPair((keyPair) =>
+      deps.loginRelay(signaling.url!, keyPair),
+    );
+    if (session?.ok) relaySessionId = session.sessionId;
   };
 
   const start = async (options?: { quiet?: boolean }): Promise<boolean> => {

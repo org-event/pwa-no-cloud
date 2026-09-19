@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { AbortScope, OwnedSecret, revocableView } from './owned-secret.ts';
+import {
+  AbortScope,
+  OwnedSecret,
+  revocableView,
+  withBorrowedKeyPair,
+} from './owned-secret.ts';
 
 describe('OwnedSecret', () => {
   it('zeroes bytes on dispose and blocks later use', () => {
@@ -40,5 +45,21 @@ describe('AbortScope', () => {
     expect(scope.signal.aborted).toBe(false);
     scope.dispose();
     expect(scope.signal.aborted).toBe(true);
+  });
+});
+
+describe('withBorrowedKeyPair', () => {
+  it('zeroes the borrowed secret after the callback', async () => {
+    const owned = new OwnedSecret(new Uint8Array([1, 2, 3, 4]));
+    const publicKey = new Uint8Array([9, 9]);
+    let leaked: Uint8Array | null = null;
+    const result = await withBorrowedKeyPair(owned, publicKey, (kp) => {
+      leaked = kp.secretKey;
+      expect(kp.secretKey).toEqual(new Uint8Array([1, 2, 3, 4]));
+      return 'ok';
+    });
+    expect(result).toBe('ok');
+    expect(leaked).toEqual(new Uint8Array([0, 0, 0, 0]));
+    owned.dispose();
   });
 });

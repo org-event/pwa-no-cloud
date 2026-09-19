@@ -35,7 +35,9 @@ export type ChatControllerDeps = {
   storage: ChatStoreStorage;
   meId: () => string;
   selfPeerId: string;
-  getKeyPair: () => KeyPair | null;
+  withKeyPair: <T>(
+    op: (keyPair: KeyPair) => T | Promise<T>,
+  ) => Promise<T | null>;
   livePeerId: () => string | null;
   linkConnected: () => boolean;
   trySendWire: (wire: string) => boolean;
@@ -100,10 +102,13 @@ export function createChatController(deps: ChatControllerDeps) {
     if (!body) return false;
 
     if (peerId === deps.selfPeerId) {
-      const keyPair = deps.getKeyPair();
+      const fromPk =
+        (await deps.withKeyPair((keyPair) =>
+          encodePublicKey(keyPair.publicKey),
+        )) ?? '';
       const entry: ChatStoredMessage = {
         id: crypto.randomUUID(),
-        fromPk: keyPair ? encodePublicKey(keyPair.publicKey) : '',
+        fromPk,
         toId: deps.meId() || deps.selfPeerId,
         text: body,
         ts: Date.now(),
@@ -114,37 +119,39 @@ export function createChatController(deps: ChatControllerDeps) {
       return true;
     }
 
-    const keyPair = deps.getKeyPair();
-    if (!keyPair) {
+    const signed = await deps.withKeyPair(async (keyPair) => {
+      const created = await createChatMessage(
+        { toId: peerId, text: body },
+        keyPair,
+      );
+      if (!created.ok) return { ok: false as const, message: created.message };
+      const verified = await parseAndVerifyChatMessage(created.value);
+      if (!verified.ok)
+        return { ok: false as const, message: verified.message };
+      return {
+        ok: true as const,
+        wire: created.value,
+        message: verified.value,
+      };
+    });
+    if (!signed) {
       notice = copy.needIdentity;
       publish();
       return false;
     }
-
-    const created = await createChatMessage(
-      { toId: peerId, text: body },
-      keyPair,
-    );
-    if (!created.ok) {
-      notice = created.message;
+    if (!signed.ok) {
+      notice = signed.message;
       publish();
       return false;
     }
 
-    const verified = await parseAndVerifyChatMessage(created.value);
-    if (!verified.ok) {
-      notice = verified.message;
-      publish();
-      return false;
-    }
-
-    const entry = storedFromWire(verified.value, 'out', created.value);
+    const entry = storedFromWire(signed.message, 'out', signed.wire);
     persist(appendChatMessage(chat, peerId, entry));
 
     const sent =
       deps.livePeerId() === peerId &&
       deps.linkConnected() &&
-      deps.trySendWire(created.value);
+      deps.trySendWire(signed.wire);
 
     if (sent) {
       notice = '';

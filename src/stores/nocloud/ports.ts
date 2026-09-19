@@ -41,7 +41,13 @@ export type ContactsPort = {
   ensureLivePeerInBook: () => void;
   knockOn: (ownerId: string, asHost: boolean) => Promise<void>;
   seedDemoContacts: () => void | Promise<void>;
-  getIdentityKeyPair: () => KeyPair | null;
+  /**
+   * Borrow secret for `op` only; zeros the copy afterward (ADR 0002).
+   * Returns null when identity is locked.
+   */
+  withIdentityKeyPair: <T>(
+    op: (keyPair: KeyPair) => T | Promise<T>,
+  ) => Promise<T | null>;
 };
 
 export type PresencePort = {
@@ -103,8 +109,8 @@ export function bindNocloudPorts(
     chat: ChatPort;
     session: SessionPort;
     transfer: TransferStorePort;
-    contacts: Omit<ContactsPort, 'getIdentityKeyPair'> &
-      Partial<Pick<ContactsPort, 'getIdentityKeyPair'>>;
+    contacts: Omit<ContactsPort, 'withIdentityKeyPair'> &
+      Partial<Pick<ContactsPort, 'withIdentityKeyPair'>>;
     presence: PresencePort;
     servers: ServersPort;
   },

@@ -18,7 +18,8 @@ export function createChatSlice(ctx: NocloudContext) {
     storage,
     meId: () => state.me.id,
     selfPeerId: SELF_PEER_ID,
-    getKeyPair: () => ctx.ports.contacts.getIdentityKeyPair?.() ?? null,
+    withKeyPair: (op) =>
+      ctx.ports.contacts.withIdentityKeyPair?.(op) ?? Promise.resolve(null),
     livePeerId: () => state.livePeerId,
     linkConnected: () => state.peer?.session.state === 'connected',
     trySendWire: (wire) => Boolean(state.peer?.sendChatWire(wire)),

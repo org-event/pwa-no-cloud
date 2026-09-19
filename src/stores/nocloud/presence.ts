@@ -34,7 +34,8 @@ export function createPresenceSlice(ctx: NocloudContext) {
     relayUrlCount: () => state.relayBundle.urls.length,
     livePeerId: () => state.livePeerId,
     linkConnected: () => state.peer?.state === 'connected',
-    getKeyPair: () => ctx.ports.contacts.getIdentityKeyPair?.() ?? null,
+    withKeyPair: (op) =>
+      ctx.ports.contacts.withIdentityKeyPair?.(op) ?? Promise.resolve(null),
     loginRelay: async (signalingUrl, keyPair) => {
       const session = await loginRelayChallenge({ signalingUrl, keyPair });
       if (session.ok) {

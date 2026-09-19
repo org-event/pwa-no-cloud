@@ -15,8 +15,8 @@ import {
 describe('NocloudPorts', () => {
   it('bindNocloudPorts merges facades without wiping late identity key', () => {
     const bag = createNocloudPortsBag();
-    const getIdentityKeyPair = vi.fn(() => null);
-    bag.contacts.getIdentityKeyPair = getIdentityKeyPair;
+    const withIdentityKeyPair = vi.fn(async () => null);
+    bag.contacts.withIdentityKeyPair = withIdentityKeyPair;
 
     const call: CallPort = {
       onRemoteTrack: vi.fn(),
@@ -33,7 +33,7 @@ describe('NocloudPorts', () => {
       queueFile: vi.fn(),
       refreshInbox: async () => {},
     };
-    const contacts: Omit<ContactsPort, 'getIdentityKeyPair'> = {
+    const contacts: Omit<ContactsPort, 'withIdentityKeyPair'> = {
       applyPeerProfile: vi.fn(),
       ensureLivePeerInBook: vi.fn(),
       knockOn: async () => {},
@@ -64,7 +64,7 @@ describe('NocloudPorts', () => {
 
     expect(bag.call.onRemoteTrack).toBe(call.onRemoteTrack);
     expect(bag.contacts.knockOn).toBe(contacts.knockOn);
-    expect(bag.contacts.getIdentityKeyPair).toBe(getIdentityKeyPair);
+    expect(bag.contacts.withIdentityKeyPair).toBe(withIdentityKeyPair);
     expect(bag.transfer.flushQueue).toBe(transfer.flushQueue);
   });
 });

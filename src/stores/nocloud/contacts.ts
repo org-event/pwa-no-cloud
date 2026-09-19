@@ -34,7 +34,7 @@ import { fileToAvatarDataUrl } from '@/lib/avatar.ts';
 import { createGroup, saveAddressBook } from '@/lib/contacts-store.ts';
 import { bindIdentityProfile, saveProfile } from '@/lib/profile-store.ts';
 import { inviteToQr } from '@/lib/qr.ts';
-import { OwnedSecret } from '@/lib/owned-secret.ts';
+import { OwnedSecret, withBorrowedKeyPair } from '@/lib/owned-secret.ts';
 import type { NocloudContext } from './context.ts';
 import { peerIsLive, socketBlocked, usesRoomLink } from './views.ts';
 
@@ -49,27 +49,26 @@ export function createContactsSlice(ctx: NocloudContext) {
     signingPublicKey = null;
   };
 
-  const currentKeyPair = (): KeyPair | null => {
+  const withIdentityKeyPair = async <T>(
+    op: (keyPair: KeyPair) => T | Promise<T>,
+  ): Promise<T | null> => {
     if (!signingPublicKey || !ownedSecret) return null;
-    return {
-      publicKey: signingPublicKey,
-      secretKey: ownedSecret.borrow(),
-    };
+    return withBorrowedKeyPair(ownedSecret, signingPublicKey, op);
   };
 
   const refreshIdentityCard = async () => {
-    const keyPair = currentKeyPair();
-    if (keyPair && state.me.id) {
-      const invite = await createIdentityInvite(
+    const invite = await withIdentityKeyPair(async (keyPair) => {
+      if (!state.me.id) return null;
+      return createIdentityInvite(
         { nick: state.me.nick || defaultNick(state.me.id) },
         keyPair,
       );
-      if (invite.ok) {
-        state.cardText = invite.value;
-        state.identityQrUrl = await inviteToQr(invite.value);
-        touch();
-        return;
-      }
+    });
+    if (invite?.ok) {
+      state.cardText = invite.value;
+      state.identityQrUrl = await inviteToQr(invite.value);
+      touch();
+      return;
     }
     state.cardText = encodeContactCard(state.me);
     state.identityQrUrl = state.cardText
@@ -202,8 +201,9 @@ export function createContactsSlice(ctx: NocloudContext) {
     if (keyPair) {
       ownedSecret = new OwnedSecret(keyPair.secretKey);
       signingPublicKey = keyPair.publicKey;
+      keyPair.secretKey.fill(0);
     }
-    ctx.ports.contacts.getIdentityKeyPair = () => currentKeyPair();
+    ctx.ports.contacts.withIdentityKeyPair = withIdentityKeyPair;
     state.peer?.setProfile(state.me);
     void refreshIdentityCard();
   }
@@ -273,25 +273,26 @@ export function createContactsSlice(ctx: NocloudContext) {
       touch();
       return false;
     }
-    const keyPair = currentKeyPair();
-    if (!keyPair) {
-      state.contactsNotice = contactsCopy.introduceNeedIdentity;
-      touch();
-      return false;
-    }
     const subjectPk = decodePublicKey(contact.publicKey);
     if (!subjectPk.ok) {
       state.contactsNotice = contactsCopy.introduceFailed;
       touch();
       return false;
     }
-    const encoded = await createIntroduceCard(
-      {
-        subjectPk: subjectPk.value,
-        subjectNick: contact.nick || defaultNick(contact.id),
-      },
-      keyPair,
+    const encoded = await withIdentityKeyPair(async (keyPair) =>
+      createIntroduceCard(
+        {
+          subjectPk: subjectPk.value,
+          subjectNick: contact.nick || defaultNick(contact.id),
+        },
+        keyPair,
+      ),
     );
+    if (!encoded) {
+      state.contactsNotice = contactsCopy.introduceNeedIdentity;
+      touch();
+      return false;
+    }
     if (!encoded.ok) {
       state.contactsNotice = contactsCopy.introduceFailed;
       touch();

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fingerprintOf, generateKeyPair } from '@/domain/identity/index.ts';
 import { createChatMessage } from '@/domain/chat/index.ts';
 import { createChatController } from './chat-controller.ts';
+import type { KeyPair } from '@/domain/identity/index.ts';
 
 const memoryStorage = () => {
   const map = new Map<string, string>();
@@ -13,16 +14,23 @@ const memoryStorage = () => {
   };
 };
 
+const withFixedKey =
+  (keyPair: KeyPair | null) =>
+  async <T>(op: (kp: KeyPair) => T | Promise<T>): Promise<T | null> => {
+    if (!keyPair) return null;
+    return op(keyPair);
+  };
+
 describe('ChatController', () => {
   it('appends a self-note without signing or knocking', async () => {
     const note = vi.fn();
     const knockOn = vi.fn();
-    const trySendWire = vi.fn(() => false);
+    const trySendWire = vi.fn((_wire: string) => false);
     const controller = createChatController({
       storage: memoryStorage(),
       meId: () => 'me-fingerprint',
       selfPeerId: 'self',
-      getKeyPair: () => null,
+      withKeyPair: withFixedKey(null),
       livePeerId: () => null,
       linkConnected: () => false,
       trySendWire,
@@ -46,7 +54,7 @@ describe('ChatController', () => {
       storage: memoryStorage(),
       meId: () => 'me-fingerprint',
       selfPeerId: 'self',
-      getKeyPair: () => null,
+      withKeyPair: withFixedKey(null),
       livePeerId: () => null,
       linkConnected: () => false,
       trySendWire: () => false,
@@ -73,7 +81,7 @@ describe('ChatController', () => {
       storage: memoryStorage(),
       meId: () => fingerprintOf(alice.publicKey),
       selfPeerId: 'self',
-      getKeyPair: () => alice,
+      withKeyPair: withFixedKey(alice),
       livePeerId: () => bobId,
       linkConnected: () => true,
       trySendWire,
@@ -96,14 +104,14 @@ describe('ChatController', () => {
     const alice = await generateKeyPair();
     const bob = await generateKeyPair();
     const bobId = fingerprintOf(bob.publicKey);
-    const trySendWire = vi.fn(() => false);
+    const trySendWire = vi.fn((_wire: string) => false);
     const knockOn = vi.fn(async () => {});
     let notice = '';
     const controller = createChatController({
       storage: memoryStorage(),
       meId: () => fingerprintOf(alice.publicKey),
       selfPeerId: 'self',
-      getKeyPair: () => alice,
+      withKeyPair: withFixedKey(alice),
       livePeerId: () => null,
       linkConnected: () => false,
       trySendWire,
@@ -140,7 +148,7 @@ describe('ChatController', () => {
       storage: memoryStorage(),
       meId: () => aliceId,
       selfPeerId: 'self',
-      getKeyPair: () => alice,
+      withKeyPair: withFixedKey(alice),
       livePeerId: () => bobId,
       linkConnected: () => true,
       trySendWire: () => false,
