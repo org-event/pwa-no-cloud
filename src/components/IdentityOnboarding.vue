@@ -15,7 +15,7 @@ import {
   restoreIdentityFromMnemonic,
   unlockIdentity,
   unlockIdentityWithBiometrics,
-  type UnlockedIdentity,
+  type IdentityUnlock,
 } from '@/lib/identity-session.ts';
 import {
   classifyFirstScreenPaste,
@@ -28,7 +28,7 @@ import FieldInput from './FieldInput.vue';
 import InputAction from './InputAction.vue';
 
 const emit = defineEmits<{
-  unlocked: [identity: UnlockedIdentity];
+  unlocked: [unlock: IdentityUnlock];
   applyPack: [text: string];
 }>();
 
@@ -54,7 +54,7 @@ const shownMnemonic = ref('');
 const error = ref('');
 const notice = ref('');
 const busy = ref(false);
-const unlocked = ref<UnlockedIdentity | null>(null);
+const unlocked = ref<IdentityUnlock | null>(null);
 const bioAvailable = ref(false);
 const bioEnrolled = ref(hasBiometricUnlock(storage));
 const qrInput = ref<HTMLInputElement | null>(null);
@@ -86,7 +86,7 @@ onMounted(() => {
   });
 });
 
-const finishUnlocked = (value: UnlockedIdentity) => {
+const finishUnlocked = (value: IdentityUnlock) => {
   unlocked.value = value;
   emit('unlocked', value);
 };
@@ -320,7 +320,7 @@ const copyBackup = async () => {
 
       <p v-if="unlocked" class="tagline">
         {{ copy.fingerprint }}
-        <code>{{ unlocked.displayFingerprint }}</code>
+        <code>{{ unlocked.view.displayFingerprint }}</code>
       </p>
 
       <template #actions>

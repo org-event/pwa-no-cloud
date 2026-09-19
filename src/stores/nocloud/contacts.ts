@@ -195,17 +195,26 @@ export function createContactsSlice(ctx: NocloudContext) {
     touch();
   }
 
-  function onBindIdentity(fingerprint: string, keyPair?: KeyPair) {
+  function onBindIdentity(
+    fingerprint: string,
+    secret?: OwnedSecret,
+    publicKey?: KeyPair['publicKey'],
+  ) {
     state.me = bindIdentityProfile(storage, fingerprint);
     clearOwnedSecret();
-    if (keyPair) {
-      ownedSecret = new OwnedSecret(keyPair.secretKey);
-      signingPublicKey = keyPair.publicKey;
-      keyPair.secretKey.fill(0);
+    if (secret) {
+      ownedSecret = secret;
+      signingPublicKey = publicKey ?? null;
     }
     ctx.ports.contacts.withIdentityKeyPair = withIdentityKeyPair;
     state.peer?.setProfile(state.me);
     void refreshIdentityCard();
+  }
+
+  function onLockIdentity() {
+    clearOwnedSecret();
+    ctx.ports.contacts.withIdentityKeyPair = async () => null;
+    touch();
   }
 
   function onSaveProfile(nick: string) {
@@ -462,6 +471,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     onSelectContact,
     onToggleGroup,
     onBindIdentity,
+    onLockIdentity,
     onSaveProfile,
     onPickAvatar,
     onCopyCard,

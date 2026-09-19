@@ -21,7 +21,10 @@ import TransferPanel from './components/TransferPanel.vue';
 import AppShell from './layouts/AppShell.vue';
 import ShellRail from './layouts/ShellRail.vue';
 import { useNocloudStore } from './stores/nocloud.ts';
-import type { UnlockedIdentity } from '@/lib/identity-session.ts';
+import type {
+  IdentityUnlock,
+  UnlockedIdentity,
+} from '@/lib/identity-session.ts';
 import { PENDING_FIRST_SCREEN_PASTE_KEY } from '@/lib/first-screen-paste.ts';
 import {
   cycleTheme,
@@ -58,9 +61,13 @@ const onToggleTheme = () => {
 };
 
 const identity = ref<UnlockedIdentity | null>(null);
-const onIdentityUnlocked = (value: UnlockedIdentity) => {
-  identity.value = value;
-  store.onBindIdentity(value.fingerprint, value.keyPair);
+const onIdentityUnlocked = (unlock: IdentityUnlock) => {
+  identity.value = unlock.view;
+  store.onBindIdentity(
+    unlock.view.fingerprint,
+    unlock.secret,
+    unlock.publicKey,
+  );
   const storage = browserStorage();
   const pending = storage.getItem(PENDING_FIRST_SCREEN_PASTE_KEY);
   if (pending) {
@@ -71,6 +78,7 @@ const onIdentityUnlocked = (value: UnlockedIdentity) => {
 
 const onLockIdentity = () => {
   identity.value = null;
+  store.onLockIdentity();
 };
 
 const onFirstScreenPack = (text: string) => {

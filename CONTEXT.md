@@ -161,6 +161,10 @@ _Avoid_: server disk
 Exclusive ownership of Ed25519 secretKey bytes (`use` / `borrow` / `move` / `dispose` with wipe). Signing goes through `withBorrowedKeyPair` / ContactsPort `withIdentityKeyPair` so borrowed copies are zeroed after the callback (ADR 0002).
 _Avoid_: returning durable KeyPair from the store; holding secretKey in long-lived UI closures
 
+**UnlockedIdentity**:
+Public identity view after unlock: fingerprint + displayFingerprint only. Secret material is an `OwnedSecret` handoff into the contacts owner at bind time (`IdentityUnlock`).
+_Avoid_: UnlockedIdentity.keyPair; Vue holding secretKey
+
 **Domain module**:
 A responsibility area (identity, call, relay, …) without dependency cycles.
 _Avoid_: dumping crypto/SDP into the Shell

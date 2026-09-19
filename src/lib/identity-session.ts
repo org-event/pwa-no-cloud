@@ -1,5 +1,6 @@
 /**
  * In-memory unlocked identity + sealed vault helpers for onboarding UI (S1.6).
+ * Public view never carries secretKey (ADR 0002); secret is an OwnedSecret handoff.
  */
 
 import {
@@ -20,26 +21,42 @@ import {
   sealSecretKey,
   unlockSecretWithBiometrics,
   clearBiometricUnlock,
-  type KeyPair,
+  type PublicKeyBytes,
   type VaultStorage,
 } from '@/domain/identity/index.ts';
+import { OwnedSecret, withBorrowedKeyPair } from '@/lib/owned-secret.ts';
 
+/** Public identity fields safe to hold in Vue. */
 export type UnlockedIdentity = {
-  keyPair: KeyPair;
   fingerprint: string;
   displayFingerprint: string;
 };
 
+/** Unlock handoff: public view + exclusive OwnedSecret (move into store). */
+export type IdentityUnlock = {
+  view: UnlockedIdentity;
+  secret: OwnedSecret;
+  publicKey: PublicKeyBytes;
+};
+
 export type IdentitySessionResult =
-  | { ok: true; value: UnlockedIdentity }
+  | { ok: true; value: IdentityUnlock }
   | { ok: false; code: string; message: string };
 
-const toUnlocked = (keyPair: KeyPair): UnlockedIdentity => {
-  const fingerprint = fingerprintOf(keyPair.publicKey);
+const toUnlock = (
+  secretKey: Uint8Array,
+  publicKey: PublicKeyBytes,
+): IdentityUnlock => {
+  const fingerprint = fingerprintOf(publicKey);
+  const secret = new OwnedSecret(secretKey);
+  secretKey.fill(0);
   return {
-    keyPair,
-    fingerprint,
-    displayFingerprint: formatFingerprint(fingerprint),
+    view: {
+      fingerprint,
+      displayFingerprint: formatFingerprint(fingerprint),
+    },
+    secret,
+    publicKey,
   };
 };
 
@@ -64,7 +81,8 @@ export const createIdentityWithMnemonic = async (
   const sealed = await sealSecretKey(derived.value.secretKey, passphrase);
   if (!sealed.ok) return sealed;
   saveVaultToStorage(storage, sealed.value);
-  return { ok: true, value: toUnlocked(derived.value), mnemonic };
+  const unlock = toUnlock(derived.value.secretKey, derived.value.publicKey);
+  return { ok: true, value: unlock, mnemonic };
 };
 
 export const createIdentityRandom = async (
@@ -82,7 +100,7 @@ export const createIdentityRandom = async (
   const sealed = await sealSecretKey(keyPair.secretKey, passphrase);
   if (!sealed.ok) return sealed;
   saveVaultToStorage(storage, sealed.value);
-  return { ok: true, value: toUnlocked(keyPair) };
+  return { ok: true, value: toUnlock(keyPair.secretKey, keyPair.publicKey) };
 };
 
 export const unlockIdentity = async (
@@ -94,10 +112,7 @@ export const unlockIdentity = async (
   const opened = await openSecretKey(vault.value, passphrase);
   if (!opened.ok) return opened;
   const publicKey = await publicKeyFromSecret(opened.value);
-  return {
-    ok: true,
-    value: toUnlocked({ secretKey: opened.value, publicKey }),
-  };
+  return { ok: true, value: toUnlock(opened.value, publicKey) };
 };
 
 export const restoreIdentityFromMnemonic = async (
@@ -118,7 +133,10 @@ export const restoreIdentityFromMnemonic = async (
   if (!sealed.ok) return sealed;
   saveVaultToStorage(storage, sealed.value);
   clearBiometricUnlock(storage);
-  return { ok: true, value: toUnlocked(derived.value) };
+  return {
+    ok: true,
+    value: toUnlock(derived.value.secretKey, derived.value.publicKey),
+  };
 };
 
 export const restoreIdentityFromBackupText = async (
@@ -132,19 +150,23 @@ export const restoreIdentityFromBackupText = async (
   if (!sealed.ok) return sealed;
   saveVaultToStorage(storage, sealed.value);
   clearBiometricUnlock(storage);
-  return { ok: true, value: toUnlocked(restored.value) };
+  return {
+    ok: true,
+    value: toUnlock(restored.value.secretKey, restored.value.publicKey),
+  };
 };
 
 export const exportBackupText = async (
-  identity: UnlockedIdentity,
+  unlock: IdentityUnlock,
   passphrase: string,
 ): Promise<
   | { ok: true; text: string; fileName: string }
   | { ok: false; code: string; message: string }
 > => {
-  const backup = await createIdentityBackup(
-    identity.keyPair.secretKey,
-    passphrase,
+  const backup = await withBorrowedKeyPair(
+    unlock.secret,
+    unlock.publicKey,
+    (keyPair) => createIdentityBackup(keyPair.secretKey, passphrase),
   );
   if (!backup.ok) return backup;
   return {
@@ -160,24 +182,25 @@ export const unlockIdentityWithBiometrics = async (
   const opened = await unlockSecretWithBiometrics(storage);
   if (!opened.ok) return opened;
   const publicKey = await publicKeyFromSecret(opened.value);
-  return {
-    ok: true,
-    value: toUnlocked({ secretKey: opened.value, publicKey }),
-  };
+  return { ok: true, value: toUnlock(opened.value, publicKey) };
 };
 
 export const enableBiometricUnlock = async (
   storage: VaultStorage,
-  identity: UnlockedIdentity,
-): Promise<IdentitySessionResult & { mode?: string }> => {
-  const registered = await registerBiometricUnlock(
-    storage,
-    identity.keyPair.secretKey,
-    {
-      userId: identity.fingerprint,
-      displayName: identity.displayFingerprint,
-    },
+  unlock: IdentityUnlock,
+): Promise<
+  | { ok: true; value: UnlockedIdentity; mode?: string }
+  | { ok: false; code: string; message: string }
+> => {
+  const registered = await withBorrowedKeyPair(
+    unlock.secret,
+    unlock.publicKey,
+    (keyPair) =>
+      registerBiometricUnlock(storage, keyPair.secretKey, {
+        userId: unlock.view.fingerprint,
+        displayName: unlock.view.displayFingerprint,
+      }),
   );
   if (!registered.ok) return registered;
-  return { ok: true, value: identity, mode: registered.value.mode };
+  return { ok: true, value: unlock.view, mode: registered.value.mode };
 };
