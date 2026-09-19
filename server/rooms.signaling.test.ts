@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { describe, expect, it } from 'vitest';
-import { createRooms } from '../../../server/rooms.js';
-import { createStunBinding } from '../../../server/stun.js';
+import { createRooms } from './rooms.js';
+import { createStunBinding } from './stun.js';
 
 describe('signaling rooms', () => {
   it('queues for poll and lists the other peer', () => {

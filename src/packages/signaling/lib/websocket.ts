@@ -1,7 +1,7 @@
 import { signalingLibCopy } from '@/content/index.ts';
 import { MIXED_CONTENT_SIGNALING } from './mixed-content.ts';
 import { parseInvite } from './invite.ts';
-import type { SignalingPort, SignalMessage } from './port.ts';
+import type { SignalingPort, SignalMessage } from '../port.ts';
 
 type SocketLike = {
   readyState: number;

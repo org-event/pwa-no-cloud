@@ -1,5 +1,5 @@
 import { parseInvite } from './invite.ts';
-import type { SignalingPort, SignalMessage } from './port.ts';
+import type { SignalingPort, SignalMessage } from '../port.ts';
 
 const POLL_MS = 800;
 

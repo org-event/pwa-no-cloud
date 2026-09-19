@@ -10,9 +10,9 @@ import {
   type DeepKind,
   type DeepLink,
 } from '@/lib/app-link.ts';
-import { PeerSession } from '@/lib/peer-session.ts';
+import type { Link } from '@/lib/link.ts';
 import { inviteToQr } from '@/lib/qr.ts';
-import { decodeInvite } from '@/lib/signaling/invite.ts';
+import { decodeInvite } from '@/packages/signaling/invite.ts';
 import { APP_BASE } from '@/workers/sw.ts';
 import { generateId } from '@/lib/id.ts';
 import type { NocloudContext } from './context.ts';
@@ -24,7 +24,7 @@ import {
 } from './views.ts';
 
 export type InviteDeps = {
-  startPeer: () => PeerSession | null;
+  startPeer: () => Link | null;
 };
 
 export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
@@ -77,13 +77,16 @@ export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
     state.inviteError = '';
     const packed = decodeSharePack(text);
     if (packed.ok) {
-      ctx.refs.applyShareDraft?.(packed.value, inviteCopy.serversFromPackSaved);
+      ctx.ports.servers.applyShareDraft?.(
+        packed.value,
+        inviteCopy.serversFromPackSaved,
+      );
       touch();
       return;
     }
     const decoded = await decodeInvite(text);
     if (decoded.ok && decoded.value.servers) {
-      ctx.refs.applyShareDraft?.(
+      ctx.ports.servers.applyShareDraft?.(
         decoded.value.servers,
         inviteCopy.serversFromInviteSaved,
       );
@@ -119,7 +122,10 @@ export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
         touch();
         return;
       }
-      ctx.refs.applyShareDraft?.(packed.value, inviteCopy.serversFromLinkSaved);
+      ctx.ports.servers.applyShareDraft?.(
+        packed.value,
+        inviteCopy.serversFromLinkSaved,
+      );
       touch();
       return;
     }

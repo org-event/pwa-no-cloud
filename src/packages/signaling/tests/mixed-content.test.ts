@@ -3,7 +3,7 @@ import {
   MIXED_CONTENT_SIGNALING,
   humanizeSignalingError,
   mixedContentBlocksSignaling,
-} from './mixed-content.ts';
+} from '../mixed-content.ts';
 
 describe('mixed content signaling', () => {
   it('blocks ws/http sockets on an HTTPS page', () => {

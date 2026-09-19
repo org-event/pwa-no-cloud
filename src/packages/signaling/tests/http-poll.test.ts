@@ -1,7 +1,7 @@
 import { fromAny } from '@total-typescript/shoehorn';
 import { describe, expect, it, vi } from 'vitest';
-import { createHttpPollPort } from './http-poll.ts';
-import type { SignalMessage } from './port.ts';
+import { createHttpPollPort } from '../http-poll.ts';
+import type { SignalMessage } from '../port.ts';
 
 const offer: SignalMessage = {
   from: 'alice',

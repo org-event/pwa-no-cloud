@@ -1,4 +1,4 @@
-import { notes, transferCopy } from '@/content/index.ts';
+import { notes, componentsCopy } from '@/content/index.ts';
 import { meetRoomId } from '@/domain/profile.ts';
 import type { InboxEntry } from '@/lib/opfs.ts';
 import {
@@ -8,9 +8,12 @@ import {
   removeInboxFile,
 } from '@/lib/opfs.ts';
 import { saveFileToDevice } from '@/lib/save-file.ts';
-import { componentsCopy } from '@/content/index.ts';
 import { requestNotifyPermission } from '@/lib/notify.ts';
 import type { PickedFile } from '@/lib/folder-walk.ts';
+import {
+  createTransferSession,
+  type TransferSessionState,
+} from '@/lib/transfer-session.ts';
 import { markRaw } from 'vue';
 import type { NocloudContext } from './context.ts';
 
@@ -40,141 +43,46 @@ export function createTransferSlice(ctx: NocloudContext) {
     }
   };
 
-  const flushQueue = () => {
-    if (!state.peer || state.peer.state !== 'connected') return;
-    if (state.peer.activeFile()) return;
-    if (state.queuedFolder && state.queuedFolder.length > 0) {
-      const folder = state.queuedFolder;
-      state.queuedFolder = null;
-      state.peer.sendFolder(folder);
-      return;
-    }
-    const next = state.queuedFiles[0];
-    if (!next) return;
-    state.queuedFiles = state.queuedFiles.slice(1);
-    state.peer.sendFile(next);
+  const syncStaging = (next: TransferSessionState) => {
+    state.queuedFiles = next.queuedFiles.map((file) => markRaw(file));
+    state.queuedFolder = next.queuedFolder
+      ? next.queuedFolder.map((entry) => ({
+          path: entry.path,
+          file: markRaw(entry.file),
+        }))
+      : null;
+    state.queuedFolderLabel = next.queuedFolderLabel;
+    state.transferError = next.transferError;
+    touch();
   };
 
-  const queueFile = (file: File) => {
-    state.queuedFiles = [...state.queuedFiles, markRaw(file)];
-    state.transferError = '';
-    ctx.note(notes.queued(file.name));
-  };
-
-  function onPickFile(file: File) {
-    state.queuedFolder = null;
-    state.queuedFolderLabel = '';
-    queueFile(file);
-    touch();
-  }
-
-  function onPickFiles(files: File[]) {
-    if (files.length === 0) return;
-    state.queuedFolder = null;
-    state.queuedFolderLabel = '';
-    state.transferError = '';
-    for (const file of files) queueFile(file);
-    touch();
-  }
-
-  function onPickFolder(entries: PickedFile[], label = '') {
-    state.transferError = '';
-    if (entries.length === 0) {
-      state.transferError = transferCopy.needFiles;
-      touch();
-      return;
-    }
-    const folderLabel =
-      label.trim() || entries[0]?.path.split('/')[0] || 'folder';
-    state.queuedFiles = [];
-    state.queuedFolderLabel = folderLabel;
-    state.queuedFolder = entries.map((entry) => ({
-      path: entry.path,
-      file: markRaw(entry.file),
-    }));
-    ctx.note(notes.queued(folderLabel));
-    touch();
-  }
-
-  function onClearStaged() {
-    state.queuedFiles = [];
-    state.queuedFolder = null;
-    state.queuedFolderLabel = '';
-    state.transferError = '';
-    touch();
-  }
-
-  function onPickError(message: string) {
-    state.transferError = message;
-    touch();
-  }
-
-  async function onSendTransfer() {
-    state.transferError = '';
-    ctx.refs.ensureLivePeerInBook?.();
-    let contactId = state.selectedContactIds[0];
-    if (!contactId && state.livePeerId && state.livePeerId !== state.me.id) {
-      contactId = state.livePeerId;
-      state.selectedContactIds = [contactId];
-      state.selectedGroupIds = [];
-    }
-    if (!contactId) {
-      state.transferError = transferCopy.needContact;
-      touch();
-      return;
-    }
-    const hasFiles =
-      state.queuedFiles.length > 0 ||
-      Boolean(state.queuedFolder && state.queuedFolder.length > 0);
-    if (!hasFiles) {
-      state.transferError = transferCopy.needFiles;
-      touch();
-      return;
-    }
-    const target = meetRoomId(contactId);
-    if (state.peer?.state === 'connected' && state.roomId === target) {
-      flushQueue();
-      touch();
-      return;
-    }
-    const knock = ctx.refs.knockOn;
-    if (!knock) {
-      state.transferError = transferCopy.needContact;
-      touch();
-      return;
-    }
-    await knock(contactId, false);
-    flushQueue();
-    touch();
-  }
-
-  function onAcceptFile(transferId: string) {
-    state.transferError = '';
-    ctx.refs.ensureLivePeerInBook?.();
-    void requestNotifyPermission();
-    state.peer?.acceptFile(transferId);
-    touch();
-  }
-
-  function onRejectFile(transferId: string) {
-    state.peer?.rejectFile(transferId);
-    touch();
-  }
-
-  function onCancelFile() {
-    state.peer?.cancelFile();
-    touch();
-  }
-
-  function onPauseFile() {
-    state.peer?.pauseFile();
-    touch();
-  }
-
-  function onResumeFile() {
-    state.peer?.resumeFile();
-    touch();
-  }
+  const session = createTransferSession({
+    getPort: () => state.peer?.transfer ?? null,
+    getLink: () =>
+      state.peer
+        ? { state: state.peer.state, roomId: state.peer.roomId }
+        : null,
+    knockOn: async (peerId, asHost) => {
+      await ctx.ports.contacts.knockOn?.(peerId, asHost);
+    },
+    meetRoomId,
+    resolveContactId: () => {
+      let contactId = state.selectedContactIds[0] ?? null;
+      if (!contactId && state.livePeerId && state.livePeerId !== state.me.id) {
+        contactId = state.livePeerId;
+        state.selectedContactIds = [contactId];
+        state.selectedGroupIds = [];
+      }
+      return contactId;
+    },
+    ensureLivePeerInBook: () => ctx.ports.contacts.ensureLivePeerInBook?.(),
+    requestNotify: () => {
+      void requestNotifyPermission();
+    },
+    note: ctx.note,
+    notesQueued: notes.queued,
+    onChange: syncStaging,
+  });
 
   function onSave(entry: InboxEntry) {
     void (async () => {
@@ -239,19 +147,20 @@ export function createTransferSlice(ctx: NocloudContext) {
   return {
     setInboxError,
     refreshInbox,
-    flushQueue,
-    queueFile,
-    onPickFile,
-    onPickFiles,
-    onPickFolder,
-    onClearStaged,
-    onPickError,
-    onSendTransfer,
-    onAcceptFile,
-    onRejectFile,
-    onCancelFile,
-    onPauseFile,
-    onResumeFile,
+    flushQueue: session.flushQueue,
+    queueFile: session.queueFile,
+    onPickFile: session.pickFile,
+    onPickFiles: session.pickFiles,
+    onPickFolder: (entries: PickedFile[], label = '') =>
+      session.pickFolder(entries, label),
+    onClearStaged: session.clearStaged,
+    onPickError: session.pickError,
+    onSendTransfer: session.send,
+    onAcceptFile: session.accept,
+    onRejectFile: session.reject,
+    onCancelFile: session.cancel,
+    onPauseFile: session.pause,
+    onResumeFile: session.resume,
     onSave,
     onRemove,
     onSelect,

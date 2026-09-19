@@ -73,6 +73,26 @@ export class OwnedSecret {
 }
 
 /**
+ * Run `op` with a borrowed KeyPair-shaped view, then zero the secret copy.
+ * Prefer this over handing out `borrow()` results that callers might retain.
+ */
+export const withBorrowedKeyPair = async <T>(
+  owned: OwnedSecret,
+  publicKey: Uint8Array,
+  op: (keyPair: {
+    publicKey: Uint8Array;
+    secretKey: Uint8Array;
+  }) => T | Promise<T>,
+): Promise<T> => {
+  const secretKey = owned.borrow();
+  try {
+    return await op({ publicKey, secretKey });
+  } finally {
+    secretKey.fill(0);
+  }
+};
+
+/**
  * Revocable capability: after dispose/revoke, proxy access throws.
  * Useful when handing a temporary view to untrusted / third-party code.
  */

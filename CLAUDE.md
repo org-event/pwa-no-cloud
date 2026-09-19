@@ -39,7 +39,7 @@ Docs live in `docs/` (Russian): start with `glossary.md`, then `architecture.md`
 - `signaling/` — pluggable transports behind one `SignalingPort` contract, selected by `signaling/factory.ts`: `http-poll`, `websocket`, `manual` (QR/paste, no server).
 - `config/` — server presets, ICE URLs, settings merge, storage.
 - `ui/` — screen logic (sections, status line, shell nav); `content/ru/` — all Russian UI strings.
-- `stores/nocloud.ts` — one Pinia store composed of slices (`calls`, `chat`, `contacts`, `presence`, `servers`, `session`, `shell`) wired through a shared context; cross-slice callbacks are assigned via `ctx.refs`.
+- `stores/nocloud.ts` — one Pinia store composed of slices (`calls`, `chat`, `contacts`, `presence`, `servers`, `session`, `shell`) wired through a shared context; cross-slice callbacks are typed ports on `ctx.ports` (`bindNocloudPorts`).
 - `workers/` — service worker. `shell-sw.js` is a **template**, not the real SW: the build plugin (`workers/plugin.ts`) fills in the asset list and emits `sw.js` + `version.json` into the bundle. It is excluded from lint/format — edit it knowing the template placeholders.
 
 ### Server (`server/`)

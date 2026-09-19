@@ -28,6 +28,7 @@ dist-ssr
 .cursor/
 .serena/
 .codegraph/
+.agent/
 *.fig
 
 # Vite+ generated hook dispatcher (recreated by `vp hooks enable` / prepare)

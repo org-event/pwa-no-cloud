@@ -9,13 +9,13 @@ import {
   type AddressBook,
   type ProfileCard,
 } from '@/domain/profile.ts';
+import type { Link } from '@/lib/link.ts';
 import type { InboxEntry, OpfsStore } from '@/lib/opfs.ts';
 import { appendLog } from '@/lib/opfs.ts';
 import type { PickedFile } from '@/lib/folder-walk.ts';
 import { loadProfile } from '@/lib/profile-store.ts';
 import { loadRelayBundle } from '@/lib/relay-bundle-store.ts';
 import { loadChatStore } from '@/lib/chat-store.ts';
-import { PeerSession } from '@/lib/peer-session.ts';
 import type { StorageLike } from '@/config/storage.ts';
 import type { InviteRole } from '@/stores/types.ts';
 import type { ChatStoreState } from '@/domain/chat/thread.ts';
@@ -28,7 +28,7 @@ export type NocloudState = {
   selected: InboxEntry | null;
   preview: string;
   inboxError: string;
-  peer: PeerSession | null;
+  peer: Link | null;
   inviteRole: InviteRole;
   outgoing: string;
   qrUrl: string | null;
@@ -77,7 +77,7 @@ export function createNocloudState(storage: StorageLike) {
     selected: null as InboxEntry | null,
     preview: '',
     inboxError: '',
-    peer: null as PeerSession | null,
+    peer: null as Link | null,
     inviteRole: 'idle' as InviteRole,
     outgoing: '',
     qrUrl: null as string | null,
