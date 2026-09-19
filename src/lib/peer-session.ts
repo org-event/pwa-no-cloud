@@ -3,7 +3,7 @@ import { iceServersHaveStun, iceServersHaveTurn } from '@/config/merge.ts';
 import { CHANNEL_BUFFER_HIGH, DATA_CHANNELS } from '@/config/defaults.ts';
 import { explainIceFailure } from '@/domain/ice-fail.ts';
 import type { IceServerConfig, CustomServerDraft } from '@/config/types.ts';
-import { parseProfileCard, type ProfileCard } from '@/domain/profile.ts';
+import type { ProfileCard } from '@/domain/profile.ts';
 import {
   applySessionEvent,
   createIdleSession,
@@ -11,6 +11,7 @@ import {
   type SessionEvent,
   type SessionState,
 } from '@/domain/session.ts';
+import { demuxControlFrame } from './control-demux.ts';
 import { EventEmitter } from './events.ts';
 import { FilePipe, type DataSink } from './file-pipe.ts';
 import { bindTransferPort, type TransferPort } from './transfer-port.ts';
@@ -41,6 +42,7 @@ import {
   waitIceGathering,
   type PeerLinks,
 } from './webrtc.ts';
+import { createRoomRecover, type RoomRecover } from './room-recover.ts';
 import { isChatControlFrame } from './peer-chat.ts';
 
 export type PeerRole = 'idle' | 'caller' | 'callee';
@@ -76,8 +78,7 @@ export class PeerSession extends EventEmitter {
   /** Meet/room flow: rejoin after lock, ICE drop, or channel close. */
   roomId = '';
   keepRoom = false;
-  recoverTimer: ReturnType<typeof setTimeout> | null = null;
-  recovering = false;
+  roomRecover: RoomRecover;
   keepAliveTimer: ReturnType<typeof setInterval> | null = null;
 
   get state(): SessionState {
@@ -94,6 +95,15 @@ export class PeerSession extends EventEmitter {
     super();
     this.config = config;
     if (config.profile?.id) this.clientId = config.profile.id;
+    this.roomRecover = createRoomRecover({
+      enabled: () => Boolean(this.keepRoom && this.roomId),
+      isHealthy: () => this.isLinkHealthy(),
+      onSchedule: (reason) => this.emit('recover', reason),
+      recover: async () => {
+        const room = this.roomId;
+        await this.enterRoom(room);
+      },
+    });
   }
 
   setProfile(profile: ProfileCard | null) {
@@ -188,31 +198,15 @@ export class PeerSession extends EventEmitter {
   }
 
   cancelRecover() {
-    if (this.recoverTimer) clearTimeout(this.recoverTimer);
-    this.recoverTimer = null;
+    this.roomRecover.cancel();
   }
 
   scheduleRecover(reason: string, delayMs: number) {
-    if (!this.keepRoom || !this.roomId) return;
-    if (this.recoverTimer) return;
-    this.recoverTimer = setTimeout(() => {
-      this.recoverTimer = null;
-      void this.recoverRoom(reason);
-    }, delayMs);
+    this.roomRecover.schedule(reason, delayMs);
   }
 
   async recoverRoom(reason: string) {
-    if (!this.keepRoom || !this.roomId || this.recovering) return;
-    // DataChannel can stay "open" after ICE dies — require live ICE too.
-    if (this.isLinkHealthy()) return;
-    this.recovering = true;
-    const room = this.roomId;
-    this.emit('recover', reason);
-    try {
-      await this.enterRoom(room);
-    } finally {
-      this.recovering = false;
-    }
+    await this.roomRecover.run(reason);
   }
 
   canTrickle() {
@@ -749,27 +743,26 @@ export class PeerSession extends EventEmitter {
 
   onControl(raw: string) {
     if (this.pipe?.onControlRaw(raw)) return;
-    if (isChatControlFrame(raw)) {
-      this.emit('chat', raw.replace(/[\u200B-\u200D\uFEFF]/g, '').trim());
+    const frame = demuxControlFrame(raw, peerSessionCopy.brokenControlFrame);
+    if (frame.kind === 'chat') {
+      this.emit('chat', frame.wire);
       return;
     }
-    try {
-      const data = JSON.parse(raw) as { type?: string; t?: number };
-      if (data.type === 'profile') {
-        const card = parseProfileCard(data);
-        if (card) this.emit('profile', card);
-        return;
-      }
-      if (data.type === 'ping' && this.links?.control) {
-        this.links.control.send(JSON.stringify({ type: 'pong', t: data.t }));
-        return;
-      }
-      if (data.type === 'pong' && typeof data.t === 'number') {
-        this.lastPongMs = Date.now() - data.t;
-        this.emit('pong', this.lastPongMs);
-      }
-    } catch {
-      this.emit('error', peerSessionCopy.brokenControlFrame);
+    if (frame.kind === 'profile') {
+      this.emit('profile', frame.card);
+      return;
+    }
+    if (frame.kind === 'ping' && this.links?.control) {
+      this.links.control.send(JSON.stringify({ type: 'pong', t: frame.t }));
+      return;
+    }
+    if (frame.kind === 'pong') {
+      this.lastPongMs = Date.now() - frame.rttBase;
+      this.emit('pong', this.lastPongMs);
+      return;
+    }
+    if (frame.kind === 'broken') {
+      this.emit('error', frame.message);
     }
   }
 }
