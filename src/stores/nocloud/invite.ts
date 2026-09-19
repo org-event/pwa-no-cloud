@@ -1,20 +1,21 @@
-import { inviteCopy, MIXED_CONTENT_SIGNALING, notes } from '@/content/index.ts';
-import { APP_NAME, decodeSharePack, DEFAULT_ROOM } from '@/config/index.ts';
+import { inviteCopy, notes } from '@/content/index.ts';
+import { APP_NAME } from '@/config/index.ts';
 import {
   cleanLocation,
   encodeHttpsLink,
   encodeProtocolLink,
   parseDeepLink,
-  parsePastedShare,
   shareMessage,
   type DeepKind,
-  type DeepLink,
 } from '@/lib/app-link.ts';
 import type { Link } from '@/lib/link.ts';
+import {
+  createInviteSession,
+  type InviteSessionState,
+} from '@/lib/invite-session.ts';
 import { inviteToQr } from '@/lib/qr.ts';
-import { decodeInvite } from '@/packages/signaling/invite.ts';
-import { APP_BASE } from '@/workers/sw.ts';
 import { generateId } from '@/lib/id.ts';
+import { APP_BASE } from '@/workers/sw.ts';
 import type { NocloudContext } from './context.ts';
 import {
   peerIsLive,
@@ -30,11 +31,43 @@ export type InviteDeps = {
 export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
   const { state, touch, note } = ctx;
 
+  const syncUi = (next: InviteSessionState) => {
+    state.inviteRole = next.inviteRole;
+    state.inviteError = next.inviteError;
+    state.roomId = next.roomId;
+    state.openedFromLink = next.openedFromLink;
+    state.hostNotice = next.hostNotice;
+    touch();
+  };
+
   const refreshOutgoing = async () => {
     state.outgoing = state.peer?.outgoing() ?? '';
     state.qrUrl = await inviteToQr(state.outgoing);
     touch();
   };
+
+  const session = createInviteSession({
+    startPeer: deps.startPeer,
+    getPeer: () => state.peer,
+    usesRoomLink: () => usesRoomLink(ctx),
+    socketBlocked: () => socketBlocked(ctx),
+    peerIsLive: () => peerIsLive(ctx),
+    getOutgoing: () => state.outgoing,
+    generateRoomId: () => generateId(),
+    pullShared: () => ({
+      inviteRole: state.inviteRole,
+      inviteError: state.inviteError,
+      roomId: state.roomId,
+      openedFromLink: state.openedFromLink,
+      hostNotice: state.hostNotice,
+    }),
+    applyShareDraft: (draft, notice) => {
+      ctx.ports.servers.applyShareDraft?.(draft, notice);
+    },
+    refreshOutgoing,
+    note,
+    onChange: syncUi,
+  });
 
   const copyText = async (text: string): Promise<boolean> => {
     try {
@@ -73,82 +106,6 @@ export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
     touch();
   };
 
-  const applyIncoming = async (text: string) => {
-    state.inviteError = '';
-    const packed = decodeSharePack(text);
-    if (packed.ok) {
-      ctx.ports.servers.applyShareDraft?.(
-        packed.value,
-        inviteCopy.serversFromPackSaved,
-      );
-      touch();
-      return;
-    }
-    const decoded = await decodeInvite(text);
-    if (decoded.ok && decoded.value.servers) {
-      ctx.ports.servers.applyShareDraft?.(
-        decoded.value.servers,
-        inviteCopy.serversFromInviteSaved,
-      );
-    }
-    if (state.inviteRole !== 'caller') {
-      if (!state.peer || (decoded.ok && decoded.value.servers)) {
-        state.inviteRole = 'callee';
-        if (!deps.startPeer()) return;
-      }
-    } else if (!state.peer) {
-      if (!deps.startPeer()) return;
-    }
-    const current = state.peer;
-    if (!current) return;
-    if (state.inviteRole === 'callee') {
-      const accepted = await current.acceptInvite(text);
-      if (!accepted.ok) state.inviteError = accepted.message;
-      await refreshOutgoing();
-      return;
-    }
-    const accepted = await current.acceptAnswer(text);
-    if (!accepted.ok) state.inviteError = accepted.message;
-    touch();
-  };
-
-  const applyDeepLink = async (link: DeepLink) => {
-    if (link.kind === 'section') return;
-    note(notes.linkKind(link.kind));
-    if (link.kind === 'pack') {
-      const packed = decodeSharePack(link.payload);
-      if (!packed.ok) {
-        state.hostNotice = packed.message;
-        touch();
-        return;
-      }
-      ctx.ports.servers.applyShareDraft?.(
-        packed.value,
-        inviteCopy.serversFromLinkSaved,
-      );
-      touch();
-      return;
-    }
-    if (link.kind === 'room') {
-      state.openedFromLink = true;
-      state.roomId = link.payload;
-      if (!usesRoomLink(ctx)) {
-        state.inviteError = socketBlocked(ctx)
-          ? MIXED_CONTENT_SIGNALING
-          : inviteCopy.roomLinkNeedsSocket;
-        touch();
-        return;
-      }
-      state.inviteRole = 'caller';
-      const next = deps.startPeer();
-      if (next) await next.enterRoom(state.roomId.trim() || DEFAULT_ROOM);
-      touch();
-      return;
-    }
-    if (link.kind === 'join') state.inviteRole = 'callee';
-    await applyIncoming(link.payload);
-  };
-
   const consumeDeepLink = () => {
     const link = parseDeepLink(
       globalThis.location.hash,
@@ -156,77 +113,32 @@ export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
     );
     if (link.kind === 'section') return;
     history.replaceState(null, '', cleanLocation(location.href, link.section));
-    void applyDeepLink(link);
-  };
-
-  const resumeMeetRoom = () => {
-    if (!usesRoomLink(ctx)) return;
-    const room = state.roomId.trim();
-    if (!room) return;
-    const peer = state.peer;
-    if (peer?.state === 'connected') return;
-    if (peer?.keepRoom && peer.roomId === room) {
-      peer.resumeRoom();
-      touch();
-      return;
-    }
-    const next = deps.startPeer();
-    if (!next) return;
-    void next.enterRoom(room);
-    touch();
+    void session.applyDeepLink(link);
   };
 
   function onCreateInvite() {
-    void (async () => {
-      state.inviteError = '';
-      state.inviteRole = 'caller';
-      const next = deps.startPeer();
-      if (!next) return;
-      await next.createInvite();
-      await refreshOutgoing();
-    })();
+    void session.createInvite();
   }
 
   function onJoin() {
-    state.inviteRole = 'callee';
-    deps.startPeer();
-    touch();
+    session.join();
   }
 
   function onApplyPaste(text: string) {
-    void applyIncoming(text);
+    void session.applyIncoming(text);
   }
 
   function onShareLink() {
-    if (!state.outgoing) return;
-    const kind: DeepKind = state.inviteRole === 'callee' ? 'answer' : 'join';
-    void shareDeepLink(kind, state.outgoing);
+    const target = session.shareLinkTarget();
+    if (!target) return;
+    void shareDeepLink(target.kind, target.payload);
   }
 
   function onShareRoom() {
     void (async () => {
-      state.inviteError = '';
-      if (usesRoomLink(ctx)) {
-        if (!peerIsLive(ctx)) {
-          state.openedFromLink = false;
-          state.roomId = generateId();
-          state.inviteRole = 'caller';
-          const next = deps.startPeer();
-          if (!next) return;
-          void next.enterRoom(state.roomId);
-        }
-        await shareDeepLink('room', state.roomId);
-        touch();
-        return;
-      }
-      state.openedFromLink = false;
-      state.inviteRole = 'caller';
-      const next = deps.startPeer();
-      if (!next) return;
-      await next.createInvite();
-      await refreshOutgoing();
-      if (state.outgoing) await shareDeepLink('join', state.outgoing);
-      touch();
+      const target = await session.prepareShareRoom();
+      if (!target) return;
+      await shareDeepLink(target.kind, target.payload);
     })();
   }
 
@@ -241,14 +153,7 @@ export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
   }
 
   function onPasteLink(text: string) {
-    const link = parsePastedShare(text);
-    if (link.kind === 'section') {
-      state.inviteError = inviteCopy.notNoCloudLink;
-      touch();
-      return;
-    }
-    state.inviteError = '';
-    void applyDeepLink(link);
+    session.pasteLink(text);
   }
 
   function onCopy() {
@@ -257,8 +162,7 @@ export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
       try {
         await navigator.clipboard.writeText(state.outgoing);
       } catch {
-        state.inviteError = inviteCopy.copyFailed;
-        touch();
+        session.setInviteError(inviteCopy.copyFailed);
       }
     })();
   }
@@ -271,10 +175,10 @@ export function createInviteSlice(ctx: NocloudContext, deps: InviteDeps) {
     copyText,
     refreshOutgoing,
     shareDeepLink,
-    applyIncoming,
-    applyDeepLink,
+    applyIncoming: session.applyIncoming,
+    applyDeepLink: session.applyDeepLink,
     consumeDeepLink,
-    resumeMeetRoom,
+    resumeMeetRoom: session.resumeMeetRoom,
     onCreateInvite,
     onJoin,
     onApplyPaste,

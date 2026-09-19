@@ -106,6 +106,10 @@ _Avoid_: putting call orchestration only in the store slice
 Deep module for Chat product behaviour: signed send/receive, self notes, thread persist over Link `sendChatWire`. The Pinia chat slice is a thin Vue adapter. Domain chat (H1. wire) stays the crypto/thread seam.
 _Avoid_: putting send/incoming orchestration only in the store slice
 
+**InviteSession**:
+Deep module for invite / deep-link product behaviour: create/join, apply share pack or invite text, room links, paste. The Pinia invite slice keeps browser glue (clipboard, `navigator.share`, location/history) and syncs role/error/room into reactive state.
+_Avoid_: putting applyIncoming/applyDeepLink orchestration only in the store slice
+
 **Leg**:
 Link to one peer (one PeerConnection).
 _Avoid_: call (when meaning a single peer link)
