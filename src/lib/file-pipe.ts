@@ -29,15 +29,18 @@ import { folderNameFromPaths, normalizeRelativePath } from './folder-path.ts';
 import type { PickedFile } from './folder-walk.ts';
 import { generateId } from './id.ts';
 import {
-  findTransferCursor,
+  advanceFolder,
+  isOpenFolder,
+  nextFolderEntry,
+} from './folder-sequencer.ts';
+import {
   isSafeName,
   openInboxWritable,
   removeInboxTransfer,
-  removeTransferCursor,
-  writeTransferCursor,
   type OpfsStore,
   type TransferCursor,
 } from './opfs.ts';
+import { createOpfsResume, type OpfsResume } from './opfs-resume.ts';
 import { estimateQuota, requestPersist } from './quota.ts';
 import { fillStreamBuffer } from './stream-fill.ts';
 import {
@@ -74,15 +77,6 @@ type FilePipeConfig = {
   persist?: () => Promise<boolean>;
 };
 
-const isOpen = (folder: FolderTransfer | null): boolean => {
-  if (!folder) return false;
-  return (
-    folder.state !== 'done' &&
-    folder.state !== 'failed' &&
-    folder.state !== 'canceled'
-  );
-};
-
 export class FilePipe extends EventEmitter {
   config: FilePipeConfig;
   store: OpfsStore | null;
@@ -98,6 +92,10 @@ export class FilePipe extends EventEmitter {
     null;
   ackGate: AckGate = createAckGate();
   pauseGate: PauseGate = createPauseGate();
+  opfsResume: OpfsResume = createOpfsResume({
+    getStore: () => this.store,
+    getResumeInboxId: () => this.resumeInboxId,
+  });
   resumeCursor: TransferCursor | null = null;
   resumeInboxId: string | null = null;
   generation = 0;
@@ -192,7 +190,7 @@ export class FilePipe extends EventEmitter {
   cancel() {
     const folder = this.currentFolder();
     const transfer = this.current();
-    if (folder && isOpen(folder)) {
+    if (folder && isOpenFolder(folder)) {
       this.sendControl({ type: 'folder-cancel', folderId: folder.id });
     }
     if (transfer) {
@@ -200,7 +198,8 @@ export class FilePipe extends EventEmitter {
       this.finish(transfer, { type: 'cancel' });
       return;
     }
-    if (folder && isOpen(folder)) this.finishFolder(folder, { type: 'cancel' });
+    if (folder && isOpenFolder(folder))
+      this.finishFolder(folder, { type: 'cancel' });
   }
 
   onControlRaw(raw: string) {
@@ -336,7 +335,7 @@ export class FilePipe extends EventEmitter {
       });
       return;
     }
-    if (isOpen(this.activeFolder) && !auto) {
+    if (isOpenFolder(this.activeFolder) && !auto) {
       this.sendControl({
         type: 'file-reject',
         transferId: message.transferId,
@@ -372,14 +371,14 @@ export class FilePipe extends EventEmitter {
     this.emit('offer', transfer);
     this.emit('transfer', transfer);
     if (this.store) {
-      const found = await findTransferCursor(this.store, {
+      const found = await this.opfsResume.find({
         name,
         path,
         size: message.size,
         chunkSize: message.chunkSize,
       });
-      if (found.ok && found.value) {
-        this.resumeCursor = found.value;
+      if (found) {
+        this.resumeCursor = found;
         await this.acceptOffer(transfer.id);
         return;
       }
@@ -507,7 +506,7 @@ export class FilePipe extends EventEmitter {
       folderId: incoming.folderId,
     };
     if (resume && resume.id !== incoming.id) {
-      void removeTransferCursor(this.store, resume.id);
+      void this.opfsResume.remove(resume.id);
     }
     this.incoming = null;
     await this.saveCursor(this.active);
@@ -520,7 +519,7 @@ export class FilePipe extends EventEmitter {
       this.emit('error', filePipeCopy.transferInProgress);
       return;
     }
-    if (isOpen(this.activeFolder) && !extra) {
+    if (isOpenFolder(this.activeFolder) && !extra) {
       this.emit('error', filePipeCopy.transferInProgress);
       return;
     }
@@ -648,16 +647,16 @@ export class FilePipe extends EventEmitter {
   async sendNextInFolder() {
     const folder = this.activeFolder;
     if (!folder || folder.direction !== 'send') return;
-    const entry = this.queue[folder.index];
-    if (!entry) {
+    const step = nextFolderEntry(folder, this.queue);
+    if (step.kind === 'done') {
       this.sendControl({ type: 'folder-done', folderId: folder.id });
       this.activeFolder = applyFolderEvent(folder, { type: 'done' });
       this.emit('folder', this.activeFolder);
       return;
     }
-    await this.startSend(entry.file, {
+    await this.startSend(step.entry.file, {
       folderId: folder.id,
-      path: entry.path,
+      path: step.entry.path,
     });
   }
 
@@ -731,7 +730,7 @@ export class FilePipe extends EventEmitter {
     this.active = applyTransferEvent(this.active, { type: 'done' });
     this.emit('transfer', this.active);
     this.emit('received', this.active);
-    if (this.store) void removeTransferCursor(this.store, transfer.id);
+    if (this.store) void this.opfsResume.remove(transfer.id);
     this.resumeInboxId = null;
     this.active = null;
     this.advanceReceiveFolder();
@@ -757,44 +756,27 @@ export class FilePipe extends EventEmitter {
   }
 
   async saveCursor(transfer: Transfer) {
-    if (!this.store || transfer.direction !== 'receive') return;
-    await writeTransferCursor(this.store, {
-      id: transfer.id,
-      inboxId: this.inboxKey(transfer),
-      name: transfer.name,
-      path: transfer.path,
-      folderId: transfer.folderId,
-      size: transfer.size,
-      mime: transfer.mime,
-      chunkSize: transfer.chunkSize,
-      index: transfer.index,
-    });
+    await this.opfsResume.save(transfer);
   }
 
   async advanceSendFolder() {
-    const folder = this.activeFolder;
-    if (!folder || folder.direction !== 'send' || !isOpen(folder)) return;
-    this.activeFolder = applyFolderEvent(folder, {
-      type: 'file',
-      index: folder.index,
-    });
+    const advanced = advanceFolder(this.activeFolder, 'send');
+    if (!advanced) return;
+    this.activeFolder = advanced.folder;
     this.emit('folder', this.activeFolder);
-    if (this.activeFolder.state === 'done') {
-      this.sendControl({ type: 'folder-done', folderId: folder.id });
+    if (advanced.done) {
+      this.sendControl({ type: 'folder-done', folderId: advanced.folder.id });
       return;
     }
     await this.sendNextInFolder();
   }
 
   advanceReceiveFolder() {
-    const folder = this.activeFolder;
-    if (!folder || folder.direction !== 'receive' || !isOpen(folder)) return;
-    this.activeFolder = applyFolderEvent(folder, {
-      type: 'file',
-      index: folder.index,
-    });
+    const advanced = advanceFolder(this.activeFolder, 'receive');
+    if (!advanced) return;
+    this.activeFolder = advanced.folder;
     this.emit('folder', this.activeFolder);
-    if (this.activeFolder.state === 'done') this.acceptedFolderId = null;
+    if (advanced.done) this.acceptedFolderId = null;
   }
 
   handleRemoteCancel(folderId: string) {
@@ -821,11 +803,11 @@ export class FilePipe extends EventEmitter {
 
   busy() {
     if (this.active || this.incoming || this.incomingFolder) return true;
-    return isOpen(this.activeFolder);
+    return isOpenFolder(this.activeFolder);
   }
 
   inboxKey(transfer: Transfer) {
-    return this.resumeInboxId || transfer.folderId || transfer.id;
+    return this.opfsResume.inboxKey(transfer);
   }
 
   finish(
@@ -847,7 +829,7 @@ export class FilePipe extends EventEmitter {
     if (this.store && transfer.direction === 'receive') {
       if (event.type === 'cancel' || event.type === 'reject') {
         void removeInboxTransfer(this.store, this.inboxKey(transfer));
-        void removeTransferCursor(this.store, transfer.id);
+        void this.opfsResume.remove(transfer.id);
       } else {
         void this.saveCursor(transfer);
       }
