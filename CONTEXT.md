@@ -56,6 +56,14 @@ _Avoid_: sending files through the relay
 A thin acquaintance / presence node. Never stores transfer contents.
 _Avoid_: cloud storage, file server
 
+**Relay Bundle**:
+Cached ordered list of signaling Relay URLs the client may use, with one active entry. Merged from share packs and live `/relays` hints.
+_Avoid_: calling the share pack S1. a Relay Bundle (S1. is the share encoding; the Bundle is the runtime cache)
+
+**Active Relay**:
+The Relay URL currently used for Presence and room signaling. «Я в сети» means Presence on this Active Relay.
+_Avoid_: a separate Presence Relay vs Call Relay in 1:1 MVP
+
 **Node**:
 The Node.js relay implementation in this repo. Not the PWA.
 _Avoid_: calling the PWA “Node”
@@ -99,8 +107,8 @@ Link to one peer (one PeerConnection).
 _Avoid_: call (when meaning a single peer link)
 
 **Presence**:
-Whether a contact is currently reachable via a relay.
-_Avoid_: online status from a file server
+Whether a contact appears reachable via the Active Relay (lobby / probe), not via a file server.
+_Avoid_: online status from a file server; “online on a different Relay than Active”
 
 **PresenceController**:
 Deep module for Presence product behaviour: lobby hub lifecycle, wake lock, relay challenge/failover, knock, and visitor→incoming Call. The Pinia presence slice is a thin Vue adapter. PresenceHub remains the internal probe adapter.
@@ -108,6 +116,10 @@ _Avoid_: putting presence orchestration only in the store slice
 
 **Knock**:
 Request to open a session with an online contact.
+
+**Lost each other**:
+Both sides still have Identity, but Presence/knock no longer meets because they sit on different Active Relays after failover or move. Recovery is re-share (card / S1. / R1.), not automatic DHT search.
+_Avoid_: “offline forever”, automatic global discovery
 
 **Room**:
 Internal signaling id. Users manage contacts, not rooms, in 1:1 MVP.
