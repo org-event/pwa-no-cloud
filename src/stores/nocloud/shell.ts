@@ -3,12 +3,15 @@ import { openStore, readAppLog, clearAppLog } from '@/lib/opfs.ts';
 import { loadAddressBook } from '@/lib/contacts-store.ts';
 import { requestPersist } from '@/lib/quota.ts';
 import { filesFromShare } from '@/lib/share.ts';
-import { loadSavedServers } from '@/lib/saved-servers-store.ts';
-import { loadTurnHost } from '@/lib/turn-host-store.ts';
 import { APP_VERSION } from '@/config/index.ts';
 import type { NocloudContext } from './context.ts';
 
-export function createShellSlice(ctx: NocloudContext) {
+export type ShellDeps = {
+  /** Load saved servers + TURN host into RelayCatalog after OPFS opens. */
+  hydrateServersFromOpfs: () => Promise<void>;
+};
+
+export function createShellSlice(ctx: NocloudContext, deps: ShellDeps) {
   const { state, app, touch } = ctx;
 
   function onInstall() {
@@ -96,10 +99,7 @@ export function createShellSlice(ctx: NocloudContext) {
       if (existing.ok) state.logText = existing.value;
       else state.logError = existing.message;
       await ctx.ports.transfer.refreshInbox?.();
-      state.hostDraft = await loadTurnHost(state.store);
-      state.savedServers = await loadSavedServers(state.store);
-      for (const server of state.savedServers)
-        void ctx.ports.servers.probeAndMark?.(server.id);
+      await deps.hydrateServersFromOpfs();
       state.book = await loadAddressBook(state.store);
       state.contactsNotice = '';
       await ctx.ports.contacts.seedDemoContacts?.();

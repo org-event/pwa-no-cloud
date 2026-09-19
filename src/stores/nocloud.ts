@@ -63,7 +63,9 @@ export const useNocloudStore = defineStore('nocloud', () => {
   const calls = createCallsSlice(ctx);
   const chat = createChatSlice(ctx);
   const session = createSessionSlice(ctx, servers.shareDraftForInvite);
-  const shell = createShellSlice(ctx);
+  const shell = createShellSlice(ctx, {
+    hydrateServersFromOpfs: servers.hydrateFromOpfs,
+  });
 
   bindNocloudPorts(ctx.ports, {
     call: {

@@ -60,6 +60,10 @@ _Avoid_: cloud storage, file server
 Cached ordered list of signaling Relay URLs the client may use, with one active entry. Merged from share packs and live `/relays` hints.
 _Avoid_: calling the share pack S1. a Relay Bundle (S1. is the share encoding; the Bundle is the runtime cache)
 
+**RelayCatalog**:
+Deep module for control-plane catalog behaviour: saved Relay list, active settings, share-pack apply, probe/reach, Relay Bundle merge/active/failover. The Pinia servers slice is a thin Vue adapter (clipboard, QR file read, presence hooks).
+_Avoid_: putting list/merge/failover orchestration only in the Pinia servers slice
+
 **Active Relay**:
 The Relay URL currently used for Presence and room signaling. «Я в сети» means Presence on this Active Relay.
 _Avoid_: a separate Presence Relay vs Call Relay in 1:1 MVP
