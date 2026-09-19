@@ -2,7 +2,7 @@ import { isProfileId, meetRoomId } from '@/domain/profile.ts';
 import {
   createSignalingPort,
   type SignalingHandle,
-} from '@/lib/signaling/factory.ts';
+} from '@/packages/signaling/index.ts';
 import type { SignalingConfig } from '@/config/types.ts';
 
 /** Probe / scout clients — ignored by WebRTC waitPeer. */

@@ -10,6 +10,7 @@ import { createNocloudContext } from './nocloud/context.ts';
 import { createCallsSlice } from './nocloud/calls.ts';
 import { createChatSlice } from './nocloud/chat.ts';
 import { createContactsSlice } from './nocloud/contacts.ts';
+import { bindNocloudPorts } from './nocloud/ports.ts';
 import { createPresenceSlice } from './nocloud/presence.ts';
 import { createServersSlice } from './nocloud/servers.ts';
 import { createSessionSlice } from './nocloud/session.ts';
@@ -61,34 +62,50 @@ export const useNocloudStore = defineStore('nocloud', () => {
   const presence = createPresenceSlice(ctx);
   const calls = createCallsSlice(ctx);
   const chat = createChatSlice(ctx);
-  ctx.refs.onRemoteTrack = calls.onRemoteTrack;
-  ctx.refs.onIncomingCall = calls.onIncomingCall;
-  ctx.refs.onCallPeerError = calls.onPeerError;
-  ctx.refs.onIncomingChatWire = chat.onIncomingChatWire;
   const session = createSessionSlice(ctx, servers.shareDraftForInvite);
   const shell = createShellSlice(ctx);
 
-  ctx.refs.startPeer = session.startPeer;
-  ctx.refs.applyPeerProfile = contacts.applyPeerProfile;
-  ctx.refs.ensureLivePeerInBook = contacts.ensureLivePeerInBook;
-  ctx.refs.applyShareDraft = servers.applyShareDraft;
-  ctx.refs.probeAndMark = servers.probeAndMark;
-  ctx.refs.refreshInbox = session.refreshInbox;
-  ctx.refs.refreshOutgoing = session.refreshOutgoing;
-  ctx.refs.flushQueue = session.flushQueue;
-  ctx.refs.applyIncoming = session.applyIncoming;
-  ctx.refs.resumeMeetRoom = session.resumeMeetRoom;
-  ctx.refs.consumeDeepLink = session.consumeDeepLink;
-  ctx.refs.queueFile = session.queueFile;
-  ctx.refs.knockOn = contacts.knockOn;
-  ctx.refs.startPresence = presence.startPresence;
-  ctx.refs.syncPresenceContacts = presence.syncPresenceContacts;
-  ctx.refs.ensurePresenceActive = presence.ensurePresenceActive;
-  ctx.refs.resumePresence = presence.resumePresence;
-  ctx.refs.copyText = session.copyText;
-  ctx.refs.seedDemoContacts = contacts.seedDemoContacts;
-  ctx.refs.refreshRelayBundleFrom = servers.refreshRelayBundleFrom;
-  ctx.refs.failoverRelay = servers.failoverRelay;
+  bindNocloudPorts(ctx.ports, {
+    call: {
+      onRemoteTrack: calls.onRemoteTrack,
+      onIncomingCall: calls.onIncomingCall,
+      onCallPeerError: calls.onPeerError,
+    },
+    chat: {
+      onIncomingChatWire: chat.onIncomingChatWire,
+    },
+    session: {
+      startPeer: session.startPeer,
+      refreshOutgoing: session.refreshOutgoing,
+      applyIncoming: session.applyIncoming,
+      resumeMeetRoom: session.resumeMeetRoom,
+      consumeDeepLink: session.consumeDeepLink,
+      copyText: session.copyText,
+    },
+    transfer: {
+      flushQueue: session.flushQueue,
+      queueFile: session.queueFile,
+      refreshInbox: session.refreshInbox,
+    },
+    contacts: {
+      applyPeerProfile: contacts.applyPeerProfile,
+      ensureLivePeerInBook: contacts.ensureLivePeerInBook,
+      knockOn: contacts.knockOn,
+      seedDemoContacts: contacts.seedDemoContacts,
+    },
+    presence: {
+      startPresence: presence.startPresence,
+      syncPresenceContacts: presence.syncPresenceContacts,
+      ensurePresenceActive: presence.ensurePresenceActive,
+      resumePresence: presence.resumePresence,
+    },
+    servers: {
+      applyShareDraft: servers.applyShareDraft,
+      probeAndMark: servers.probeAndMark,
+      refreshRelayBundleFrom: servers.refreshRelayBundleFrom,
+      failoverRelay: servers.failoverRelay,
+    },
+  });
 
   const trackRevision = () => {
     void peerRevision.value;

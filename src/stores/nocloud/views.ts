@@ -8,7 +8,7 @@ import { formatIceReport } from '@/lib/ice.ts';
 import {
   humanizeSignalingError,
   mixedContentBlocksSignaling,
-} from '@/lib/signaling/mixed-content.ts';
+} from '@/packages/signaling/mixed-content.ts';
 import type { TransferViewState } from '@/ui/transfer-status.ts';
 import type {
   ContactsState,
@@ -138,10 +138,10 @@ export function transferState(ctx: NocloudContext): TransferViewState {
     state.queuedFolderLabel || folder?.[0]?.path.split('/')[0] || '';
   return {
     connected: state.peer?.state === 'connected',
-    current: state.peer?.activeFile() ?? null,
-    incoming: state.peer?.incomingFile() ?? null,
-    folder: state.peer?.activeFolder() ?? null,
-    incomingFolder: state.peer?.incomingFolder() ?? null,
+    current: state.peer?.transfer?.activeFile() ?? null,
+    incoming: state.peer?.transfer?.incomingFile() ?? null,
+    folder: state.peer?.transfer?.activeFolder() ?? null,
+    incomingFolder: state.peer?.transfer?.incomingFolder() ?? null,
     queuedNames: state.queuedFiles.map((file) => file.name),
     queuedItems: state.queuedFiles.map((file, index) => ({
       key: `file:${index}:${file.name}:${file.size}`,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createWebSocketPort, toWebSocketUrl } from './websocket.ts';
-import type { SignalMessage } from './port.ts';
+import { createWebSocketPort, toWebSocketUrl } from '../websocket.ts';
+import type { SignalMessage } from '../port.ts';
 
 class FakeSocket {
   readyState = 1;

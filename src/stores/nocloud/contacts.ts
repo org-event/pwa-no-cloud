@@ -34,7 +34,7 @@ import { fileToAvatarDataUrl } from '@/lib/avatar.ts';
 import { createGroup, saveAddressBook } from '@/lib/contacts-store.ts';
 import { bindIdentityProfile, saveProfile } from '@/lib/profile-store.ts';
 import { inviteToQr } from '@/lib/qr.ts';
-import { OwnedSecret } from '@/lib/owned-secret.ts';
+import { OwnedSecret, withBorrowedKeyPair } from '@/lib/owned-secret.ts';
 import type { NocloudContext } from './context.ts';
 import { peerIsLive, socketBlocked, usesRoomLink } from './views.ts';
 
@@ -49,27 +49,26 @@ export function createContactsSlice(ctx: NocloudContext) {
     signingPublicKey = null;
   };
 
-  const currentKeyPair = (): KeyPair | null => {
+  const withIdentityKeyPair = async <T>(
+    op: (keyPair: KeyPair) => T | Promise<T>,
+  ): Promise<T | null> => {
     if (!signingPublicKey || !ownedSecret) return null;
-    return {
-      publicKey: signingPublicKey,
-      secretKey: ownedSecret.borrow(),
-    };
+    return withBorrowedKeyPair(ownedSecret, signingPublicKey, op);
   };
 
   const refreshIdentityCard = async () => {
-    const keyPair = currentKeyPair();
-    if (keyPair && state.me.id) {
-      const invite = await createIdentityInvite(
+    const invite = await withIdentityKeyPair(async (keyPair) => {
+      if (!state.me.id) return null;
+      return createIdentityInvite(
         { nick: state.me.nick || defaultNick(state.me.id) },
         keyPair,
       );
-      if (invite.ok) {
-        state.cardText = invite.value;
-        state.identityQrUrl = await inviteToQr(invite.value);
-        touch();
-        return;
-      }
+    });
+    if (invite?.ok) {
+      state.cardText = invite.value;
+      state.identityQrUrl = await inviteToQr(invite.value);
+      touch();
+      return;
     }
     state.cardText = encodeContactCard(state.me);
     state.identityQrUrl = state.cardText
@@ -105,7 +104,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       note(notes.contact(card.nick));
     }
     touch();
-    ctx.refs.syncPresenceContacts?.();
+    ctx.ports.presence.syncPresenceContacts?.();
   };
 
   /** After delete mid-call, put the live peer back into the book. */
@@ -124,7 +123,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       void persistBook();
       state.contactsNotice = contactsCopy.inBook(card.nick);
       note(notes.contact(card.nick));
-      ctx.refs.syncPresenceContacts?.();
+      ctx.ports.presence.syncPresenceContacts?.();
     }
     if (state.selectedContactIds[0] !== id) {
       state.selectedContactIds = [id];
@@ -152,7 +151,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     state.openedFromLink = false;
     state.roomId = target;
     state.inviteRole = 'caller';
-    const next = ctx.refs.startPeer?.();
+    const next = ctx.ports.session.startPeer?.();
     if (!next) return;
     state.contactsNotice = knockStartNotice(asHost, known?.nick);
     touch();
@@ -202,8 +201,9 @@ export function createContactsSlice(ctx: NocloudContext) {
     if (keyPair) {
       ownedSecret = new OwnedSecret(keyPair.secretKey);
       signingPublicKey = keyPair.publicKey;
+      keyPair.secretKey.fill(0);
     }
-    ctx.refs.getIdentityKeyPair = () => currentKeyPair();
+    ctx.ports.contacts.withIdentityKeyPair = withIdentityKeyPair;
     state.peer?.setProfile(state.me);
     void refreshIdentityCard();
   }
@@ -247,7 +247,7 @@ export function createContactsSlice(ctx: NocloudContext) {
   function onCopyCard() {
     void (async () => {
       await refreshIdentityCard();
-      const ok = await ctx.refs.copyText?.(state.cardText);
+      const ok = await ctx.ports.session.copyText?.(state.cardText);
       state.contactsNotice = ok
         ? contactsCopy.cardCopied
         : contactsCopy.cardCopyFailed;
@@ -255,7 +255,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       touch();
       // Publish lobby presence; keep waiting for WebRTC guests too.
       if (ok) {
-        await ctx.refs.startPresence?.();
+        await ctx.ports.presence.startPresence?.();
         await knockOn(state.me.id, true);
       }
     })();
@@ -273,31 +273,32 @@ export function createContactsSlice(ctx: NocloudContext) {
       touch();
       return false;
     }
-    const keyPair = currentKeyPair();
-    if (!keyPair) {
-      state.contactsNotice = contactsCopy.introduceNeedIdentity;
-      touch();
-      return false;
-    }
     const subjectPk = decodePublicKey(contact.publicKey);
     if (!subjectPk.ok) {
       state.contactsNotice = contactsCopy.introduceFailed;
       touch();
       return false;
     }
-    const encoded = await createIntroduceCard(
-      {
-        subjectPk: subjectPk.value,
-        subjectNick: contact.nick || defaultNick(contact.id),
-      },
-      keyPair,
+    const encoded = await withIdentityKeyPair(async (keyPair) =>
+      createIntroduceCard(
+        {
+          subjectPk: subjectPk.value,
+          subjectNick: contact.nick || defaultNick(contact.id),
+        },
+        keyPair,
+      ),
     );
+    if (!encoded) {
+      state.contactsNotice = contactsCopy.introduceNeedIdentity;
+      touch();
+      return false;
+    }
     if (!encoded.ok) {
       state.contactsNotice = contactsCopy.introduceFailed;
       touch();
       return false;
     }
-    const ok = await ctx.refs.copyText?.(encoded.value);
+    const ok = await ctx.ports.session.copyText?.(encoded.value);
     state.contactsNotice = ok
       ? contactsCopy.introduceCopied(contactDisplayName(contact))
       : contactsCopy.cardCopyFailed;
@@ -324,7 +325,7 @@ export function createContactsSlice(ctx: NocloudContext) {
         introduced.value.contact.nick,
       );
       touch();
-      ctx.refs.syncPresenceContacts?.();
+      ctx.ports.presence.syncPresenceContacts?.();
       return true;
     }
     const invite = await parseIdentityInvite(text);
@@ -343,7 +344,7 @@ export function createContactsSlice(ctx: NocloudContext) {
       void persistBook();
       state.contactsNotice = contactsCopy.inBook(invite.value.nick);
       touch();
-      ctx.refs.syncPresenceContacts?.();
+      ctx.ports.presence.syncPresenceContacts?.();
       return true;
     }
     const card = parseContactCard(text);
@@ -361,7 +362,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     void persistBook();
     state.contactsNotice = contactsCopy.inBook(card.nick);
     touch();
-    ctx.refs.syncPresenceContacts?.();
+    ctx.ports.presence.syncPresenceContacts?.();
     return true;
   }
 
@@ -389,7 +390,7 @@ export function createContactsSlice(ctx: NocloudContext) {
     state.contactsNotice = contactsCopy.removed;
     void persistBook();
     touch();
-    ctx.refs.syncPresenceContacts?.();
+    ctx.ports.presence.syncPresenceContacts?.();
   }
 
   function onSaveGroup(name: string, memberIds: string[]) {
@@ -423,7 +424,7 @@ export function createContactsSlice(ctx: NocloudContext) {
 
   function onCopyId() {
     void (async () => {
-      const ok = await ctx.refs.copyText?.(state.me.id);
+      const ok = await ctx.ports.session.copyText?.(state.me.id);
       note(ok ? notes.idCopied : notes.idCopyFailed);
       touch();
     })();

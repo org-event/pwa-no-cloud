@@ -43,7 +43,7 @@ export function createServersSlice(ctx: NocloudContext) {
     saveUserSettings(state.settings, storage);
     state.activeServerId = server.id;
     if (notice) state.hostNotice = notice;
-    void ctx.refs.ensurePresenceActive?.();
+    void ctx.ports.presence.ensurePresenceActive?.();
   };
 
   const probeAndMark = async (serverId: string) => {
@@ -80,7 +80,7 @@ export function createServersSlice(ctx: NocloudContext) {
     state.savedServers = next.list;
     activateSavedServer(next.server, notice);
     persistSavedServers();
-    void ctx.refs.probeAndMark?.(next.server.id);
+    void ctx.ports.servers.probeAndMark?.(next.server.id);
   };
 
   const applyShareDraft = (draft: CustomServerDraft, notice: string) => {
@@ -155,7 +155,7 @@ export function createServersSlice(ctx: NocloudContext) {
   }
 
   async function onCopyText(text: string, okNotice: string) {
-    const ok = await ctx.refs.copyText?.(text);
+    const ok = await ctx.ports.session.copyText?.(text);
     state.hostNotice = ok ? okNotice : serversCopy.copyFailed;
     touch();
   }
@@ -175,7 +175,7 @@ export function createServersSlice(ctx: NocloudContext) {
 
   function onCopyHostScript(script: string) {
     void (async () => {
-      const ok = await ctx.refs.copyText?.(script);
+      const ok = await ctx.ports.session.copyText?.(script);
       state.hostNotice = ok
         ? serversCopy.commandsCopied
         : serversCopy.commandsCopyFailed;
@@ -308,7 +308,7 @@ export function createServersSlice(ctx: NocloudContext) {
     state.settings = createUserSettings('custom', draft);
     saveUserSettings(state.settings, storage);
     if (options?.restartPresence !== false) {
-      void ctx.refs.ensurePresenceActive?.();
+      void ctx.ports.presence.ensurePresenceActive?.();
     }
   };
 
@@ -330,9 +330,16 @@ export function createServersSlice(ctx: NocloudContext) {
   function onSelectRelayUrl(raw: string) {
     const next = setActiveRelay(state.relayBundle, raw);
     if (next === state.relayBundle) return;
+    const wasPresent = state.presenceAvailable;
     state.relayBundle = next;
     persistRelayBundle();
-    applyActiveRelayToSettings();
+    // Recreate Presence on the new Active Relay; do not rely on quiet ensure alone.
+    applyActiveRelayToSettings({ restartPresence: false });
+    if (wasPresent) {
+      void ctx.ports.presence.startPresence?.();
+    } else {
+      void ctx.ports.presence.ensurePresenceActive?.();
+    }
     state.hostNotice = serversCopy.relayActive;
     touch();
   }

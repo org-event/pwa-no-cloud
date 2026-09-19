@@ -56,6 +56,14 @@ _Avoid_: sending files through the relay
 A thin acquaintance / presence node. Never stores transfer contents.
 _Avoid_: cloud storage, file server
 
+**Relay Bundle**:
+Cached ordered list of signaling Relay URLs the client may use, with one active entry. Merged from share packs and live `/relays` hints.
+_Avoid_: calling the share pack S1. a Relay Bundle (S1. is the share encoding; the Bundle is the runtime cache)
+
+**Active Relay**:
+The Relay URL currently used for Presence and room signaling. «Я в сети» means Presence on this Active Relay.
+_Avoid_: a separate Presence Relay vs Call Relay in 1:1 MVP
+
 **Node**:
 The Node.js relay implementation in this repo. Not the PWA.
 _Avoid_: calling the PWA “Node”
@@ -82,20 +90,44 @@ _Avoid_: “through our cloud”
 One WebRTC session between two sides (data + media).
 _Avoid_: one PC per feature
 
+**Link**:
+The deep module for one PeerConnection: signaling, ICE, control, and local media. File Transfer uses a separate TransferPort once channels are open.
+_Avoid_: PeerSession (legacy name for the same implementation)
+
 **Call**:
 Logical session made of legs to participants.
 _Avoid_: room (MVP rooms are signaling-only)
+
+**CallController**:
+Deep module for Call product behaviour: dial/accept/reject/hangup, media lifecycle, and attach to Link. The Pinia calls slice is a thin Vue adapter.
+_Avoid_: putting call orchestration only in the store slice
+
+**ChatController**:
+Deep module for Chat product behaviour: signed send/receive, self notes, thread persist over Link `sendChatWire`. The Pinia chat slice is a thin Vue adapter. Domain chat (H1. wire) stays the crypto/thread seam.
+_Avoid_: putting send/incoming orchestration only in the store slice
 
 **Leg**:
 Link to one peer (one PeerConnection).
 _Avoid_: call (when meaning a single peer link)
 
 **Presence**:
-Whether a contact is currently reachable via a relay.
-_Avoid_: online status from a file server
+Whether a contact appears reachable via the Active Relay (lobby / probe), not via a file server.
+_Avoid_: online status from a file server; “online on a different Relay than Active”
+
+**Online (contact)**:
+UI reachability: Presence probe on the Active Relay **or** an open Link to that contact.
+_Avoid_: treating Online as “in a Call only”; hiding Live Link as offline
+
+**PresenceController**:
+Deep module for Presence product behaviour: lobby hub lifecycle, wake lock, relay challenge/failover, knock, and visitor→incoming Call. The Pinia presence slice is a thin Vue adapter. PresenceHub remains the internal probe adapter.
+_Avoid_: putting presence orchestration only in the store slice
 
 **Knock**:
 Request to open a session with an online contact.
+
+**Lost each other**:
+Both sides still have Identity, but Presence/knock no longer meets because they sit on different Active Relays after failover or move. Recovery is re-share (card / S1. / R1.), not automatic DHT search.
+_Avoid_: “offline forever”, automatic global discovery
 
 **Room**:
 Internal signaling id. Users manage contacts, not rooms, in 1:1 MVP.
@@ -107,11 +139,23 @@ _Avoid_: chat group (later)
 Sending a file or folder over a DataChannel.
 _Avoid_: upload to relay
 
+**TransferPort**:
+Byte-plane seam once Link control+bytes channels are open: send/accept/pause file and folder Transfer. FilePipe is the implementation; Link exposes only this port (via `bindTransferPort`), not FilePipe methods.
+_Avoid_: PeerSession sendFile/acceptFile pass-throughs; calling FilePipe from UI/store
+
+**TransferSession**:
+Deep module for Transfer product behaviour: stage queue, send over Link/`TransferPort`, accept/reject/cancel. The Pinia transfer slice keeps inbox (OPFS) UI and syncs staging into reactive state.
+_Avoid_: putting send/queue orchestration only in the store slice
+
 **OPFS**:
 Origin-private browser filesystem used as inbox storage.
 _Avoid_: server disk
 
 ### Code organisation
+
+**OwnedSecret**:
+Exclusive ownership of Ed25519 secretKey bytes (`use` / `borrow` / `move` / `dispose` with wipe). Signing goes through `withBorrowedKeyPair` / ContactsPort `withIdentityKeyPair` so borrowed copies are zeroed after the callback (ADR 0002).
+_Avoid_: returning durable KeyPair from the store; holding secretKey in long-lived UI closures
 
 **Domain module**:
 A responsibility area (identity, call, relay, …) without dependency cycles.
@@ -120,3 +164,7 @@ _Avoid_: dumping crypto/SDP into the Shell
 **Adapter**:
 Transport wrapper (WebSocket, HTTP poll, manual QR) behind one SignalingPort contract.
 _Avoid_: leaking transport details into domain facades
+
+**NocloudPorts**:
+Typed cross-slice facades on the Pinia context (`call`, `chat`, `session`, `transfer`, `contacts`, `presence`, `servers`), bound once at store composition.
+_Avoid_: flat untyped `refs` callback bag

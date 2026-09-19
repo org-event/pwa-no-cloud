@@ -30,7 +30,15 @@ function fakeCtx(
     peerRevision: { value: 0 },
     touch: () => {},
     note: () => {},
-    refs: {},
+    ports: {
+      call: {},
+      chat: {},
+      session: {},
+      transfer: {},
+      contacts: {},
+      presence: {},
+      servers: {},
+    },
   });
 }
 
