@@ -110,6 +110,10 @@ _Avoid_: call (when meaning a single peer link)
 Whether a contact appears reachable via the Active Relay (lobby / probe), not via a file server.
 _Avoid_: online status from a file server; “online on a different Relay than Active”
 
+**Online (contact)**:
+UI reachability: Presence probe on the Active Relay **or** an open Link to that contact.
+_Avoid_: treating Online as “in a Call only”; hiding Live Link as offline
+
 **PresenceController**:
 Deep module for Presence product behaviour: lobby hub lifecycle, wake lock, relay challenge/failover, knock, and visitor→incoming Call. The Pinia presence slice is a thin Vue adapter. PresenceHub remains the internal probe adapter.
 _Avoid_: putting presence orchestration only in the store slice
