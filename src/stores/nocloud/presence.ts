@@ -1,8 +1,10 @@
-import { presenceCopy } from '@/content/index.ts';
 import { isProfileId } from '@/domain/profile.ts';
 import type { CallIntent } from '@/lib/call-intent.ts';
-import { PresenceHub } from '@/lib/presence.ts';
 import { loginRelayChallenge } from '@/lib/relay-auth.ts';
+import {
+  createPresenceController,
+  type PresenceControllerState,
+} from '@/lib/presence-controller.ts';
 import {
   releaseWakeLock,
   requestWakeLock,
@@ -13,208 +15,66 @@ import { peerSignaling, usesRoomLink } from './views.ts';
 
 export function createPresenceSlice(ctx: NocloudContext) {
   const { state, touch, note } = ctx;
-  let hub: PresenceHub | null = null;
-  let hubKey = '';
-  let relaySessionId: string | null = null;
 
-  const publish = () => {
+  const syncUi = (next: PresenceControllerState) => {
+    state.presenceAvailable = next.available;
+    state.presenceOnlineIds = next.onlineIds;
+    if (next.notice) state.contactsNotice = next.notice;
     touch();
   };
 
-  const contactIds = (): string[] =>
-    state.book.contacts.map((item) => item.id).filter((id) => isProfileId(id));
-
-  const signalingKey = (signaling: ReturnType<typeof peerSignaling>): string =>
-    `${signaling.kind}:${'url' in signaling ? (signaling.url ?? '') : ''}`;
-
-  const ensureHub = (): PresenceHub | null => {
-    if (!usesRoomLink(ctx)) return null;
-    if (!isProfileId(state.me.id)) return null;
-    const signaling = peerSignaling(ctx);
-    if (signaling.kind === 'manual' || !signaling.url) return null;
-    const key = `${signalingKey(signaling)}:${state.me.id}`;
-    if (hub && hubKey === key) {
-      hub.setContacts(contactIds());
-      return hub;
-    }
-    hub?.stop();
-    hub = null;
-    hubKey = key;
-    hub = new PresenceHub({
-      meId: state.me.id,
-      signaling,
-      onChange: (snapshot) => {
-        state.presenceAvailable = snapshot.available;
-        state.presenceOnlineIds = [...snapshot.onlineIds];
-        publish();
-      },
-      onVisitor: (peerId) => {
-        if (state.livePeerId === peerId && peerIsConnected()) return;
-        if (
-          state.peer?.state === 'connected' ||
-          !ctx.ports.call.onIncomingCall?.(peerId)
-        ) {
-          state.contactsNotice = presenceCopy.busyIncoming(peerId);
-          publish();
-          return;
-        }
-        state.contactsNotice = presenceCopy.incomingKnock;
-        publish();
-      },
-    });
-    hub.setContacts(contactIds());
-    return hub;
-  };
-
-  const peerIsConnected = (): boolean => state.peer?.state === 'connected';
-
-  const ensureRelaySession = async (): Promise<void> => {
-    if (relaySessionId) return;
-    const signaling = peerSignaling(ctx);
-    if (signaling.kind === 'manual' || !signaling.url) return;
-    const keyPair = ctx.ports.contacts.getIdentityKeyPair?.();
-    if (!keyPair) return;
-    const session = await loginRelayChallenge({
-      signalingUrl: signaling.url,
-      keyPair,
-    });
-    if (session.ok) relaySessionId = session.value.sessionId;
-  };
-
-  async function startPresence(options?: { quiet?: boolean }) {
-    const quiet = options?.quiet === true;
-    if (!isProfileId(state.me.id)) {
-      if (!quiet) {
-        state.contactsNotice = presenceCopy.needIdentity;
-        publish();
+  const controller = createPresenceController({
+    selfId: () => state.me.id,
+    contactIds: () =>
+      state.book.contacts
+        .map((item) => item.id)
+        .filter((id) => isProfileId(id)),
+    usesRoomLink: () => usesRoomLink(ctx),
+    getSignaling: () => peerSignaling(ctx),
+    relayUrlCount: () => state.relayBundle.urls.length,
+    livePeerId: () => state.livePeerId,
+    linkConnected: () => state.peer?.state === 'connected',
+    getKeyPair: () => ctx.ports.contacts.getIdentityKeyPair?.() ?? null,
+    loginRelay: async (signalingUrl, keyPair) => {
+      const session = await loginRelayChallenge({ signalingUrl, keyPair });
+      if (session.ok) {
+        return { ok: true as const, sessionId: session.value.sessionId };
       }
-      return false;
-    }
-    if (!usesRoomLink(ctx)) {
-      if (!quiet) {
-        state.contactsNotice = presenceCopy.needS1;
-        publish();
-      }
-      return false;
-    }
-
-    const maxAttempts = Math.max(1, state.relayBundle.urls.length || 1);
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      await ensureRelaySession();
-      const next = ensureHub();
-      if (!next) {
-        if (!quiet) {
-          state.contactsNotice = presenceCopy.needS1;
-          publish();
-        }
-        return false;
-      }
-      next.setContacts(contactIds());
-      const wasAvailable = state.presenceAvailable && next.available;
-      const ok = await next.start();
-      if (ok) {
-        const signaling = peerSignaling(ctx);
-        if (signaling.kind !== 'manual' && signaling.url) {
-          void ctx.ports.servers.refreshRelayBundleFrom?.(signaling.url);
-        }
-        state.presenceAvailable = true;
-        if (!quiet) {
-          state.contactsNotice = presenceCopy.available;
-          note(presenceCopy.availableNote);
-        } else if (!wasAvailable) {
-          state.contactsNotice = presenceCopy.available;
-        }
-        void requestWakeLock();
-        publish();
-        return true;
-      }
-
-      const signaling = peerSignaling(ctx);
-      const failedUrl =
-        signaling.kind !== 'manual' && signaling.url ? signaling.url : '';
-      hub?.stop();
-      hub = null;
-      hubKey = '';
-      relaySessionId = null;
-      if (!failedUrl || !ctx.ports.servers.failoverRelay?.(failedUrl)) {
-        break;
-      }
-    }
-
-    if (!quiet) {
-      state.contactsNotice = presenceCopy.startFailed;
-      publish();
-    }
-    return false;
-  }
-
-  function stopPresence() {
-    hub?.stop();
-    hub = null;
-    hubKey = '';
-    relaySessionId = null;
-    state.presenceAvailable = false;
-    state.presenceOnlineIds = [];
-    state.contactsNotice = presenceCopy.unavailable;
-    void releaseWakeLock();
-    publish();
-  }
-
-  function syncPresenceContacts() {
-    hub?.setContacts(contactIds());
-  }
-
-  /** Join lobby when the app is in the foreground and S1 is ready. */
-  async function ensurePresenceActive() {
-    if (
-      typeof document !== 'undefined' &&
-      document.visibilityState !== 'visible'
-    ) {
-      return;
-    }
-    await startPresence({ quiet: true });
-  }
-
-  async function resumePresence() {
-    void resumeWakeLock();
-    await ensurePresenceActive();
-  }
-
-  /**
-   * Knock for data (files) now; later pass CallIntent.kind audio|video|screen.
-   */
-  async function onKnockContact(peerId: string, intent?: CallIntent) {
-    const kind = intent?.kind ?? 'data';
-    if (kind !== 'data') {
-      state.contactsNotice = presenceCopy.mediaSoon(kind);
-      publish();
-    }
-    if (!state.presenceOnlineIds.includes(peerId) && kind === 'data') {
-      state.contactsNotice = presenceCopy.peerOffline;
-      publish();
-      // Still allow knock — peer may have just come online.
-    }
-    await startPresence();
-    await ctx.ports.contacts.knockOn?.(peerId, false);
-  }
-
-  function isPresenceOnline(id: string): boolean {
-    if (state.livePeerId === id && peerIsConnected()) return true;
-    return state.presenceOnlineIds.includes(id);
-  }
-
-  function isChannelOpen(id: string): boolean {
-    return Boolean(state.livePeerId === id && peerIsConnected());
-  }
+      return { ok: false as const };
+    },
+    onIncomingCall: (peerId) =>
+      ctx.ports.call.onIncomingCall?.(peerId) ?? false,
+    knockOn: async (peerId, asHost) => {
+      await ctx.ports.contacts.knockOn?.(peerId, asHost);
+    },
+    refreshRelayBundleFrom: (url) =>
+      ctx.ports.servers.refreshRelayBundleFrom?.(url),
+    failoverRelay: (failedUrl) =>
+      ctx.ports.servers.failoverRelay?.(failedUrl) ?? false,
+    requestWakeLock: () => {
+      void requestWakeLock();
+    },
+    releaseWakeLock: () => {
+      void releaseWakeLock();
+    },
+    resumeWakeLock: () => {
+      void resumeWakeLock();
+    },
+    isDocumentVisible: () =>
+      typeof document === 'undefined' || document.visibilityState === 'visible',
+    note,
+    onChange: syncUi,
+  });
 
   return {
-    startPresence,
-    stopPresence,
-    syncPresenceContacts,
-    ensurePresenceActive,
-    resumePresence,
-    onKnockContact,
-    isPresenceOnline,
-    isChannelOpen,
+    startPresence: controller.start,
+    stopPresence: controller.stop,
+    syncPresenceContacts: controller.syncContacts,
+    ensurePresenceActive: controller.ensureActive,
+    resumePresence: controller.resume,
+    onKnockContact: (peerId: string, intent?: CallIntent) =>
+      controller.knock(peerId, intent),
+    isPresenceOnline: controller.isOnline,
+    isChannelOpen: controller.isChannelOpen,
   };
 }
