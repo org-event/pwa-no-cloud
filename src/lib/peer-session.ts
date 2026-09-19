@@ -13,8 +13,7 @@ import {
 } from '@/domain/session.ts';
 import { EventEmitter } from './events.ts';
 import { FilePipe, type DataSink } from './file-pipe.ts';
-import type { TransferPort } from './transfer-port.ts';
-import type { PickedFile } from './folder-walk.ts';
+import { bindTransferPort, type TransferPort } from './transfer-port.ts';
 import { generateId } from './id.ts';
 import type { OpfsStore } from './opfs.ts';
 import {
@@ -88,23 +87,7 @@ export class PeerSession extends EventEmitter {
   /** TransferPort once control+bytes are open; null beforehand. */
   get transfer(): TransferPort | null {
     this.ensurePipe();
-    if (!this.pipe) return null;
-    const pipe = this.pipe;
-    return {
-      sendFile: (file) => pipe.sendFile(file),
-      sendFolder: (entries) => pipe.sendFolder(entries),
-      accept: (id) => pipe.accept(id),
-      reject: (id, reason) => pipe.reject(id, reason),
-      cancel: () => pipe.cancel(),
-      pause: () => pipe.pause(),
-      resume: () => pipe.resume(),
-      current: () => pipe.current(),
-      currentFolder: () => pipe.currentFolder(),
-      activeFile: () => pipe.active,
-      incomingFile: () => pipe.incoming,
-      activeFolder: () => pipe.activeFolder,
-      incomingFolder: () => pipe.incomingFolder,
-    };
+    return this.pipe ? bindTransferPort(this.pipe) : null;
   }
 
   constructor(config: PeerSessionConfig) {
@@ -358,56 +341,6 @@ export class PeerSession extends EventEmitter {
   setStore(store: OpfsStore | null) {
     this.store = store;
     this.pipe?.setStore(store);
-  }
-
-  sendFile(file: File) {
-    this.ensurePipe();
-    this.pipe?.sendFile(file);
-  }
-
-  sendFolder(entries: PickedFile[]) {
-    this.ensurePipe();
-    this.pipe?.sendFolder(entries);
-  }
-
-  acceptFile(transferId: string) {
-    this.pipe?.accept(transferId);
-  }
-
-  rejectFile(transferId: string, reason?: string) {
-    this.pipe?.reject(transferId, reason);
-  }
-
-  cancelFile() {
-    this.pipe?.cancel();
-  }
-
-  pauseFile() {
-    this.pipe?.pause();
-  }
-
-  resumeFile() {
-    this.pipe?.resume();
-  }
-
-  currentTransfer() {
-    return this.pipe?.current() ?? null;
-  }
-
-  activeFile() {
-    return this.pipe?.active ?? null;
-  }
-
-  incomingFile() {
-    return this.pipe?.incoming ?? null;
-  }
-
-  activeFolder() {
-    return this.pipe?.activeFolder ?? null;
-  }
-
-  incomingFolder() {
-    return this.pipe?.incomingFolder ?? null;
   }
 
   ping() {
