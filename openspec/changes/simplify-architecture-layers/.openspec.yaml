@@ -1,8 +1,10 @@
 schema: spec-driven
 created: 2026-09-23
 skip_specs: true
-# Pure structural / dependency-rule change — no product behavior deltas.
-goal: Document product-facing client map (UI → API → Domain blocks → Transport → Platform) and incremental leak cleanup without rewriting the P2P hub
+# Structural / contracts docs — no product behavior deltas; no src until contracts gate.
+goal: >-
+  Approve product map, document layer/domain contracts (Transport facade + Codec),
+  then only incremental leak cleanup — no code until contracts agreed
 affected_areas:
   - docs/architecture.md
   - src/lib
