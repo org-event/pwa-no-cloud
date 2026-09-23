@@ -25,7 +25,9 @@ dist-ssr
 *.sw?
 
 # Local agent / code intelligence (machine-specific)
-.cursor/
+.cursor/*
+!.cursor/commands/
+!.cursor/commands/**
 .serena/
 .codegraph/
 .agent/

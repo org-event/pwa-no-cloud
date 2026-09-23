@@ -24,6 +24,8 @@ PWA для обмена файлами и папками между устрой
 14. [features-realtime.md](./features-realtime.md) — presence, стук, звонки (задел).
 15. [.github/SECURITY.md](../.github/SECURITY.md) — disclosure + automated security checks.
 16. [CONTRIBUTING.md](../CONTRIBUTING.md) — check/test, PR, security.
+17. [agents/](./agents/) — issue tracker, triage labels, domain docs, [skills](./agents/skills.md), [human merge](./agents/human-merge.md).
+18. [../openspec/](../openspec/) — OpenSpec config + changes (e.g. `changes/simplify-architecture-layers/`).
 
 ## Источники подхода
 

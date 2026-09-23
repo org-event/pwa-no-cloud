@@ -1,0 +1,31 @@
+schema: spec-driven
+
+context: |
+  NoCloud — PWA for peer-to-peer file/voice/video/chat without a cloud.
+  Media plane is WebRTC RTCDataChannel / PeerConnection; the Node relay is
+  control-plane only (signaling, presence, relay discovery, optional TURN).
+  Never put file/media bytes on the relay. OwnedSecret (ADR 0002) owns Ed25519
+  secretKey bytes — no long-lived UI closures over keys.
+  Tooling: pnpm 12.4.1, Vite+ (`vp`), Node 22. Path alias `@/` → `src/`.
+  Domain docs: CONTEXT.md, docs/glossary.md, docs/adr/, docs/architecture.md.
+  Agent triage labels: docs/agents/triage-labels.md (needs-triage, needs-info,
+  ready-for-agent, ready-for-human, wontfix). Merge to main is human-only.
+  Deep modules: src/packages/ + `pnpm run lint:boundaries`.
+
+rules:
+  proposal:
+    - Include Non-goals when the change is structural or cross-cutting
+    - Call out control≠media and OwnedSecret if those areas are touched
+  tasks:
+    - Prefer incremental mechanical steps; no big-bang PeerSession rewrites
+    - Mark discussion/approval gates explicitly before code moves
+
+operations:
+  apply:
+    guidance:
+      - Do not weaken OwnedSecret wipe/lifecycle or put media bytes on the relay
+      - Run `./scripts/pre-pr.sh` before opening a PR
+      - Open draft PRs; never merge to main (human gate)
+  archive:
+    guidance:
+      - Summarize outcome and link the merged PR; update ADR/docs when decisions landed
