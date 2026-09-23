@@ -49,6 +49,12 @@ export default defineConfig({
       'docs/**',
       'design-system/**',
       'deploy/**',
+      // Vendored agent skills / OpenSpec command trees — leave upstream formatting alone.
+      '.agents/**',
+      '.claude/commands/**',
+      '.claude/skills/**',
+      '.cursor/commands/**',
+      'openspec/**',
       'src/workers/shell-sw.js',
     ],
     singleQuote: true,
