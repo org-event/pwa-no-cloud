@@ -11,6 +11,10 @@
     "check": "vp check && pnpm run lint:boundaries",
     "lint:boundaries": "depcruise src/packages",
     "test": "vp test",
+    "pre-pr": "./scripts/pre-pr.sh",
+    "agent-ready": "./scripts/agent-ready.sh",
+    "afk": "./scripts/afk-run.sh",
+    "install-agent-skills": "./scripts/install-agent-skills.sh",
     "prepare": "vp config --hooks --no-agent"
   },
   "dependencies": {

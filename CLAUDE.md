@@ -57,6 +57,16 @@ Thin Node.js relay (plain JS, not the PWA): HTTP poll endpoints (`/join`, `/sign
 
 ## Agent skills
 
+Install/update and AFK scripts: [docs/agents/skills.md](./docs/agents/skills.md). Human merge gate: [docs/agents/human-merge.md](./docs/agents/human-merge.md). Short index: [AGENTS.md](./AGENTS.md).
+
+Skills live under `.agents/skills/` (mattpocock engineering + OpenSpec workflows + local `openspec-workflow` / `ship-from-brief`). OpenSpec root: `openspec/`.
+
+```bash
+./scripts/afk-run.sh              # claim one ready-for-agent issue (no auto-merge)
+./scripts/pre-pr.sh               # check + test before PR
+./scripts/agent-ready.sh list     # list ready-for-agent
+```
+
 ### Issue tracker
 
 GitHub Issues in `org-event/pwa-no-cloud` via `gh`. See `docs/agents/issue-tracker.md`.
