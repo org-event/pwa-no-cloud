@@ -18,10 +18,10 @@
     "@noble/hashes": "^2.4.0",
     "@scure/bip39": "^2.4.0",
     "@vue/runtime-vapor": "3.6.0-rc.8",
-    "pinia": "^4.0.3",
+    "pinia": "^4.1.0",
     "qrcode": "^1.5.4",
     "vue": "3.6.0-rc.8",
-    "ws": "^8.21.3"
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@swc/core": "^1.16.2",
